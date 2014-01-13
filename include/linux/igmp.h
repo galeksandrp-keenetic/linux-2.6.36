@@ -201,6 +201,10 @@ struct ip_mc_list {
 	char			loaded;
 	unsigned char		gsquery;	/* check source marks? */
 	unsigned char		crcount;
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+	__u32	sk_mark;
+#endif
+
 };
 
 /* V3 exponential field decoding */
@@ -213,6 +217,7 @@ struct ip_mc_list {
 #define IGMPV3_QQIC(value) IGMPV3_EXP(0x80, 4, 3, value)
 #define IGMPV3_MRC(value) IGMPV3_EXP(0x80, 4, 3, value)
 
+#ifdef CONFIG_IGMP
 extern int ip_check_mc(struct in_device *dev, __be32 mc_addr, __be32 src_addr, u16 proto);
 extern int igmp_rcv(struct sk_buff *);
 extern int ip_mc_join_group(struct sock *sk, struct ip_mreqn *imr);
@@ -232,9 +237,35 @@ extern void ip_mc_up(struct in_device *);
 extern void ip_mc_down(struct in_device *);
 extern void ip_mc_unmap(struct in_device *);
 extern void ip_mc_remap(struct in_device *);
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+extern void ip_mc_dec_group_tc(struct in_device *in_dev, __be32 addr, __u32 sk_mark);
+extern void ip_mc_inc_group_tc(struct in_device *in_dev, __be32 addr, __u32 sk_mark);
+#endif
 extern void ip_mc_dec_group(struct in_device *in_dev, __be32 addr);
 extern void ip_mc_inc_group(struct in_device *in_dev, __be32 addr);
 extern void ip_mc_rejoin_group(struct ip_mc_list *im);
+#else /* !CONFIG_IGMP */
+#define ip_check_mc(a, b, c, d) (0)
+#define igmp_rcv (0)
+#define ip_mc_join_group(a, b) (0)
+#define ip_mc_leave_group(a, b) (0)
+#define ip_mc_drop_socket(a)
+#define ip_mc_source(a, b, c, d, e) (0)
+#define ip_mc_msfilter(a, b, c) (0)
+#define ip_mc_msfget(a, b, c, d) (0)
+#define ip_mc_gsfget(a, b, c, d) (0)
+#define ip_mc_sf_allow(a, b, c, d) (0)
+#define ip_mc_init_dev(a)
+#define ip_mc_destroy_dev(a)
+#define ip_mc_up(a)
+#define ip_mc_down(a)
+#define ip_mc_unmap(a)
+#define ip_mc_remap(a)
+#define ip_mc_dec_group(a, b)
+#define ip_mc_inc_group(a, b)
+#define ip_mc_rejoin_group(a)
+#endif /* !CONFIG_IGMP */
+
 
 #endif
 #endif

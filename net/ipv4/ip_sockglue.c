@@ -51,6 +51,18 @@
 #define IP_CMSG_PASSSEC		32
 #define IP_CMSG_ORIGDSTADDR     64
 
+#define	CONFIG_TCSUPPORT_IGMP_QOS
+#if defined(CONFIG_TCSUPPORT_IGMP_QOS) || defined(CONFIG_TCSUPPORT_CT_DNSBIND)
+#define IP_CMSG_SKB_MARK    128
+#endif
+
+#ifdef CONFIG_TCSUPPORT_QOS
+/*It's for marking rtp packets*/
+#define	RTP_TOS_VALUE		184
+#define	QOS_HH_PRIORITY		0x10 /*This vaule is the same as QOS_HH_PRIORITY define in sar_tc3162l2.c & tc3262ptm.c*/
+/*End It's for marking rtp packets*/
+#endif
+
 /*
  *	SOL_IP control messages.
  */
@@ -150,6 +162,14 @@ static void ip_cmsg_recv_dstaddr(struct msghdr *msg, struct sk_buff *skb)
 	put_cmsg(msg, SOL_IP, IP_ORIGDSTADDR, sizeof(sin), &sin);
 }
 
+#if defined(CONFIG_TCSUPPORT_IGMP_QOS) || defined(CONFIG_TCSUPPORT_CT_DNSBIND)
+static void ip_cmsg_recv_skbmark(struct msghdr *msg, struct sk_buff *skb)
+{
+	__u32 skb_mark = skb->mark;
+	put_cmsg(msg, SOL_IP, IP_SKB_MARK_FLAG, sizeof(__u32), &skb_mark);
+}
+#endif
+
 void ip_cmsg_recv(struct msghdr *msg, struct sk_buff *skb)
 {
 	struct inet_sock *inet = inet_sk(skb->sk);
@@ -188,6 +208,14 @@ void ip_cmsg_recv(struct msghdr *msg, struct sk_buff *skb)
 		return;
 	if (flags & 1)
 		ip_cmsg_recv_dstaddr(msg, skb);
+
+#if defined(CONFIG_TCSUPPORT_IGMP_QOS) || defined(CONFIG_TCSUPPORT_CT_DNSBIND)
+	if ((flags>>=1) == 0)
+		return;
+	
+	if (flags & 1)
+		ip_cmsg_recv_skbmark(msg, skb);
+#endif
 
 }
 EXPORT_SYMBOL(ip_cmsg_recv);
@@ -465,6 +493,9 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 			     (1<<IP_MTU_DISCOVER) | (1<<IP_RECVERR) |
 			     (1<<IP_ROUTER_ALERT) | (1<<IP_FREEBIND) |
 			     (1<<IP_PASSSEC) | (1<<IP_TRANSPARENT) |
+#if defined(CONFIG_TCSUPPORT_IGMP_QOS) || defined(CONFIG_TCSUPPORT_CT_DNSBIND)
+			 	(1<<IP_SKB_MARK_FLAG) |
+#endif
 			     (1<<IP_MINTTL) | (1<<IP_NODEFRAG))) ||
 	    optname == IP_MULTICAST_TTL ||
 	    optname == IP_MULTICAST_ALL ||
@@ -539,6 +570,14 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 		else
 			inet->cmsg_flags &= ~IP_CMSG_TOS;
 		break;
+#if defined(CONFIG_TCSUPPORT_IGMP_QOS) || defined(CONFIG_TCSUPPORT_CT_DNSBIND)
+	case IP_SKB_MARK_FLAG:
+		if (val)
+			inet->cmsg_flags |=  IP_CMSG_SKB_MARK;
+		else
+			inet->cmsg_flags &= ~IP_CMSG_SKB_MARK;
+		break;
+#endif
 	case IP_RECVOPTS:
 		if (val)
 			inet->cmsg_flags |=  IP_CMSG_RECVOPTS;
@@ -573,6 +612,15 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 			sk->sk_priority = rt_tos2priority(val);
 			sk_dst_reset(sk);
 		}
+		
+#ifdef CONFIG_TCSUPPORT_QOS
+		/*It's for marking rtp packets*/
+		if(val == RTP_TOS_VALUE || val == QOS_RTP_MARK){
+			sk->sk_mark &= (~0xf0);
+			sk->sk_mark |= QOS_HH_PRIORITY;
+		}
+		/*End It's for marking rtp packets*/
+#endif
 		break;
 	case IP_TTL:
 		if (optlen < 1)
@@ -676,6 +724,24 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 		err = 0;
 		break;
 	}
+#if 1//def CONFIG_TCSUPPORT_IGMP_QOS
+	case IP_SKB_MARK:
+	{
+		__u32 skb_mark = 0;
+		if (optlen < sizeof(__u32))
+			goto e_inval;
+		err = -EFAULT;
+		if (copy_from_user(&skb_mark, optval, sizeof(__u32)))
+			break;
+		sk->sk_mark = skb_mark;
+		err = 0;
+	
+		/* dbg_info */
+//		printk("xyz_dbg:%s, skb_mark is %x\n", __FUNCTION__, skb_mark);
+			
+		break;
+	}
+#endif
 
 	case IP_ADD_MEMBERSHIP:
 	case IP_DROP_MEMBERSHIP:
@@ -704,6 +770,7 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 			err = ip_mc_leave_group(sk, &mreq);
 		break;
 	}
+#ifdef CONFIG_IGMP
 	case IP_MSFILTER:
 	{
 		struct ip_msfilter *msf;
@@ -740,6 +807,7 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 		kfree(msf);
 		break;
 	}
+#endif
 	case IP_BLOCK_SOURCE:
 	case IP_UNBLOCK_SOURCE:
 	case IP_ADD_SOURCE_MEMBERSHIP:
@@ -857,6 +925,7 @@ static int do_ip_setsockopt(struct sock *sk, int level,
 				   greqs.gsr_interface);
 		break;
 	}
+#ifdef CONFIG_IGMP
 	case MCAST_MSFILTER:
 	{
 		struct sockaddr_in *psin;
@@ -922,6 +991,7 @@ mc_msf_out:
 		kfree(gsf);
 		break;
 	}
+#endif
 	case IP_MULTICAST_ALL:
 		if (optlen < 1)
 			goto e_inval;
@@ -1100,6 +1170,11 @@ static int do_ip_getsockopt(struct sock *sk, int level, int optname,
 	case IP_PKTINFO:
 		val = (inet->cmsg_flags & IP_CMSG_PKTINFO) != 0;
 		break;
+#if defined(CONFIG_TCSUPPORT_IGMP_QOS) || defined(CONFIG_TCSUPPORT_CT_DNSBIND)
+	case IP_SKB_MARK_FLAG:
+		val = (inet->cmsg_flags & IP_CMSG_SKB_MARK) != 0;
+		break;
+#endif
 	case IP_RECVTTL:
 		val = (inet->cmsg_flags & IP_CMSG_TTL) != 0;
 		break;
@@ -1172,6 +1247,25 @@ static int do_ip_getsockopt(struct sock *sk, int level, int optname,
 			return -EFAULT;
 		return 0;
 	}
+#if 1//def CONFIG_TCSUPPORT_IGMP_QOS || defined(CONFIG_TCSUPPORT_REDIRECT_PORTMASK)
+	case IP_SKB_MARK:
+	{
+		__u32 skb_mark = 0;
+		len = sizeof(__u32);
+		skb_mark = sk->sk_mark;
+		release_sock(sk);
+	
+		/* dbg_info */
+//		printk("xyz_dbg:%s, skb_mark is %x\n", __FUNCTION__, skb_mark);
+			
+		if (put_user(len, optlen))
+			return -EFAULT;
+		if (copy_to_user(optval, &skb_mark, len))
+			return -EFAULT;
+		return 0;
+	}	
+#endif
+
 	case IP_MSFILTER:
 	{
 		struct ip_msfilter msf;

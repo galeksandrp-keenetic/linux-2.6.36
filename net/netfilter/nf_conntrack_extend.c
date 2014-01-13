@@ -68,11 +68,14 @@ nf_ct_ext_create(struct nf_ct_ext **ext, enum nf_ct_ext_id id, gfp_t gfp)
 	return (void *)(*ext) + off;
 }
 
-static void __nf_ct_ext_free_rcu(struct rcu_head *head)
+/*static */void __nf_ct_ext_free_rcu(struct rcu_head *head)
 {
 	struct nf_ct_ext *ext = container_of(head, struct nf_ct_ext, rcu);
 	kfree(ext);
 }
+/* add by donglei */
+EXPORT_SYMBOL_GPL(__nf_ct_ext_free_rcu);
+
 
 void *__nf_ct_ext_add(struct nf_conn *ct, enum nf_ct_ext_id id, gfp_t gfp)
 {

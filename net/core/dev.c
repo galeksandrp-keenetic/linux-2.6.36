@@ -98,6 +98,9 @@
 #include <net/net_namespace.h>
 #include <net/sock.h>
 #include <linux/rtnetlink.h>
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+#include <linux/imq.h>
+#endif
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
 #include <linux/stat.h>
@@ -131,6 +134,18 @@
 #include <linux/pci.h>
 
 #include "net-sysfs.h"
+#ifdef CONFIG_QOS
+#include <linux/ip.h>
+#include <linux/if_pppox.h>
+#ifdef CONFIG_IPV6
+#include <linux/ipv6.h>
+#include <net/dsfield.h>
+#endif
+#include <linux/netfilter.h>
+#include <linux/if_vlan.h>
+#include <linux/qos_type.h>
+#endif
+
 
 /* Instead of increasing this, you should create a hash table. */
 #define MAX_GRO_SKBS 8
@@ -168,11 +183,63 @@
 
 #define PTYPE_HASH_SIZE	(16)
 #define PTYPE_HASH_MASK	(PTYPE_HASH_SIZE - 1)
+#if !defined(CONFIG_TCSUPPORT_CT)	
+#if defined(CONFIG_TCSUPPORT_BRIDGE_FASTPATH)
+int (*hook_bridge_shortcut_process)(struct net_device *net_dev, struct sk_buff *skb);
+EXPORT_SYMBOL(hook_bridge_shortcut_process);
+void (*hook_dev_shortcut_learn)(struct sk_buff *skb, struct net_device *dev);
+EXPORT_SYMBOL(hook_dev_shortcut_learn);
+#endif
+#endif
+
+#if defined(TC_SUPPORT_3G) && defined(TR068_LED)
+void (*Dongle_InternetLed_hook)(void);
+EXPORT_SYMBOL(Dongle_InternetLed_hook);
+#endif
+
+#ifdef CONFIG_SMUX
+int (*smux_pkt_recv_hook)(struct sk_buff *skb, 
+                  struct net_device *dev,
+                  struct net_device *rdev);
+EXPORT_SYMBOL(smux_pkt_recv_hook);
+#endif
+
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+/*use for set voip rx port in application, shnwind add 20110215.*/
+unsigned short int voip_rx_port[VOIP_RX_PORT_NUM] = {0};
+EXPORT_SYMBOL(voip_rx_port);
+char downstream_qos_enable = 0;
+EXPORT_SYMBOL(downstream_qos_enable);
+#endif
 
 static DEFINE_SPINLOCK(ptype_lock);
 static struct list_head ptype_base[PTYPE_HASH_SIZE] __read_mostly;
 static struct list_head ptype_all __read_mostly;	/* Taps */
+#ifdef CONFIG_TCSUPPORT_VLAN_TAG
+int (*remove_vtag_hook)(struct sk_buff *skb, struct net_device *dev);
+int (*insert_vtag_hook)(struct sk_buff **pskb);
+//#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
+int (*check_vtag_hook)(void);
+//#endif
+int (*get_vtag_hook)(struct net_device *dev, struct sk_buff *skb);
+EXPORT_SYMBOL(remove_vtag_hook);
+EXPORT_SYMBOL(insert_vtag_hook);
+//#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
+EXPORT_SYMBOL(check_vtag_hook);
+//#endif
+EXPORT_SYMBOL(get_vtag_hook);
+#endif
 
+
+#ifdef CONFIG_QOS
+#ifdef CONFIG_TCSUPPORT_SBTHROUGHPUT_ENHANCE
+int tc_qos_switch = 0;
+#endif
+#endif
+
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
+extern void tc3162wdog_kick(void);
+#endif
 /*
  * The @dev_base_head list is protected by @dev_base_lock and the rtnl
  * semaphore.
@@ -398,6 +465,34 @@ void dev_add_pack(struct packet_type *pt)
 	spin_unlock_bh(&ptype_lock);
 }
 EXPORT_SYMBOL(dev_add_pack);
+
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+//check if type already in the list.
+//return: 0:yes 1:no
+int pon_check_pack(__u16 type)
+{
+	struct list_head *head;
+	struct packet_type *pt1;
+
+	spin_lock_bh(&ptype_lock);
+	if (type == htons(ETH_P_ALL))
+		head = &ptype_all;
+	else
+		head = &ptype_base[ntohs(type) & 15];
+
+	list_for_each_entry(pt1, head, list) 
+	{
+		if (type == pt1->type)
+		{
+			spin_unlock_bh(&ptype_lock);
+			return 0;
+		}
+	}
+	spin_unlock_bh(&ptype_lock);
+	return 1;
+}
+EXPORT_SYMBOL(pon_check_pack);
+#endif
 
 /**
  *	__dev_remove_pack	 - remove packet handler
@@ -1521,7 +1616,11 @@ static void dev_queue_xmit_nit(struct sk_buff *skb, struct net_device *dev)
 		if ((ptype->dev == dev || !ptype->dev) &&
 		    (ptype->af_packet_priv == NULL ||
 		     (struct sock *)ptype->af_packet_priv != skb->sk)) {
+#if defined(CONFIG_TCSUPPORT_HWNAT)		
+			struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC | GFP_SKIP_PKTFLOW);
+#else
 			struct sk_buff *skb2 = skb_clone(skb, GFP_ATOMIC);
+#endif
 			if (!skb2)
 				break;
 
@@ -1935,14 +2034,17 @@ static inline int skb_needs_linearize(struct sk_buff *skb,
 					      illegal_highdma(dev, skb))));
 }
 
-int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev,
+__IMEM int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev,
 			struct netdev_queue *txq)
 {
 	const struct net_device_ops *ops = dev->netdev_ops;
 	int rc = NETDEV_TX_OK;
-
 	if (likely(!skb->next)) {
-		if (!list_empty(&ptype_all))
+		if (!list_empty(&ptype_all)
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+			&& !(skb->imq_flags & IMQ_F_ENQUEUE)
+#endif
+		   )
 			dev_queue_xmit_nit(skb, dev);
 
 		/*
@@ -1976,6 +2078,13 @@ int dev_hard_start_xmit(struct sk_buff *skb, struct net_device *dev,
 					goto out_kfree_skb;
 			}
 		}
+#if !defined(CONFIG_TCSUPPORT_CT)
+#if defined(CONFIG_TCSUPPORT_BRIDGE_FASTPATH)
+		if(hook_dev_shortcut_learn){
+			hook_dev_shortcut_learn(skb, dev);
+		}
+#endif	
+#endif
 
 		rc = ops->ndo_start_xmit(skb, dev);
 		if (rc == NETDEV_TX_OK)
@@ -2018,6 +2127,83 @@ out_kfree_skb:
 	return rc;
 }
 
+#ifdef CONFIG_QOS
+static inline __be16 vlan_proto(const struct sk_buff *skb)
+{
+	return vlan_eth_hdr(skb)->h_vlan_encapsulated_proto;
+}
+static inline __be16 pppoe_proto(const struct sk_buff *skb)
+{
+	return *((__be16 *)(skb_mac_header(skb) + ETH_HLEN + sizeof(struct pppoe_hdr)));
+}
+
+u32 qos_queue_mask = 0;
+#endif
+
+
+#if !defined(CONFIG_TCSUPPORT_CT) 
+
+#ifdef CONFIG_PORT_BINDING
+int (*portbind_sw_hook)(void);
+int (*portbind_check_hook)(char *inIf, char *outIf);
+EXPORT_SYMBOL(portbind_sw_hook);
+EXPORT_SYMBOL(portbind_check_hook);
+#endif
+#endif
+
+#ifdef CONFIG_TCSUPPORT_EPON_MAPPING
+int (*epon_sfu_mapping_hook)(struct sk_buff *skb, int port);
+int (*epon_hgu_mapping_hook)(struct sk_buff *skb);
+EXPORT_SYMBOL(epon_sfu_mapping_hook);
+EXPORT_SYMBOL(epon_hgu_mapping_hook);
+
+#endif
+
+#ifdef CONFIG_TCSUPPORT_GPON_MAPPING
+int (*gpon_mapping_hook)(struct sk_buff *pskb);
+int (*xpon_mode_get_hook)(void);
+
+EXPORT_SYMBOL(gpon_mapping_hook);
+EXPORT_SYMBOL(xpon_mode_get_hook);
+
+#if defined(CONFIG_TCSUPPORT_GPON_DOWNSTREAM_MAPPING)
+int (*gpon_downstream_mapping_hook)(struct sk_buff *skb);
+int (*gpon_downstream_mapping_stag_hook)(struct sk_buff *skb);
+EXPORT_SYMBOL(gpon_downstream_mapping_hook);
+EXPORT_SYMBOL(gpon_downstream_mapping_stag_hook);
+
+#endif
+#endif
+
+
+#define MODE_HGU 0
+#define MODE_SFU 1
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+int (*pon_insert_tag_hook)(struct sk_buff **pskb);
+int (*pon_vlan_get_mode_hook)(void);
+int (*pon_store_tag_hook)(struct sk_buff *skb, struct net_device *dev);
+int (*pon_check_vlan_hook)(struct net_device *dev, struct sk_buff *skb);
+int (*pon_check_tpid_hook)(__u16 * buf);
+int (*pon_check_user_group_hook)(struct sk_buff *skb);
+int (*pon_PCP_decode_hook)(struct sk_buff **pskb);
+
+EXPORT_SYMBOL(pon_insert_tag_hook);
+EXPORT_SYMBOL(pon_vlan_get_mode_hook);
+EXPORT_SYMBOL(pon_store_tag_hook);
+EXPORT_SYMBOL(pon_check_vlan_hook);
+EXPORT_SYMBOL(pon_check_tpid_hook);
+EXPORT_SYMBOL(pon_check_user_group_hook);
+EXPORT_SYMBOL(pon_PCP_decode_hook);
+#endif
+#ifdef CONFIG_TCSUPPORT_PON_MAC_FILTER
+int (*pon_check_mac_hook)(struct sk_buff *skb);
+int (*pon_mac_filter_get_mode_hook)(void);
+
+EXPORT_SYMBOL(pon_check_mac_hook);
+EXPORT_SYMBOL(pon_mac_filter_get_mode_hook);
+#endif
+
+
 static u32 hashrnd __read_mostly;
 
 u16 skb_tx_hash(const struct net_device *dev, const struct sk_buff *skb)
@@ -2054,8 +2240,7 @@ static inline u16 dev_cap_txqueue(struct net_device *dev, u16 queue_index)
 	return queue_index;
 }
 
-static struct netdev_queue *dev_pick_tx(struct net_device *dev,
-					struct sk_buff *skb)
+struct netdev_queue *dev_pick_tx(struct net_device *dev, struct sk_buff *skb)
 {
 	int queue_index;
 	const struct net_device_ops *ops = dev->netdev_ops;
@@ -2084,6 +2269,7 @@ static struct netdev_queue *dev_pick_tx(struct net_device *dev,
 	skb_set_queue_mapping(skb, queue_index);
 	return netdev_get_tx_queue(dev, queue_index);
 }
+EXPORT_SYMBOL(dev_pick_tx);
 
 static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
 				 struct net_device *dev,
@@ -2168,12 +2354,269 @@ static inline int __dev_xmit_skb(struct sk_buff *skb, struct Qdisc *q,
  *      the BH enable code must have IRQs enabled so that it will not deadlock.
  *          --BLG
  */
-int dev_queue_xmit(struct sk_buff *skb)
+__IMEM int dev_queue_xmit(struct sk_buff *skb)
 {
 	struct net_device *dev = skb->dev;
 	struct netdev_queue *txq;
 	struct Qdisc *q;
 	int rc = -ENOMEM;
+#ifdef CONFIG_PORT_BINDING	
+	int portbind_ret = NULL;
+#endif
+#ifdef CONFIG_QOS
+	u32 queue_num = 0;
+	/* add for ppp & dhcp QoS */
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+	u8 *cp = NULL;
+	u16 etherType = 0;
+	u16 pppProtocol = 0;
+	
+	struct iphdr *ih = NULL;
+#ifdef CONFIG_IPV6
+	struct ipv6hdr *ih6 = NULL;
+#endif
+	unsigned int /*ifidx,*/ newtos = 0, oldtos = 0;
+	int ret = 0, rule_no = 0, rtp_match = 0;
+#endif
+#endif
+#if defined(CONFIG_TCSUPPORT_PON_VLAN)
+	int vlan_mode = MODE_HGU;
+#endif
+#if defined(CONFIG_TCSUPPORT_PON_MAC_FILTER)
+	int mac_filter_mode = MODE_HGU;
+#endif
+
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	if(pon_vlan_get_mode_hook)
+		vlan_mode = pon_vlan_get_mode_hook();
+#endif
+#if defined(CONFIG_TCSUPPORT_PON_MAC_FILTER)
+	if(pon_mac_filter_get_mode_hook)
+		mac_filter_mode = pon_mac_filter_get_mode_hook();
+#endif
+
+
+#if !defined(CONFIG_TCSUPPORT_CT) 
+#ifdef CONFIG_PORT_BINDING
+/*
+	if ((portbind_sw_hook) && (portbind_sw_hook() == 1) && ((skb->portbind_mark & MASK_OUT_DEV) == 0)) {
+		if ((portbind_check_hook) && (portbind_check_hook(skb->orig_dev_name, skb->dev->name) == 0)) {
+			//printk("dev_queue_xmit: checkGroup will free skb, skb orig dev is [%s] outgoing dev is [%s]\n", skb->orig_dev_name, skb->dev->name);
+			goto out_kfree_skb;
+		}
+		else {
+			if ('b' != skb->dev->name[0]) {
+				skb->portbind_mark |= MASK_OUT_DEV;
+			}
+		}
+	}
+*/
+	#if defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
+		if ((portbind_sw_hook) && ((skb->portbind_mark & MASK_OUT_DEV) == 0)) {
+	#else
+		if ((portbind_sw_hook) && (portbind_sw_hook() == 1) && ((skb->portbind_mark & MASK_OUT_DEV) == 0)) {
+	#endif
+		if (portbind_check_hook) {
+			//only need check once. shnwind 20110407.
+			portbind_ret = portbind_check_hook(skb->orig_dev_name, skb->dev->name);
+			if(portbind_ret == 0){
+				goto out_kfree_skb;
+			}else if(portbind_ret == 1){
+				skb->portbind_mark |= MASK_OUT_DEV;	
+			}
+#if 0	
+			if (portbind_check_hook(skb->orig_dev_name, skb->dev->name) == 0) 
+				goto out_kfree_skb;
+			else if (portbind_check_hook(skb->orig_dev_name, skb->dev->name) == 1) 
+				skb->portbind_mark |= MASK_OUT_DEV;
+#endif				
+			/* else check again */
+		}
+	}
+#endif
+
+#endif
+	
+#if defined(CONFIG_TCSUPPORT_PON_VLAN) && defined(CONFIG_TCSUPPORT_PON_USER_ISOLATION)
+	if(pon_check_user_group_hook)
+	{
+		if(pon_check_user_group_hook(skb) == -1)
+			return rc;
+	}
+#endif
+
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	if(vlan_mode == MODE_HGU)
+#endif
+	{
+	#ifdef CONFIG_TCSUPPORT_VLAN_TAG
+	if (check_vtag_hook && (check_vtag_hook()) == 1)
+	{
+
+		if (insert_vtag_hook && (-1 == insert_vtag_hook(&skb)))
+		{
+			kfree_skb(skb);
+			return rc;
+		}
+	}
+	#endif
+	
+	}
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	if(vlan_mode == MODE_SFU)
+	{
+	/* packet from cpe */
+	if (skb->original_dev == NULL) {
+		skb->pon_vlan_flag |= PON_PKT_FROM_CPE;
+	}
+	}
+	else
+	{
+		if(strcmp(skb->dev->name,"pon") == 0)
+			skb->pon_vlan_flag |= PON_VLAN_TX_CALL_HOOK;
+	}
+	if(pon_insert_tag_hook)
+	{
+		if(pon_insert_tag_hook(&skb) == -1)
+		{
+			kfree_skb(skb);
+			return rc;
+		}
+	}
+	if(pon_check_vlan_hook && (pon_check_vlan_hook(dev,skb) != 1))
+		return rc;
+#endif
+#ifdef CONFIG_TCSUPPORT_PON_MAC_FILTER 
+	if(pon_check_mac_hook)
+	{
+		if(mac_filter_mode == MODE_SFU && (skb->dev->name[0] == 'e' || skb->dev->name[0] == 'r' || skb->dev->name[0] == 'u'))
+			skb->pon_mac_filter_flag |= PON_MAC_FILTER_TX_CALL_HOOK;
+		if(pon_check_mac_hook(skb) == -1)
+		{
+			kfree_skb(skb);
+			return rc;
+		}
+	}
+#endif
+#if defined(CONFIG_TCSUPPORT_GPON_DOWNSTREAM_MAPPING)
+	if(gpon_downstream_mapping_hook && (-1 == gpon_downstream_mapping_hook(skb)))
+		return rc;
+#endif
+
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	//decode after mapping
+	if(pon_PCP_decode_hook)
+	{
+		if(pon_PCP_decode_hook(&skb) == -1)
+			return rc;
+	}
+#endif
+
+#ifdef CONFIG_QOS
+#ifdef CONFIG_TCSUPPORT_SBTHROUGHPUT_ENHANCE
+		if(1 == tc_qos_switch)
+		{
+#endif
+			queue_num = (skb->mark & QOS_FILTER_MARK) >> 4;
+			if (qos_queue_mask && (queue_num > 0 && queue_num < 7) && (qos_queue_mask & (1 << (queue_num - 1)))) {
+//				printk("%s:free skb for this skb is to 0 bindwidth queue.", __FUNCTION__);
+				goto out_kfree_skb;
+			}
+	
+			
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+			if ( skb->imq_flags & IMQ_F_ENQUEUE ) {
+				skb->imq_flags &= ~IMQ_F_ENQUEUE;	
+				/*start no queue marked packets to default queue*/
+				if ( !(skb->mark & QOS_FILTER_MARK) ) {
+					skb->mark |= QOS_PRIORITY_DEFAULT;
+				}
+			}
+	
+			/* set ppp & dhcp packet to highest prioty */
+			cp = skb->data;
+			cp += 12;
+			etherType = *(u16*)cp;
+			cp += 2;
+			if (etherType == 0x8863) {
+				skb->mark &= ~(0xF0);
+				skb->mark |= 0x10;
+			}
+			else if (etherType == 0x8864) {
+				/* skip pppoe head */
+				cp += 6;					/* 6: PPPoE header 2: PPP protocol */
+				/* get ppp protocol */
+				pppProtocol = *(u16 *) cp;
+				/* check if LCP protocol */
+				if (pppProtocol == 0xc021 || 
+					pppProtocol == 0xc023 || 
+					pppProtocol == 0xc025 || 
+					pppProtocol == 0x8021 || 
+					pppProtocol == 0xc223) {
+					skb->mark &= ~(0xF0);
+					skb->mark |= 0x10;
+				}
+			} 
+			else {
+				/* check dhcp packet, set it to first queue */
+				cp = skb->data;
+				cp += 23;
+				if (*cp == 0x11) { /* udp */
+					cp += 12;
+					if (*cp == 0x43 || *cp == 0x44) { /* udp port is 67 or 68 */
+						skb->mark &= ~(0xF0);
+						skb->mark |= 0x10;
+					}
+				}
+			}
+			
+			
+			if (skb->mark & QOS_RTP_MARK) {
+				rtp_match = 1;
+			}
+			else {
+				rtp_match = 0;
+			}
+			
+			if (skb->mark & QOS_RULE_INDEX_MARK) {
+				rule_no = (skb->mark & QOS_RULE_INDEX_MARK) >> 12;
+				skb->mark &= ~QOS_RULE_INDEX_MARK;
+				if (0 == qostype_chk(DEV_XMIT_CHK_TYPE, rule_no, dev->name, rtp_match)) {
+					ret = get_tos(rule_no, &newtos);
+					if (0 == ret) {
+						if ( (skb->protocol == htons(ETH_P_IP)) || 
+							 (skb->protocol == htons(ETH_P_8021Q) && vlan_proto(skb) == htons(ETH_P_IP)) ) {
+							ih = (struct iphdr *)(skb->network_header);
+							oldtos = ih->tos;
+							if ( skb_make_writable(&skb, sizeof(struct iphdr)) ) {
+								ih->tos = (unsigned char)newtos;
+								csum_replace2(&ih->check, htons(oldtos), htons(ih->tos));
+							}
+						}
+				#ifdef CONFIG_IPV6
+						else if ( (skb->protocol == htons(ETH_P_IPV6)) ||
+								  (skb->protocol == htons(ETH_P_8021Q) && vlan_proto(skb) == htons(ETH_P_IPV6)) ) {
+							ih6 = (struct ipv6hdr *)(skb->network_header);
+							if ( skb_make_writable(&skb, sizeof(struct ipv6hdr)) ) {
+								ipv6_change_dsfield( ih6, 0xFF, (unsigned char)newtos );								
+							}
+						}
+				#endif
+					}
+				}
+				else {
+					/* wan if not match */
+					skb->mark &= ~QOS_FILTER_MARK;
+					skb->mark |= QOS_PRIORITY_DEFAULT;
+					/* clear 802.1p mark */
+					skb->mark &= ~QOS_DOT1P_MARK;
+				}
+			}
+#endif
+#ifdef CONFIG_TCSUPPORT_SBTHROUGHPUT_ENHANCE
+		}
+#endif
+#endif
 
 	/* Disable soft irqs for various locks below. Also
 	 * stops preemption for RCU.
@@ -2233,6 +2676,9 @@ int dev_queue_xmit(struct sk_buff *skb)
 	rc = -ENETDOWN;
 	rcu_read_unlock_bh();
 
+#if defined (CONFIG_PORT_BINDING) || defined(CONFIG_QOS)
+out_kfree_skb:
+#endif
 	kfree_skb(skb);
 	return rc;
 out:
@@ -2246,10 +2692,10 @@ EXPORT_SYMBOL(dev_queue_xmit);
 			Receiver routines
   =======================================================================*/
 
-int netdev_max_backlog __read_mostly = 1000;
-int netdev_tstamp_prequeue __read_mostly = 1;
-int netdev_budget __read_mostly = 300;
-int weight_p __read_mostly = 64;            /* old backlog weight */
+__DMEM int netdev_max_backlog __read_mostly = 1000;
+__DMEM int netdev_tstamp_prequeue __read_mostly = 1;
+__DMEM int netdev_budget __read_mostly = 300;
+__DMEM int weight_p __read_mostly = 64;            /* old backlog weight */
 
 /* Called with irq disabled */
 static inline void ____napi_schedule(struct softnet_data *sd,
@@ -2486,6 +2932,98 @@ enqueue:
 	return NET_RX_DROP;
 }
 
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+int isVoipPacket(unsigned char *ip_header){
+	unsigned short int skb_port;
+	unsigned char protocol;
+	int i;
+
+	if(ip_header == NULL){
+		return 0;	
+	}
+
+	protocol  = *((unsigned char *)(ip_header + 9));
+	skb_port = *((unsigned short int *)(ip_header + 22));
+
+	//printk("VoIP packet %d %d\n",protocol, skb_port);
+	if(skb_port == 5060){
+		return 1;	
+	}
+
+	//check rtp port
+	for(i=0;i<VOIP_RX_PORT_NUM;i++){
+		if(voip_rx_port[i] != 0){
+			if((protocol == 0x11) && (skb_port == voip_rx_port[i])){//only UDP
+				return 1;
+			}	
+		}
+	}	
+
+	return 0;
+}
+int isDHCPPacket(unsigned char *ip_header){
+	unsigned short int skb_src_port, skb_dst_port;
+
+	if(ip_header == NULL){
+		return 0;	
+	}
+
+	skb_dst_port = *((unsigned short int *)(ip_header + 22));
+	skb_src_port = *((unsigned short int *)(ip_header + 20));
+	
+	//printk("DHCP %d %d\n",skb_dst_port, skb_src_port);
+	if(((skb_dst_port == 68) || (skb_src_port == 68)) //CPE is client
+		||((skb_dst_port == 67) || (skb_src_port == 67))) //CPE is server
+	{
+		return 1;	
+	}
+	return 0;
+}
+int isPPPPacket(unsigned char *mac_header){
+	unsigned short int ether_protocol, p2p_protocol;
+
+	if(mac_header == NULL){
+		return 0;	
+	}
+	
+	ether_protocol = *((unsigned short int *)(mac_header + 12));
+
+	//printk("PPP eth %x p2p %x\n",*((unsigned short int *)(mac_header + 12)), *((unsigned short int *)(mac_header + 20)));
+	if(ether_protocol == 0x8863)//pppoe discovery
+	{
+		return 1;
+	}
+	else if(ether_protocol == 0x8864)//pppoe session
+	{	
+		p2p_protocol = *((unsigned short int *)(mac_header + 20));
+		if((p2p_protocol == 0xc021) //LCP
+			|| (p2p_protocol == 0xc223) //CHAP
+			|| (p2p_protocol == 0xc023) //PAP
+			|| (p2p_protocol == 0x8021)) //IPCP 0x8021?
+		{
+			return 1;	
+		}
+	}
+	return 0;
+}
+int isMulticastPacket(unsigned char *ip_header){
+	unsigned char skb_dst_ip_hi;
+
+	if(ip_header == NULL){
+		return 0;	
+	}
+
+	skb_dst_ip_hi = *((unsigned char *)(ip_header + 16));
+	//printk("Multicast %x\n",skb_dst_ip_hi);
+	if((skb_dst_ip_hi & 0xf0) == 0xe0){
+		return 1;	
+	}
+	return 0;
+}
+
+#endif
+
+
 /**
  *	netif_rx	-	post buffer to the network code
  *	@skb: buffer to post
@@ -2501,9 +3039,17 @@ enqueue:
  *
  */
 
-int netif_rx(struct sk_buff *skb)
+__IMEM int netif_rx(struct sk_buff *skb)
 {
 	int ret;
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+	struct softnet_data  *queue = NULL;
+	unsigned long flags = 0;
+	unsigned char *mac_header = NULL;
+	unsigned char *ip_header = NULL;
+	int total_queue_len = 0;
+	int  i = 0;
+#endif
 
 	/* if netpoll wants it, pretend we never saw it */
 	if (netpoll_rx(skb))
@@ -2512,6 +3058,80 @@ int netif_rx(struct sk_buff *skb)
 	if (netdev_tstamp_prequeue)
 		net_timestamp_check(skb);
 
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+	if(downstream_qos_enable){
+	local_irq_save(flags);
+	queue = &per_cpu(softnet_data, get_cpu());
+
+	//caclute total queue len
+	total_queue_len = queue->input_pkt_queue.qlen;
+	for( i = 0 ; i < PRIORITY_QUEUE_NUM; i++){
+		total_queue_len += queue->pri_queue[i].qlen;
+	}
+	if(total_queue_len <= netdev_max_backlog){
+		if(total_queue_len == 0){
+			//no packet in queue. wackup net_rx_action.
+			if (!__test_and_set_bit(NAPI_STATE_SCHED, &queue->backlog.state)) {
+				if (!rps_ipi_queued(queue))
+					____napi_schedule(queue, &queue->backlog);
+			}
+		}
+		//dev_hold(skb->dev);
+		//if enable, check each packet for each priority queue. shnwind 20110415.
+
+		mac_header = (unsigned char *)eth_hdr(skb);
+		ip_header = (unsigned char *)(skb->data);
+		if(mac_header != NULL){ //check vlan_tag
+			
+			if(*((unsigned short int *)(mac_header + 12)) == 0x8100){
+				mac_header += 4;
+				ip_header += 4;
+				if(*((unsigned short int *)(mac_header + 12)) == 0x8100){
+					mac_header += 4;
+					ip_header += 4;
+				}
+			}
+		}
+		
+		//check first priority
+		if(isVoipPacket(ip_header)
+			|| isDHCPPacket(ip_header)
+			|| isPPPPacket(mac_header)
+			)
+		{	
+			__skb_queue_tail(&queue->pri_queue[0], skb);
+			goto exit;
+		}
+			
+		//check second priority
+		if(isMulticastPacket(ip_header))
+		{
+			__skb_queue_tail(&queue->pri_queue[1], skb);
+			goto exit;
+		}
+
+		//check third priority
+
+
+
+		}
+		//lowest priority , original backlog queue.
+		__skb_queue_tail(&queue->input_pkt_queue, skb);
+		goto exit;
+	
+	queue->dropped++;
+	local_irq_restore(flags);
+
+	kfree_skb(skb);
+	put_cpu();
+	return NET_RX_DROP;
+exit:
+	local_irq_restore(flags);
+	put_cpu();
+	return NET_RX_SUCCESS;
+	}
+	else{//downstream qos disable
+#endif
 #ifdef CONFIG_RPS
 	{
 		struct rps_dev_flow voidflow, *rflow = &voidflow;
@@ -2536,8 +3156,15 @@ int netif_rx(struct sk_buff *skb)
 		put_cpu();
 	}
 #endif
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+		}
+#endif
+
 	return ret;
+
+
 }
+
 EXPORT_SYMBOL(netif_rx);
 
 int netif_rx_ni(struct sk_buff *skb)
@@ -2824,7 +3451,27 @@ static int __netif_receive_skb(struct sk_buff *skb)
 	struct net_device *orig_or_bond;
 	int ret = NET_RX_DROP;
 	__be16 type;
+#if defined(CONFIG_TCSUPPORT_PON_VLAN)
+	int vlan_mode = MODE_HGU;
+#endif
+#if defined(CONFIG_TCSUPPORT_PON_MAC_FILTER)
+	int mac_filter_mode = MODE_HGU;
+#endif
+	
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	if(pon_vlan_get_mode_hook)
+		vlan_mode = pon_vlan_get_mode_hook();
+#endif
+#if defined(CONFIG_TCSUPPORT_PON_MAC_FILTER)
+	if(pon_mac_filter_get_mode_hook)
+		mac_filter_mode = pon_mac_filter_get_mode_hook();
+#endif
 
+	if(skb->dev->reg_state!=NETREG_REGISTERED){
+	//	printk("xflu:: drop packet from %s\n",skb->dev->name);
+		kfree_skb(skb);
+		return NET_RX_DROP;
+	}
 	if (!netdev_tstamp_prequeue)
 		net_timestamp_check(skb);
 
@@ -2858,6 +3505,103 @@ static int __netif_receive_skb(struct sk_buff *skb)
 		} else
 			skb->dev = master;
 	}
+	
+#if !defined(CONFIG_TCSUPPORT_CT)
+#if defined(CONFIG_TCSUPPORT_BRIDGE_FASTPATH)
+		if(hook_bridge_shortcut_process)
+		{
+			if( hook_bridge_shortcut_process(skb->dev, skb) ){
+				return NET_RX_DROP;
+			}	
+		}
+#endif
+#endif
+
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	if((orig_dev->name[0] == 'r' || orig_dev->name[0] == 'u' || orig_dev->name[0] == 'e') && vlan_mode == MODE_SFU)
+	{
+		skb->pon_vlan_flag |= PON_PKT_FROM_LAN;
+	}
+	else if(strcmp(orig_dev->name,"pon") == 0 && vlan_mode == MODE_SFU)
+	{
+		skb->pon_vlan_flag |= PON_PKT_FROM_WAN;
+	}
+	skb->original_dev = skb->dev;
+#endif
+
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	if(pon_insert_tag_hook && vlan_mode == MODE_HGU)
+	{
+		if(strcmp(orig_dev->name,"pon") == 0)
+			skb->pon_vlan_flag |= PON_VLAN_RX_CALL_HOOK;
+		if(pon_insert_tag_hook(&skb) == -1)
+		{
+			kfree_skb(skb);
+			return NET_RX_DROP;
+		}
+	}
+#endif
+#ifdef CONFIG_TCSUPPORT_PON_MAC_FILTER 
+	if(pon_check_mac_hook && mac_filter_mode == MODE_HGU)
+	{
+		if(strcmp(orig_dev->name,"pon") == 0)
+			skb->pon_mac_filter_flag |= PON_MAC_FILTER_RX_CALL_HOOK;
+		if(pon_check_mac_hook(skb) == -1)
+		{
+			kfree_skb(skb);
+			return NET_RX_DROP;
+		}
+	}
+#endif
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	if(vlan_mode == MODE_HGU)
+#endif
+	{
+	#ifdef CONFIG_TCSUPPORT_VLAN_TAG
+	//#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
+	if (check_vtag_hook && (check_vtag_hook() == 1))
+	//#endif
+	{
+		if (get_vtag_hook)
+			if (-1 == get_vtag_hook(orig_dev, skb)) {
+				kfree_skb(skb);
+				return NET_RX_DROP;
+			}
+	}
+	#endif
+	}
+#if !defined(CONFIG_TCSUPPORT_CT) 
+#ifdef CONFIG_PORT_BINDING
+#if defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
+	if (portbind_sw_hook) {
+#else
+	if (portbind_sw_hook && (portbind_sw_hook() == 1)) {
+#endif
+#ifdef CONFIG_SMUX
+	 /*we only check OSMUX interface and other interface*/
+	 //if((orig_dev->priv_flags & IFF_RSMUX) == 0)
+ 	//if((orig_dev->name[0] != 'n') || (orig_dev->priv_flags & IFF_OSMUX))
+	 //{
+		if( (orig_dev->priv_flags & IFF_OSMUX) || (skb->portbind_mark & MASK_ORIGIN_DEV) == 0)
+		{
+			skb->portbind_mark |= MASK_ORIGIN_DEV;
+			memcpy(skb->orig_dev_name, orig_dev->name, IFNAMSIZ);
+			//printk("netif_receive_skb: CONFIG_SMUX origin name is [%s], skb device name is [%s]\n", skb->orig_dev_name, skb->dev->name);
+		}
+
+	 //}
+#else
+	if( (skb->portbind_mark & MASK_ORIGIN_DEV) == 0)
+	{
+		skb->portbind_mark |= MASK_ORIGIN_DEV;
+		memcpy(skb->orig_dev_name, orig_dev->name, IFNAMSIZ);
+		//printk("netif_receive_skb: begin orig_dev name is [%s], skb device name is [%s]\n", skb->orig_dev_name, skb->dev->name);
+	}
+#endif
+	}
+#endif
+#endif
+
 
 	__this_cpu_inc(softnet_data.processed);
 	skb_reset_network_header(skb);
@@ -2911,6 +3655,24 @@ ncls:
 		if (!skb)
 			goto out;
 	}
+#ifdef CONFIG_SMUX
+			/* 
+			 * Transfer all packets from PVC Device to Smux Device
+			 */
+		   if((orig_dev->priv_flags & IFF_RSMUX) && 
+			smux_pkt_recv_hook) {
+			atomic_inc(&skb->users);
+				  ret = smux_pkt_recv_hook(skb, skb->dev, orig_dev);		  
+#if ((defined(CONFIG_TCSUPPORT_WAN_ETHER) || defined(CONFIG_TCSUPPORT_WAN_PTM)) && defined(CONFIG_TCSUPPORT_MULTISERVICE_ON_WAN) ) || defined(CONFIG_TCSUPPORT_WAN_GPON) || defined(CONFIG_TCSUPPORT_WAN_EPON)
+#ifdef CONFIG_TCSUPPORT_VLAN_TAG
+				  if (skb) {
+					skb->vlan_tag_flag |= VLAN_TAG_FROM_INDEV;
+				  }
+#endif			  
+#endif
+			}
+			else {
+#endif /* CONFIG_SMUX */
 
 	/*
 	 * Make sure frames received on VLAN interfaces stacked on
@@ -2935,6 +3697,9 @@ ncls:
 			pt_prev = ptype;
 		}
 	}
+#ifdef CONFIG_SMUX
+	}
+#endif /* CONFIG_SMUX */
 
 bypass:
 	if (pt_prev) {
@@ -2967,7 +3732,7 @@ out:
  *	NET_RX_SUCCESS: no congestion
  *	NET_RX_DROP: packet was dropped
  */
-int netif_receive_skb(struct sk_buff *skb)
+__IMEM int netif_receive_skb(struct sk_buff *skb)
 {
 	if (netdev_tstamp_prequeue)
 		net_timestamp_check(skb);
@@ -3353,10 +4118,15 @@ static void net_rps_action_and_irq_enable(struct softnet_data *sd)
 		local_irq_enable();
 }
 
-static int process_backlog(struct napi_struct *napi, int quota)
+__IMEM static int process_backlog(struct napi_struct *napi, int quota)
 {
 	int work = 0;
 	struct softnet_data *sd = container_of(napi, struct softnet_data, backlog);
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+	int i = 0;
+	int total_queue_len = 0;
+#endif	
+
 
 #ifdef CONFIG_RPS
 	/* Check if we have pending ipi, its better to send them now,
@@ -3385,12 +4155,29 @@ static int process_backlog(struct napi_struct *napi, int quota)
 		}
 
 		rps_lock(sd);
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+		total_queue_len = 0;
+		if(downstream_qos_enable){
+			for( i = 0 ; i < PRIORITY_QUEUE_NUM; i++){
+				qlen = skb_queue_len(&sd->pri_queue[i]);
+				total_queue_len += qlen;
+				if (qlen)
+					skb_queue_splice_tail_init(&sd->pri_queue[i], &sd->process_queue);
+			}
+		}
+#endif
 		qlen = skb_queue_len(&sd->input_pkt_queue);
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+		total_queue_len += qlen;
+#endif
 		if (qlen)
 			skb_queue_splice_tail_init(&sd->input_pkt_queue,
 						   &sd->process_queue);
-
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+		if (total_queue_len < quota - work) {
+#else
 		if (qlen < quota - work) {
+#endif
 			/*
 			 * Inline a custom version of __napi_complete().
 			 * only current cpu owns and manipulates this napi,
@@ -3401,7 +4188,11 @@ static int process_backlog(struct napi_struct *napi, int quota)
 			list_del(&napi->poll_list);
 			napi->state = 0;
 
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+			quota = work + total_queue_len;
+#else
 			quota = work + qlen;
+#endif
 		}
 		rps_unlock(sd);
 	}
@@ -3416,7 +4207,7 @@ static int process_backlog(struct napi_struct *napi, int quota)
  *
  * The entry's receive function will be scheduled to run
  */
-void __napi_schedule(struct napi_struct *n)
+__IMEM void __napi_schedule(struct napi_struct *n)
 {
 	unsigned long flags;
 
@@ -3426,7 +4217,7 @@ void __napi_schedule(struct napi_struct *n)
 }
 EXPORT_SYMBOL(__napi_schedule);
 
-void __napi_complete(struct napi_struct *n)
+__IMEM void __napi_complete(struct napi_struct *n)
 {
 	BUG_ON(!test_bit(NAPI_STATE_SCHED, &n->state));
 	BUG_ON(n->gro_list);
@@ -3492,7 +4283,7 @@ void netif_napi_del(struct napi_struct *napi)
 }
 EXPORT_SYMBOL(netif_napi_del);
 
-static void net_rx_action(struct softirq_action *h)
+__IMEM static void net_rx_action(struct softirq_action *h)
 {
 	struct softnet_data *sd = &__get_cpu_var(softnet_data);
 	unsigned long time_limit = jiffies + 2;
@@ -3500,7 +4291,6 @@ static void net_rx_action(struct softirq_action *h)
 	void *have;
 
 	local_irq_disable();
-
 	while (!list_empty(&sd->poll_list)) {
 		struct napi_struct *n;
 		int work, weight;
@@ -3509,8 +4299,14 @@ static void net_rx_action(struct softirq_action *h)
 		 * Allow this to run for 2 jiffies since which will allow
 		 * an average latency of 1.5/HZ.
 		 */
-		if (unlikely(budget <= 0 || time_after(jiffies, time_limit)))
+		if (unlikely(budget <= 0 || time_after(jiffies, time_limit))){
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
+		/* clear watchdog counter because system will reboot in big
+		   traffic, shnwind */
+			tc3162wdog_kick();
+#endif
 			goto softnet_break;
+		}
 
 		local_irq_enable();
 
@@ -4655,6 +5451,7 @@ int dev_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 		return ret;
 
 	case SIOCETHTOOL:
+#ifdef CONFIG_ETHTOOL
 		dev_load(net, ifr.ifr_name);
 		rtnl_lock();
 		ret = dev_ethtool(net, &ifr);
@@ -4667,7 +5464,9 @@ int dev_ioctl(struct net *net, unsigned int cmd, void __user *arg)
 				ret = -EFAULT;
 		}
 		return ret;
-
+#else
+		return -EINVAL;
+#endif
 	/*
 	 *	These ioctl calls:
 	 *	- require superuser power.
@@ -5053,7 +5852,7 @@ int register_netdevice(struct net_device *dev)
 	ret = netdev_register_kobject(dev);
 	if (ret)
 		goto err_uninit;
-	dev->reg_state = NETREG_REGISTERED;
+//	dev->reg_state = NETREG_REGISTERED;//xflu marked
 
 	/*
 	 *	Default initial state at registry is that the
@@ -5066,6 +5865,8 @@ int register_netdevice(struct net_device *dev)
 	dev_hold(dev);
 	list_netdevice(dev);
 
+	
+
 	/* Notify protocols, that a new device appeared. */
 	ret = call_netdevice_notifiers(NETDEV_REGISTER, dev);
 	ret = notifier_to_errno(ret);
@@ -5073,6 +5874,9 @@ int register_netdevice(struct net_device *dev)
 		rollback_registered(dev);
 		dev->reg_state = NETREG_UNREGISTERED;
 	}
+	else
+		dev->reg_state = NETREG_REGISTERED;//xflu move to here
+
 	/*
 	 *	Prevent userspace races by waiting until the network
 	 *	device is fully setup before sending notifications.
@@ -5210,12 +6014,28 @@ static void netdev_wait_allrefs(struct net_device *dev)
 		}
 
 		msleep(250);
-
+#ifdef CONFIG_SMUX
+		if (time_after(jiffies, warning_time + 2 * HZ)) {
+#else
 		if (time_after(jiffies, warning_time + 10 * HZ)) {
+#endif
 			printk(KERN_EMERG "unregister_netdevice: "
 			       "waiting for %s to become free. Usage "
 			       "count = %d\n",
 			       dev->name, atomic_read(&dev->refcnt));
+#ifdef CONFIG_SMUX
+			/*When do smux interface unregister, it may be drop in endless loop. So add this clean refcnt action to avoid endless loop */
+			if(atomic_read(&dev->refcnt) != 0 && (dev->name[0]=='n'
+							|| dev->name[0]=='e'
+							|| dev->name[0]=='p'
+							|| dev->name[0]=='d' //for dslite
+							|| dev->name[0]=='r'))
+			{
+				//for network interface, e.g. nas0,nas0_1,eth0,eth0.1,ppp0,ra0
+				atomic_set(&dev->refcnt, 0);
+				printk("\nSet %s refcnt as 0 to avoid endless loop\n", dev->name);
+			}
+#endif
 			warning_time = jiffies;
 		}
 	}
@@ -5354,13 +6174,16 @@ struct rtnl_link_stats64 *dev_get_stats(struct net_device *dev,
 		memset(storage, 0, sizeof(*storage));
 		return ops->ndo_get_stats64(dev, storage);
 	}
+
 	if (ops->ndo_get_stats) {
 		netdev_stats_to_stats64(storage, ops->ndo_get_stats(dev));
 		return storage;
+
 	}
 	netdev_stats_to_stats64(storage, &dev->stats);
 	dev_txq_stats_fold(dev, storage);
 	return storage;
+
 }
 EXPORT_SYMBOL(dev_get_stats);
 
@@ -5473,6 +6296,8 @@ struct net_device *alloc_netdev_mq(int sizeof_priv, const char *name,
 	INIT_LIST_HEAD(&dev->unreg_list);
 	INIT_LIST_HEAD(&dev->link_watch_list);
 	dev->priv_flags = IFF_XMIT_DST_RELEASE;
+
+
 	setup(dev);
 	strcpy(dev->name, name);
 	return dev;
@@ -5557,6 +6382,7 @@ EXPORT_SYMBOL(synchronize_net);
 void unregister_netdevice_queue(struct net_device *dev, struct list_head *head)
 {
 	ASSERT_RTNL();
+
 
 	if (head) {
 		list_move_tail(&dev->unreg_list, head);
@@ -6013,6 +6839,9 @@ static struct pernet_operations __net_initdata default_device_ops = {
 static int __init net_dev_init(void)
 {
 	int i, rc = -ENOMEM;
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+	int j = 0;
+#endif
 
 	BUG_ON(!dev_boot_phase);
 
@@ -6048,6 +6877,11 @@ static int __init net_dev_init(void)
 		sd->csd.info = sd;
 		sd->csd.flags = 0;
 		sd->cpu = i;
+#endif
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+		for( j = 0 ; j < PRIORITY_QUEUE_NUM; j++){
+			skb_queue_head_init(&sd->pri_queue[j]);
+		}
 #endif
 
 		sd->backlog.poll = process_backlog;
@@ -6093,4 +6927,8 @@ static int __init initialize_hashrnd(void)
 }
 
 late_initcall_sync(initialize_hashrnd);
-
+#ifdef CONFIG_QOS
+#ifdef CONFIG_TCSUPPORT_SBTHROUGHPUT_ENHANCE
+EXPORT_SYMBOL(tc_qos_switch);
+#endif
+#endif

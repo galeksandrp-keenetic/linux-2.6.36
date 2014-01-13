@@ -26,6 +26,10 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <linux/netfilter/nf_conntrack_ftp.h>
 
+#if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
+#include <asm/tc3162/tc3162.h>
+#endif
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Rusty Russell <rusty@rustcorp.com.au>");
 MODULE_DESCRIPTION("ftp connection tracking helper");
@@ -324,12 +328,17 @@ static void update_nl_seq(struct nf_conn *ct, u32 nl_seq,
 			  struct nf_ct_ftp_master *info, int dir,
 			  struct sk_buff *skb)
 {
-	unsigned int i, oldest;
+	unsigned int i, oldest = NUM_SEQ_TO_REMEMBER;
 
 	/* Look for oldest: if we find exact match, we're done. */
 	for (i = 0; i < info->seq_aft_nl_num[dir]; i++) {
 		if (info->seq_aft_nl[dir][i] == nl_seq)
 			return;
+
+		if (oldest == info->seq_aft_nl_num[dir] ||
+		    before(info->seq_aft_nl[dir][i],
+			   info->seq_aft_nl[dir][oldest]))
+			oldest = i;
 	}
 
 	if (info->seq_aft_nl_num[dir] < NUM_SEQ_TO_REMEMBER) {
@@ -365,6 +374,10 @@ static int help(struct sk_buff *skb,
 	unsigned int i;
 	int found = 0, ends_in_nl;
 	typeof(nf_nat_ftp_hook) nf_nat_ftp;
+
+	/*for FTP ALG switch*/
+	if(!nf_conntrack_ftp_enable)
+		return NF_ACCEPT;//ftp switch is off, just accept packet and do not do ALG 
 
 	/* Until there's been traffic both ways, don't look in packets. */
 	if (ctinfo != IP_CT_ESTABLISHED &&
@@ -542,8 +555,11 @@ static int __init nf_conntrack_ftp_init(void)
 {
 	int i, j = -1, ret = 0;
 	char *tmpname;
-
+#if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
+	ftp_buffer = kmalloc(NF_CONNTRACK_BUF_SIZE, GFP_KERNEL);
+#else
 	ftp_buffer = kmalloc(65536, GFP_KERNEL);
+#endif
 	if (!ftp_buffer)
 		return -ENOMEM;
 

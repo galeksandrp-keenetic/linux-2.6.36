@@ -22,6 +22,11 @@
 #include <net/netfilter/nf_conntrack_helper.h>
 #include <linux/netfilter/nf_conntrack_irc.h>
 
+#if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
+#include <asm/tc3162/tc3162.h>
+#endif
+
+
 #define MAX_PORTS 8
 static unsigned short ports[MAX_PORTS];
 static unsigned int ports_c;
@@ -241,8 +246,11 @@ static int __init nf_conntrack_irc_init(void)
 
 	irc_exp_policy.max_expected = max_dcc_channels;
 	irc_exp_policy.timeout = dcc_timeout;
-
+#if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
+    	irc_buffer = kmalloc(NF_CONNTRACK_BUF_SIZE, GFP_KERNEL);
+#else
 	irc_buffer = kmalloc(65536, GFP_KERNEL);
+#endif
 	if (!irc_buffer)
 		return -ENOMEM;
 

@@ -42,6 +42,14 @@
 #define BRCTL_SET_PORT_PRIORITY 16
 #define BRCTL_SET_PATH_COST 17
 #define BRCTL_GET_FDB_ENTRIES 18
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+/*IGMP Snooping*/
+#define BRCTL_SET_IGMPSNOOPING_STATE 19
+#define BRCTL_SET_IGMPSNOOPING_AGEING_TIME 20
+#define BRCTL_GET_MC_FDB_ENTRIES 21
+#define BRCTL_SET_IGMPSNOOPING_QUICKLEAVE 22
+#define BRCTL_SET_IGMPSNOOPING_DBG 23
+#endif
 
 #define BR_STATE_DISABLED 0
 #define BR_STATE_LISTENING 1
@@ -69,6 +77,12 @@ struct __bridge_info {
 	__u32 tcn_timer_value;
 	__u32 topology_change_timer_value;
 	__u32 gc_timer_value;
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+	__u8 igmpsnoop_enabled;
+	__u8 igmpsnoop_quickleave;
+	__u8 igmpsnoop_dbg;
+	__u32 igmpsnoop_ageing_time;
+#endif
 };
 
 struct __port_info {
@@ -85,6 +99,9 @@ struct __port_info {
 	__u32 message_age_timer_value;
 	__u32 forward_delay_timer_value;
 	__u32 hold_timer_value;
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+	__u8 is_router;
+#endif
 };
 
 struct __fdb_entry {
@@ -96,6 +113,20 @@ struct __fdb_entry {
 	__u8 pad0;
 	__u16 unused;
 };
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+struct __mc_fdb_entry
+{
+	__u8 group_addr[40];
+	__u8 host_addr[6];
+	__u8 group_mac[6];
+	__u16 port_no;
+	__u32 ageing_timer_value;
+	__u8 src_addr[40];
+	__u8 filter_mode;
+	__u8 version;
+	__u32 unused;
+};
+#endif
 
 #ifdef __KERNEL__
 

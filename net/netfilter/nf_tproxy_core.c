@@ -17,7 +17,7 @@
 #include <linux/netdevice.h>
 #include <net/udp.h>
 #include <net/netfilter/nf_tproxy_core.h>
-
+#if 0
 struct sock *
 nf_tproxy_get_sock_v4(struct net *net, const u8 protocol,
 		      const __be32 saddr, const __be32 daddr,
@@ -54,6 +54,7 @@ nf_tproxy_get_sock_v4(struct net *net, const u8 protocol,
 }
 EXPORT_SYMBOL_GPL(nf_tproxy_get_sock_v4);
 
+#endif
 static void
 nf_tproxy_destructor(struct sk_buff *skb)
 {

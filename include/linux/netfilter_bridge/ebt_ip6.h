@@ -28,8 +28,17 @@ struct ebt_ip6_info {
 	struct in6_addr daddr;
 	struct in6_addr smsk;
 	struct in6_addr dmsk;
+#if 0
 	uint8_t  tclass;
+#else
+	uint8_t	 tclass[2];
+#endif
+#if 0
 	uint8_t  protocol;
+#else
+	uint8_t	 protocol[2];
+#endif
+
 	uint8_t  bitmask;
 	uint8_t  invflags;
 	uint16_t sport[2];

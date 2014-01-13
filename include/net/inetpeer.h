@@ -39,6 +39,8 @@ struct inet_peer {
 	};
 };
 
+#ifdef CONFIG_INETPEER
+
 void			inet_initpeers(void) __init;
 
 /* can be called with or without local BH being disabled */
@@ -65,4 +67,12 @@ static inline __u16	inet_getid(struct inet_peer *p, int more)
 	return atomic_add_return(more, &p->ip_id_count) - more;
 }
 
+#else
+static void inline inet_initpeers(void) { }
+#define inet_getpeer(a, b) (0)
+#define inet_putpeer(b)
+#define inet_peer_refcheck(a)
+#define inet_getid(a, b) (0)
+#endif
+	
 #endif /* _NET_INETPEER_H */

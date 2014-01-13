@@ -518,6 +518,10 @@ conntrack_pptp_help(struct sk_buff *skb, unsigned int protoff,
 	int ret;
 	u_int16_t msg;
 
+	/*for PPTP ALG switch*/
+	if(!nf_conntrack_pptp_enable)
+		return NF_ACCEPT;//pptp switch is off, just accept packet and do not do ALG 
+
 	/* don't do any tracking before tcp handshake complete */
 	if (ctinfo != IP_CT_ESTABLISHED &&
 	    ctinfo != IP_CT_ESTABLISHED + IP_CT_IS_REPLY)

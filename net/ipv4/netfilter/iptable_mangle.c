@@ -75,6 +75,9 @@ ipt_mangle_out(struct sk_buff *skb, const struct net_device *out)
 }
 
 /* The work comes in here from netfilter.c. */
+#ifdef CONFIG_MIPS_TC3262
+__IMEM
+#endif
 static unsigned int
 iptable_mangle_hook(unsigned int hook,
 		     struct sk_buff *skb,

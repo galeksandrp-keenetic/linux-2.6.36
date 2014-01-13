@@ -701,7 +701,7 @@ set_rcvbuf:
 	case SO_SNDTIMEO:
 		ret = sock_set_timeout(&sk->sk_sndtimeo, optval, optlen);
 		break;
-
+#ifdef CONFIG_NET_SK_FILTER
 	case SO_ATTACH_FILTER:
 		ret = -EINVAL;
 		if (optlen == sizeof(struct sock_fprog)) {
@@ -725,6 +725,7 @@ set_rcvbuf:
 		else
 			clear_bit(SOCK_PASSSEC, &sock->flags);
 		break;
+#endif
 	case SO_MARK:
 		if (!capable(CAP_NET_ADMIN))
 			ret = -EPERM;

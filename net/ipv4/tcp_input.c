@@ -73,6 +73,10 @@
 #include <asm/unaligned.h>
 #include <net/netdma.h>
 
+#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../nat/hw_nat/ra_nat.h"
+#endif
+
 int sysctl_tcp_timestamps __read_mostly = 1;
 int sysctl_tcp_window_scaling __read_mostly = 1;
 int sysctl_tcp_sack __read_mostly = 1;
@@ -5238,6 +5242,15 @@ int tcp_rcv_established(struct sock *sk, struct sk_buff *skb,
 {
 	struct tcp_sock *tp = tcp_sk(sk);
 	int res;
+
+#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	if( IS_SPACE_AVAILABLED(skb) &&
+			((FOE_MAGIC_TAG(skb) == FOE_MAGIC_PCI) ||
+			 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ||
+			 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE))){
+		FOE_ALG(skb)=1;
+	}
+#endif
 
 	/*
 	 *	Header prediction.

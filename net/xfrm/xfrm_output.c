@@ -18,6 +18,15 @@
 #include <linux/spinlock.h>
 #include <net/dst.h>
 #include <net/xfrm.h>
+#ifdef CONFIG_TCSUPPORT_RA_HWNAT
+#include <linux/foe_hook.h>
+#endif
+#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../nat/hw_nat/ra_nat.h"
+#endif
+#ifdef CONFIG_TCSUPPORT_IPSEC_PASSTHROUGH
+#include <net/mtk_esp.h>
+#endif
 
 static int xfrm_output2(struct sk_buff *skb);
 
@@ -46,6 +55,18 @@ static int xfrm_output_one(struct sk_buff *skb, int err)
 
 	if (err <= 0)
 		goto resume;
+#ifdef CONFIG_TCSUPPORT_IPSEC_PASSTHROUGH
+		if(VPN_PASSTHROUGH_SWITCH_ON == gpVpnPTPara->vpnpassthroughswitch)
+		{
+			struct ipsec_para_s ipsec_data;
+			ipsec_data.flag = HWNAT_IPSEC_LEARING;
+			ipsec_data.data.learn.skb = skb;
+			ipsec_data.data.learn.x = x;
+			err = ipsec_esp_output_pt(&ipsec_data);
+			if (err)
+				goto error_nolock;
+		}
+#endif
 
 	do {
 		err = xfrm_state_check_space(x, skb);
@@ -84,17 +105,45 @@ static int xfrm_output_one(struct sk_buff *skb, int err)
 		x->curlft.packets++;
 
 		spin_unlock_bh(&x->lock);
-
+#if 0//def CONFIG_TCSUPPORT_RA_HWNAT
+/* Don't let HWNAT has the change to learn ipsec packets!
+ * Once HWNAT learned ipsec packets, it will forward packets
+ * directly from Rx to Tx, which will cause ipsec packets
+ * not being decrypted.
+ */
+    if (ra_sw_nat_hook_free)
+        ra_sw_nat_hook_free(skb);
+#endif
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+		if( IS_SPACE_AVAILABLED(skb)  &&
+			((FOE_MAGIC_TAG(skb) == FOE_MAGIC_PCI) ||
+			(FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ||
+			(FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE))){
+			FOE_ALG(skb)=1;
+		}
+#endif
 		err = x->type->output(x, skb);
+#if defined(CONFIG_MTK_CRYPTO_DRIVER) || defined(CONFIG_RALINK_HWCRYPTO) || defined(CONFIG_RALINK_HWCRYPTO_MODULE)
+		if (skb->protocol == htons(ETH_P_IP))
+		{
+			if (err == 1)
+				return err;
+		}
+#endif	
 		if (err == -EINPROGRESS)
 			goto out_exit;
 
 resume:
-		if (err) {
-			XFRM_INC_STATS(net, LINUX_MIB_XFRMOUTSTATEPROTOERROR);
-			goto error_nolock;
+#if defined(CONFIG_MTK_CRYPTO_DRIVER) || defined(CONFIG_RALINK_HWCRYPTO) || defined(CONFIG_RALINK_HWCRYPTO_MODULE)
+		if (skb->protocol == htons(ETH_P_IPV6))
+#else
 		}
-
+			if (err) {
+				XFRM_INC_STATS(net, LINUX_MIB_XFRMOUTSTATEPROTOERROR);
+				goto error_nolock;
+			}
+		}
+#endif
 		dst = skb_dst_pop(skb);
 		if (!dst) {
 			XFRM_INC_STATS(net, LINUX_MIB_XFRMOUTERROR);
@@ -103,6 +152,10 @@ resume:
 		}
 		skb_dst_set(skb, dst_clone(dst));
 		x = dst->xfrm;
+		if(x && err == 0){
+			printk("do not support double encryption now!\n");
+ 			break; 
+		}
 	} while (x && !(x->outer_mode->flags & XFRM_MODE_FLAG_TUNNEL));
 
 	err = 0;
@@ -138,6 +191,10 @@ int xfrm_output_resume(struct sk_buff *skb, int err)
 	if (err == -EINPROGRESS)
 		err = 0;
 
+#if defined(CONFIG_MTK_CRYPTO_DRIVER) || defined(CONFIG_RALINK_HWCRYPTO) || defined(CONFIG_RALINK_HWCRYPTO_MODULE)
+	if (skb->protocol = htons(ETH_P_IP))
+		return 0;
+#endif
 out:
 	return err;
 }

@@ -88,7 +88,13 @@
 #ifdef CONFIG_INET
 #include <net/inet_common.h>
 #endif
-
+#if defined(CONFIG_TCSUPPORT_VLAN_TAG) || defined(CONFIG_TCSUPPORT_PON_VLAN) 
+//#include <linux/if_vlan.h>
+#include <linux/if_ether.h>
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+extern int (*pon_check_tpid_hook)(__u16 * buf);
+#endif
+#endif
 /*
    Assumptions:
    - if device has no dev->hard_header routine, it adds and removes ll header
@@ -492,6 +498,13 @@ retry:
 	if (err < 0)
 		goto out_unlock;
 
+#ifdef CONFIG_QOS
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+		/*if QoS enable, all packets to IMQ*/
+		skb->mark |= QOS_DEFAULT_MARK;
+#endif
+#endif
+
 	dev_queue_xmit(skb);
 	rcu_read_unlock();
 	return len;
@@ -538,6 +551,9 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 	u8 *skb_head = skb->data;
 	int skb_len = skb->len;
 	unsigned int snaplen, res;
+#if defined(CONFIG_TCSUPPORT_VLAN_TAG) || defined(CONFIG_TCSUPPORT_PON_VLAN) 
+	u16 *proto = NULL;
+#endif
 
 	if (skb->pkt_type == PACKET_LOOPBACK)
 		goto drop;
@@ -558,8 +574,35 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 		   structure, so that corresponding packet head
 		   never delivered to user.
 		 */
-		if (sk->sk_type != SOCK_DGRAM)
+		if (sk->sk_type != SOCK_DGRAM){
 			skb_push(skb, skb->data - skb_mac_header(skb));
+		#ifdef CONFIG_TCSUPPORT_VLAN_TAG
+#if (defined(CONFIG_TCSUPPORT_WAN_GPON) || defined (CONFIG_TCSUPPORT_WAN_EPON))
+		if((orig_dev->name[1] != 'm') && (orig_dev->name[2] != 'm'))
+		{//not omci interface and oam interface.
+#endif
+			proto = (u16*)(skb->data + 12);
+			if (*proto == htons(ETH_P_8021Q)) {
+				memmove(skb->data + VLAN_HLEN, skb->data, 12);
+				skb_pull(skb, VLAN_HLEN);
+			}
+#if (defined(CONFIG_TCSUPPORT_WAN_GPON) || defined (CONFIG_TCSUPPORT_WAN_EPON))
+		}	
+#endif
+	#endif
+	#if defined(CONFIG_TCSUPPORT_PON_VLAN)
+			if(orig_dev->name[0] == 'n')
+			{
+				proto = (u16*)(skb->data + 12);
+				while(pon_check_tpid_hook && (pon_check_tpid_hook(proto) == 1))
+				{
+					memmove(skb->data + VLAN_HLEN, skb->data, 12);
+					skb_pull(skb, VLAN_HLEN);
+					proto = (u16*)(skb->data + 12);
+				}
+			}
+		#endif
+		}
 		else if (skb->pkt_type == PACKET_OUTGOING) {
 			/* Special case: outgoing packets have ll header at head */
 			skb_pull(skb, skb_network_offset(skb));
@@ -579,7 +622,12 @@ static int packet_rcv(struct sk_buff *skb, struct net_device *dev,
 		goto drop_n_acct;
 
 	if (skb_shared(skb)) {
+#if defined(CONFIG_TCSUPPORT_HWNAT)		
+		struct sk_buff *nskb = skb_clone(skb, GFP_ATOMIC|GFP_SKIP_PKTFLOW);
+#else
 		struct sk_buff *nskb = skb_clone(skb, GFP_ATOMIC);
+#endif
+//		struct sk_buff *nskb = skb_clone(skb, GFP_ATOMIC);
 		if (nskb == NULL)
 			goto drop_n_acct;
 
@@ -705,7 +753,11 @@ static int tpacket_rcv(struct sk_buff *skb, struct net_device *dev,
 		    atomic_read(&sk->sk_rmem_alloc) + skb->truesize <
 		    (unsigned)sk->sk_rcvbuf) {
 			if (skb_shared(skb)) {
+#if defined(CONFIG_TCSUPPORT_HWNAT)		
+				copy_skb = skb_clone(skb, GFP_ATOMIC|GFP_SKIP_PKTFLOW);
+#else
 				copy_skb = skb_clone(skb, GFP_ATOMIC);
+#endif
 			} else {
 				copy_skb = skb_get(skb);
 				skb_head = skb->data;

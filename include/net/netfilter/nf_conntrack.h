@@ -98,7 +98,9 @@ struct nf_conn {
 	/* XXX should I move this to the tail ? - Y.K */
 	/* These are my tuples; original and reply */
 	struct nf_conntrack_tuple_hash tuplehash[IP_CT_DIR_MAX];
-
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+	unsigned int pktflow_key[IP_CT_DIR_MAX];
+#endif
 	/* Have we seen traffic both ways yet? (bitset) */
 	unsigned long status;
 
@@ -114,6 +116,37 @@ struct nf_conn {
 
 #ifdef CONFIG_NF_CONNTRACK_SECMARK
 	u_int32_t secmark;
+#endif
+#if defined(CONFIG_NETFILTER_XT_MATCH_LAYER7) || \
+    defined(CONFIG_NETFILTER_XT_MATCH_LAYER7_MODULE)
+	struct {
+	/*
+		 * e.g. "http". NULL before decision. "unknown" after decision
+		 * if no match.
+		 */
+		char *app_proto;
+		/*
+		 * application layer data so far. NULL after match decision.
+		 */
+		char *app_data;
+		unsigned int app_data_len;
+	} layer7;
+#endif
+
+#if defined(CONFIG_NETFILTER_XT_MATCH_LAYER7) || \
+    defined(CONFIG_NETFILTER_XT_MATCH_LAYER7_MODULE)
+	struct {
+		/*
+		 * e.g. "http". NULL before decision. "unknown" after decision
+		 * if no match.
+		 */
+		char *app_proto;
+		/*
+		 * application layer data so far. NULL after match decision.
+		 */
+		char *app_data;
+		unsigned int app_data_len;
+	} layer7;
 #endif
 
 	/* Storage reserved for other modules: */
@@ -298,6 +331,15 @@ static inline int nf_ct_is_untracked(const struct nf_conn *ct)
 extern int nf_conntrack_set_hashsize(const char *val, struct kernel_param *kp);
 extern unsigned int nf_conntrack_htable_size;
 extern unsigned int nf_conntrack_max;
+
+/*for alg switch*/
+extern int nf_conntrack_ftp_enable;
+extern int nf_conntrack_sip_enable;
+extern int nf_conntrack_h323_enable;
+extern int nf_conntrack_rtsp_enable;
+extern int nf_conntrack_l2tp_enable;
+extern int nf_conntrack_ipsec_enable;
+extern int nf_conntrack_pptp_enable;
 
 #define NF_CT_STAT_INC(net, count)	\
 	__this_cpu_inc((net)->ct.stat->count)

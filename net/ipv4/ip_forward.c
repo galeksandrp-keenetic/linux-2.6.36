@@ -39,7 +39,8 @@
 #include <net/route.h>
 #include <net/xfrm.h>
 
-static int ip_forward_finish(struct sk_buff *skb)
+
+__IMEM static int ip_forward_finish(struct sk_buff *skb)
 {
 	struct ip_options * opt	= &(IPCB(skb)->opt);
 
@@ -48,10 +49,11 @@ static int ip_forward_finish(struct sk_buff *skb)
 	if (unlikely(opt->optlen))
 		ip_forward_options(skb);
 
+
 	return dst_output(skb);
 }
 
-int ip_forward(struct sk_buff *skb)
+__IMEM int ip_forward(struct sk_buff *skb)
 {
 	struct iphdr *iph;	/* Our header */
 	struct rtable *rt;	/* Route we use */
@@ -110,7 +112,16 @@ int ip_forward(struct sk_buff *skb)
 	if (rt->rt_flags&RTCF_DOREDIRECT && !opt->srr && !skb_sec_path(skb))
 		ip_rt_send_redirect(skb);
 
-	skb->priority = rt_tos2priority(iph->tos);
+	/*
+         * 1.In general case, we use DSCP to stand for different priority not tos.
+         * 2.To make sure vlan priority is the same in rx/tx packet
+         * FIXME - Steven
+         */
+#if !defined (CONFIG_RA_NAT_HW)
+        if(iph->tos != 0) {
+            skb->priority = rt_tos2priority(iph->tos);
+        }
+#endif
 
 	return NF_HOOK(NFPROTO_IPV4, NF_INET_FORWARD, skb, skb->dev,
 		       rt->dst.dev, ip_forward_finish);

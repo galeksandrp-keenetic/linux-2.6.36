@@ -86,6 +86,10 @@ struct in_addr {
 
 #define IP_MINTTL       21
 #define IP_NODEFRAG     22
+#if 1//def CONFIG_TCSUPPORT_IGMP_QOS
+#define	IP_SKB_MARK_FLAG	23
+#endif
+
 
 /* IP_MTU_DISCOVER values */
 #define IP_PMTUDISC_DONT		0	/* Never send DF frames */
@@ -111,6 +115,9 @@ struct in_addr {
 #define MCAST_LEAVE_SOURCE_GROUP	47
 #define MCAST_MSFILTER			48
 #define IP_MULTICAST_ALL		49
+#if 1//def CONFIG_TCSUPPORT_IGMP_QOS
+#define	IP_SKB_MARK				50
+#endif
 
 #define MCAST_EXCLUDE	0
 #define MCAST_INCLUDE	1

@@ -125,6 +125,11 @@
 /* hardware time stamping: parameters in linux/net_tstamp.h */
 #define SIOCSHWTSTAMP   0x89b0
 
+#ifdef CONFIG_SMUX
+/* smux calls */
+#define SIOCSIFSMUX     0x89c0 /* add or rem smux interface */
+#endif
+
 /* Device private ioctl calls */
 
 /*

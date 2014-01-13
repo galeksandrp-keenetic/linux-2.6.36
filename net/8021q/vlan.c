@@ -57,6 +57,17 @@ static struct packet_type vlan_packet_type __read_mostly = {
 	.func = vlan_skb_recv, /* VLAN receive method */
 };
 
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+static struct packet_type QinQ_88a8_packet_type = {
+	.type = cpu_to_be16(ETH_P_QinQ_88a8),
+	.func = vlan_skb_recv, /* VLAN receive method */
+};
+
+static struct packet_type QinQ_9100_packet_type = {
+	.type = cpu_to_be16(ETH_P_QinQ_9100),
+	.func = vlan_skb_recv, /* VLAN receive method */
+};
+#endif
 /* End of global variables definitions. */
 
 static inline unsigned int vlan_grp_hashfn(unsigned int idx)
@@ -327,6 +338,17 @@ static int register_vlan_device(struct net_device *real_dev, u16 vlan_id)
 	 * hope the underlying device can handle it.
 	 */
 	new_dev->mtu = real_dev->mtu;
+
+#if defined (CONFIG_RAETH_TSO)
+#if defined(CONFIG_RALINK_MT7620)                                                                                
+	if( (*(volatile u32 *)(0xB000000C) & 0xf) >= 0x5) {
+		new_dev->features = real_dev->features;
+	}
+#else
+	/* make pseudo interface has same capacity like real interface */
+	new_dev->features = real_dev->features;
+#endif
+#endif
 
 	vlan_dev_info(new_dev)->vlan_id = vlan_id;
 	vlan_dev_info(new_dev)->real_dev = real_dev;
@@ -727,6 +749,10 @@ static int __init vlan_proto_init(void)
 		goto err4;
 
 	dev_add_pack(&vlan_packet_type);
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	dev_add_pack(&QinQ_88a8_packet_type);
+	dev_add_pack(&QinQ_9100_packet_type);
+#endif
 	vlan_ioctl_set(vlan_ioctl_handler);
 	return 0;
 
@@ -750,7 +776,10 @@ static void __exit vlan_cleanup_module(void)
 	unregister_netdevice_notifier(&vlan_notifier_block);
 
 	dev_remove_pack(&vlan_packet_type);
-
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	dev_remove_pack(&QinQ_88a8_packet_type);
+	dev_remove_pack(&QinQ_9100_packet_type);
+#endif
 	/* This table must be empty if there are no module references left. */
 	for (i = 0; i < VLAN_GRP_HASH_SIZE; i++)
 		BUG_ON(!hlist_empty(&vlan_group_hash[i]));

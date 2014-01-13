@@ -229,6 +229,40 @@ static inline struct sk_buff *__vlan_put_tag(struct sk_buff *skb, u16 vlan_tci)
 	return skb;
 }
 
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+extern int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
+		  struct packet_type* ptype, struct net_device *orig_dev);
+
+
+/*
+Uesd for xPon insert tag.Support set TPID
+*/
+static inline struct sk_buff *__pon_vlan_put_tag(struct sk_buff *skb, u16 tpid,unsigned short vlan_tci)
+{
+	struct vlan_ethhdr *veth;
+
+	if (skb_cow_head(skb, VLAN_HLEN) < 0) {
+		kfree_skb(skb);
+		return NULL;
+	}
+	veth = (struct vlan_ethhdr *)skb_push(skb, VLAN_HLEN);
+
+	/* Move the mac addresses to the beginning of the new header. */
+	memmove(skb->data, skb->data + VLAN_HLEN, 2 * VLAN_ETH_ALEN);
+	skb->mac_header -= VLAN_HLEN;
+
+	/* first, the ethernet type */
+	veth->h_vlan_proto = htons(tpid);
+
+	/* now, the TCI */
+	veth->h_vlan_TCI = htons(vlan_tci);
+
+	skb->protocol = htons(tpid);
+
+	return skb;
+}
+#endif
+
 /**
  * __vlan_hwaccel_put_tag - hardware accelerated VLAN inserting
  * @skb: skbuff to tag

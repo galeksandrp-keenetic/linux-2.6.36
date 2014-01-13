@@ -79,6 +79,11 @@
 #define IF_GET_IFACE	0x0001		/* for querying only */
 #define IF_GET_PROTO	0x0002
 
+#ifdef CONFIG_SMUX
+#define IFF_RSMUX      0x10000             /* pvc interface          */
+#define IFF_OSMUX      0x20000            /* smux interface       */
+#endif
+
 /* For definitions see hdlc.h */
 #define IF_IFACE_V35	0x1000		/* V.35 serial interface	*/
 #define IF_IFACE_V24	0x1001		/* V.24 serial interface	*/

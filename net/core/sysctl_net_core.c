@@ -17,7 +17,13 @@
 
 #include <net/ip.h>
 #include <net/sock.h>
+#ifdef CONFIG_TCSUPPORT_USB_HOST_LED
+u32 usb_dev_connected = 0 ;
+EXPORT_SYMBOL(usb_dev_connected);
 
+u32 usb_led_blink = 0;
+EXPORT_SYMBOL(usb_led_blink);
+#endif
 #ifdef CONFIG_RPS
 static int rps_sock_flow_sysctl(ctl_table *table, int write,
 				void __user *buffer, size_t *lenp, loff_t *ppos)
@@ -76,6 +82,10 @@ static int rps_sock_flow_sysctl(ctl_table *table, int write,
 	return ret;
 }
 #endif /* CONFIG_RPS */
+
+#ifdef CONFIG_TCSUPPORT_QOS
+extern u32 	qos_queue_mask;
+#endif
 
 static struct ctl_table net_core_table[] = {
 #ifdef CONFIG_NET
@@ -172,6 +182,16 @@ static struct ctl_table net_core_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec
 	},
+	
+#ifdef CONFIG_TCSUPPORT_QOS
+	{
+		.procname	= "queue_mask",
+		.data		= &qos_queue_mask,
+		.maxlen 	= sizeof(u32),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec
+			},
+#endif
 	{ }
 };
 

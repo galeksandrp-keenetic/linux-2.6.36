@@ -368,7 +368,7 @@ static int __lro_proc_skb(struct net_lro_mgr *lro_mgr, struct sk_buff *skb,
 	if (lro_desc->tcp_next_seq != ntohl(tcph->seq))
 		goto out2;
 
-	if (lro_tcp_ip_check(iph, tcph, skb->len, lro_desc))
+	if (lro_tcp_ip_check(iph, tcph, skb->len - vlan_hdr_len, lro_desc))
 		goto out2;
 
 	lro_add_packet(lro_desc, skb, iph, tcph);

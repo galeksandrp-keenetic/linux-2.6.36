@@ -189,7 +189,7 @@ static inline int qdisc_restart(struct Qdisc *q)
 	return sch_direct_xmit(skb, q, dev, txq, root_lock);
 }
 
-void __qdisc_run(struct Qdisc *q)
+__IMEM void __qdisc_run(struct Qdisc *q)
 {
 	unsigned long start_time = jiffies;
 
@@ -445,7 +445,7 @@ static inline struct sk_buff_head *band2list(struct pfifo_fast_priv *priv,
 	return priv->q + band;
 }
 
-static int pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc* qdisc)
+__IMEM static int pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc* qdisc)
 {
 	if (skb_queue_len(&qdisc->q) < qdisc_dev(qdisc)->tx_queue_len) {
 		int band = prio2band[skb->priority & TC_PRIO_MAX];
@@ -460,7 +460,7 @@ static int pfifo_fast_enqueue(struct sk_buff *skb, struct Qdisc* qdisc)
 	return qdisc_drop(skb, qdisc);
 }
 
-static struct sk_buff *pfifo_fast_dequeue(struct Qdisc* qdisc)
+__IMEM static struct sk_buff *pfifo_fast_dequeue(struct Qdisc* qdisc)
 {
 	struct pfifo_fast_priv *priv = qdisc_priv(qdisc);
 	int band = bitmap2band[priv->bitmap];

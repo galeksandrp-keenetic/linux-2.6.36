@@ -151,6 +151,9 @@ struct neigh_table nd_tbl = {
 		.anycast_delay =	 1 * HZ,
 		.proxy_delay =		(8 * HZ) / 10,
 		.proxy_qlen =		64,
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+		.dlf_route =    "",
+#endif
 	},
 	.gc_interval =	  30 * HZ,
 	.gc_thresh1 =	 128,
@@ -1158,8 +1161,13 @@ static void ndisc_router_discovery(struct sk_buff *skb)
 		return;
 	}
 
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT	
+	/*Enable WAN interface to receive RA for SLAAC mode*/
+	if (!is_wan_dev(in6_dev->dev) || !in6_dev->cnf.accept_ra) 
+#else
 	/* skip route and link configuration on routers */
 	if (in6_dev->cnf.forwarding || !in6_dev->cnf.accept_ra)
+#endif
 		goto skip_linkparms;
 
 #ifdef CONFIG_IPV6_NDISC_NODETYPE
@@ -1307,10 +1315,19 @@ skip_linkparms:
 			     NEIGH_UPDATE_F_OVERRIDE|
 			     NEIGH_UPDATE_F_OVERRIDE_ISROUTER|
 			     NEIGH_UPDATE_F_ISROUTER);
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+		/*Add for outputing default gateway by RA*/
+		sprintf(neigh->parms->dlf_route, NIP6_FMT, NIP6(ipv6_hdr(skb)->saddr));
+#endif
 	}
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+/*Enable WAN interface to receive RA for SLAAC mode*/
+	if (!is_wan_dev(in6_dev->dev) || !in6_dev->cnf.accept_ra) 
 
+#else
 	/* skip route and link configuration on routers */
 	if (in6_dev->cnf.forwarding || !in6_dev->cnf.accept_ra)
+#endif
 		goto out;
 
 #ifdef CONFIG_IPV6_ROUTE_INFO

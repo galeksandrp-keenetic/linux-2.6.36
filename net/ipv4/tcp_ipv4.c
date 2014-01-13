@@ -1545,6 +1545,9 @@ static __sum16 tcp_v4_checksum_init(struct sk_buff *skb)
 int tcp_v4_do_rcv(struct sock *sk, struct sk_buff *skb)
 {
 	struct sock *rsk;
+	#if defined(CONFIG_TCSUPPORT_REDIRECT_WITH_PORTMASK)||defined(CONFIG_TCSUPPORT_FW_UPGRADE_16M)||defined(CONFIG_TCSUPPORT_CD_NEW_GUI)||defined(CONFIG_TCSUPPORT_ACCOUNT_ACL)||(defined(CONFIG_TCSUPPORT_CT_E8GUI)&&defined(CONFIG_TCSUPPORT_CT_FW_UPGRADE_16M))
+	sk->sk_mark = skb->mark;
+	#endif
 #ifdef CONFIG_TCP_MD5SIG
 	/*
 	 * We really want to reject the packet as early as possible

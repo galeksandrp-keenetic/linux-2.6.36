@@ -8,8 +8,13 @@
 #define EBT_VLAN_MATCH "vlan"
 
 struct ebt_vlan_info {
+#if 1 /*Rodney_20090724*/	
+	uint16_t id[2];		/* VLAN ID {1-4095} */
+	uint8_t prio[2];		/* VLAN User Priority {0-7} */
+#else
 	uint16_t id;		/* VLAN ID {1-4095} */
 	uint8_t prio;		/* VLAN User Priority {0-7} */
+#endif
 	__be16 encap;		/* VLAN Encapsulated frame code {0-65535} */
 	uint8_t bitmask;		/* Args bitmask bit 1=1 - ID arg,
 				   bit 2=1 User-Priority arg, bit 3=1 encap*/

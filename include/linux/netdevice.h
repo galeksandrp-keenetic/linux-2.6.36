@@ -198,6 +198,11 @@ struct net_device_stats {
 
 #endif  /*  __KERNEL__  */
 
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+	/*shnwind 20100115*/
+#define PRIORITY_QUEUE_NUM 3
+#define VOIP_RX_PORT_NUM 4
+#endif
 
 /* Media selection options. */
 enum {
@@ -901,7 +906,11 @@ struct net_device {
 
 	unsigned int		flags;	/* interface flags (a la BSD)	*/
 	unsigned short		gflags;
+	#ifdef CONFIG_SMUX
+	unsigned int          priv_flags;// for CONFIG_SMUX
+	#else
         unsigned short          priv_flags; /* Like 'flags' but invisible to userspace. */
+        #endif
 	unsigned short		padded;	/* How much padding added by alloc_netdev() */
 
 	unsigned char		operstate; /* RFC2863 operstate */
@@ -1156,6 +1165,7 @@ static inline void *netdev_priv(const struct net_device *dev)
 {
 	return (char *)dev + ALIGN(sizeof(struct net_device), NETDEV_ALIGN);
 }
+#define SET_MODULE_OWNER(dev) do { } while (0)
 
 /* Set the sysfs physical device reference for the network logical device
  * if set prior to registration will cause a symlink during initialization.
@@ -1283,6 +1293,9 @@ extern struct net_device    *dev_getbyhwaddr(struct net *net, unsigned short typ
 extern struct net_device *dev_getfirstbyhwtype(struct net *net, unsigned short type);
 extern struct net_device *__dev_getfirstbyhwtype(struct net *net, unsigned short type);
 extern void		dev_add_pack(struct packet_type *pt);
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+extern int pon_check_pack(__u16 type);
+#endif
 extern void		dev_remove_pack(struct packet_type *pt);
 extern void		__dev_remove_pack(struct packet_type *pt);
 
@@ -1295,6 +1308,7 @@ extern int		dev_alloc_name(struct net_device *dev, const char *name);
 extern int		dev_open(struct net_device *dev);
 extern int		dev_close(struct net_device *dev);
 extern void		dev_disable_lro(struct net_device *dev);
+extern struct		netdev_queue *dev_pick_tx(struct net_device *dev, struct sk_buff *skb);
 extern int		dev_queue_xmit(struct sk_buff *skb);
 extern int		register_netdevice(struct net_device *dev);
 extern void		unregister_netdevice_queue(struct net_device *dev,
@@ -1426,6 +1440,9 @@ struct softnet_data {
 	unsigned		dropped;
 	struct sk_buff_head	input_pkt_queue;
 	struct napi_struct	backlog;
+#ifdef CONFIG_TCSUPPORT_DOWNSTREAM_QOS
+	struct sk_buff_head pri_queue[PRIORITY_QUEUE_NUM];
+#endif
 };
 
 static inline void input_queue_head_incr(struct softnet_data *sd)

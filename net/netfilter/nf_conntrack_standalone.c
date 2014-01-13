@@ -177,6 +177,23 @@ static int ct_seq_show(struct seq_file *s, void *v)
 	if (seq_printf(s, "zone=%u ", nf_ct_zone(ct)))
 		goto release;
 #endif
+#if defined(CONFIG_NETFILTER_XT_MATCH_LAYER7) || defined(CONFIG_NETFILTER_XT_MATCH_LAYER7_MODULE)
+	if(ct->layer7.app_proto &&
+           seq_printf(s, "l7proto=%s ", ct->layer7.app_proto))
+		return -ENOSPC;
+#endif
+
+#if defined(CONFIG_NETFILTER_XT_MATCH_LAYER7) || defined(CONFIG_NETFILTER_XT_MATCH_LAYER7_MODULE)
+	if(ct->layer7.app_proto &&
+           seq_printf(s, "l7proto=%s ", ct->layer7.app_proto))
+		return -ENOSPC;
+#endif
+
+#if defined(CONFIG_NETFILTER_XT_MATCH_LAYER7) || defined(CONFIG_NETFILTER_XT_MATCH_LAYER7_MODULE)
+	if(ct->layer7.app_proto &&
+           seq_printf(s, "l7proto=%s ", ct->layer7.app_proto))
+		return -ENOSPC;
+#endif
 
 	if (seq_printf(s, "use=%u\n", atomic_read(&ct->ct_general.use)))
 		goto release;
@@ -391,6 +408,55 @@ static ctl_table nf_ct_sysctl_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec,
 	},
+	{
+		.procname	= "nf_conntrack_ftp_enable",
+		.data		= &nf_conntrack_ftp_enable,
+		.maxlen 	= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},	//for ftp alg switch
+	{		
+		.procname	= "nf_conntrack_sip_enable",
+		.data		= &nf_conntrack_sip_enable,
+		.maxlen 	= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},	//for sip alg switch
+	{
+		.procname	= "nf_conntrack_h323_enable",
+		.data		= &nf_conntrack_h323_enable,
+		.maxlen 	= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},	//for h323 alg switch
+	{
+		.procname	= "nf_conntrack_rtsp_enable",
+		.data		= &nf_conntrack_rtsp_enable,
+		.maxlen 	= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},	//for rtsp alg switch
+	{
+		.procname	= "nf_conntrack_l2tp_enable",
+		.data		= &nf_conntrack_l2tp_enable,
+		.maxlen 	= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},	//for l2tp alg switch
+	{
+		.procname	= "nf_conntrack_ipsec_enable",
+		.data		= &nf_conntrack_ipsec_enable,
+		.maxlen 	= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},	//for ipsec alg switch
+	{
+		.procname	= "nf_conntrack_pptp_enable",
+		.data		= &nf_conntrack_pptp_enable,
+		.maxlen 	= sizeof(int),
+		.mode		= 0644,
+		.proc_handler	= &proc_dointvec,
+	},	//for pptp alg switch
 	{ }
 };
 

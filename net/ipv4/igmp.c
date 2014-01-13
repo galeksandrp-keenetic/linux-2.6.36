@@ -373,6 +373,13 @@ static struct sk_buff *add_grhead(struct sk_buff *skb, struct ip_mc_list *pmc,
 		skb = igmpv3_newpack(dev, dev->mtu);
 	if (!skb)
 		return NULL;
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+	//printk("%s,dev->name is %s, pmc->multiaddr is %x, pmc->sk_mark is %x\n", __FUNCTION__, dev->name, pmc->multiaddr, pmc->sk_mark);
+	
+	if (pmc->sk_mark)
+		skb->mark = pmc->sk_mark;
+#endif
+
 	pgr = (struct igmpv3_grec *)skb_put(skb, sizeof(struct igmpv3_grec));
 	pgr->grec_type = type;
 	pgr->grec_auxwords = 0;
@@ -417,9 +424,20 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ip_mc_list *pmc,
 	if (truncate) {
 		if (pih && pih->ngrec &&
 		    AVAILABLE(skb) < grec_size(pmc, type, gdeleted, sdeleted)) {
-			if (skb)
+			if (skb){
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+				if (pmc->sk_mark)
+					skb->mark = pmc->sk_mark;
+#endif
 				igmpv3_sendpack(skb);
+			}
 			skb = igmpv3_newpack(dev, dev->mtu);
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+			if (skb)
+				if (pmc->sk_mark)
+					skb->mark = pmc->sk_mark;
+#endif
+
 		}
 	}
 	first = 1;
@@ -444,9 +462,19 @@ static struct sk_buff *add_grec(struct sk_buff *skb, struct ip_mc_list *pmc,
 				break;	 /* truncate these */
 			if (pgr)
 				pgr->grec_nsrcs = htons(scount);
-			if (skb)
+			if (skb){
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+				if (pmc->sk_mark)
+					skb->mark = pmc->sk_mark;
+#endif
 				igmpv3_sendpack(skb);
+			}
 			skb = igmpv3_newpack(dev, dev->mtu);
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+			if (skb)
+				if (pmc->sk_mark)
+					skb->mark = pmc->sk_mark;
+#endif
 			first = 1;
 			scount = 0;
 		}
@@ -482,6 +510,11 @@ empty_source:
 		if (pmc->crcount || isquery) {
 			/* make sure we have room for group header */
 			if (skb && AVAILABLE(skb)<sizeof(struct igmpv3_grec)) {
+				
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+				if (pmc->sk_mark)
+					skb->mark = pmc->sk_mark;
+#endif
 				igmpv3_sendpack(skb);
 				skb = NULL; /* add_grhead will get a new one */
 			}
@@ -512,6 +545,11 @@ static int igmpv3_send_report(struct in_device *in_dev, struct ip_mc_list *pmc)
 			else
 				type = IGMPV3_MODE_IS_INCLUDE;
 			skb = add_grec(skb, pmc, type, 0, 0);
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+			if (skb && pmc) {
+				skb->mark = pmc->sk_mark;
+			}
+#endif
 			spin_unlock_bh(&pmc->lock);
 		}
 		read_unlock(&in_dev->mc_list_lock);
@@ -522,6 +560,11 @@ static int igmpv3_send_report(struct in_device *in_dev, struct ip_mc_list *pmc)
 		else
 			type = IGMPV3_MODE_IS_INCLUDE;
 		skb = add_grec(skb, pmc, type, 0, 0);
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+		if (skb && pmc) {
+			skb->mark = pmc->sk_mark;
+		}
+#endif
 		spin_unlock_bh(&pmc->lock);
 	}
 	if (!skb)
@@ -620,6 +663,12 @@ static void igmpv3_send_cr(struct in_device *in_dev)
 
 	if (!skb)
 		return;
+
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+	if (pmc && pmc->sk_mark)
+		skb->mark = pmc->sk_mark;
+#endif
+
 	(void) igmpv3_sendpack(skb);
 }
 
@@ -661,6 +710,12 @@ static int igmp_send_report(struct in_device *in_dev, struct ip_mc_list *pmc,
 	}
 
 	skb_dst_set(skb, &rt->dst);
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+	if (pmc && pmc->sk_mark)
+		skb->mark = pmc->sk_mark;
+		/* dbg_info */
+		//printk("xyz_dbg:%s, sk->mark is %x\n",__FUNCTION__, skb->mark);
+#endif
 
 	skb_reserve(skb, LL_RESERVED_SPACE(dev));
 
@@ -1045,6 +1100,11 @@ static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 	pmc->interface = im->interface;
 	in_dev_hold(in_dev);
 	pmc->multiaddr = im->multiaddr;
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+	//printk("xyz_dbg:%s, pmc->sk_mark is %x\n", __FUNCTION__, pmc->sk_mark);
+	pmc->sk_mark = im->sk_mark;
+#endif
+
 	pmc->crcount = in_dev->mr_qrv ? in_dev->mr_qrv :
 		IGMP_Unsolicited_Report_Count;
 	pmc->sfmode = im->sfmode;
@@ -1193,6 +1253,72 @@ static void igmp_group_added(struct ip_mc_list *im)
 #endif
 }
 
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+void ip_mc_inc_group_tc(struct in_device *in_dev, __be32 addr, __u32 sk_mark)
+{
+	struct ip_mc_list *im = NULL;
+
+	ASSERT_RTNL();
+
+	for (im=in_dev->mc_list; im; im=im->next) {
+		if (im->multiaddr == addr) {
+			/* update im->sk_mark from sk_mark */
+			im->sk_mark = sk_mark;
+			/* dbg_info */
+			//printk("xyz_dbg: %s, (update)im->sk_mark is %x\n", __FUNCTION__, im->sk_mark);
+			
+			im->users++;
+			ip_mc_add_src(in_dev, &addr, MCAST_EXCLUDE, 0, NULL, 0);
+			goto out;
+		}
+	}
+
+	im = kmalloc(sizeof(*im), GFP_KERNEL);
+	if (!im)
+		goto out;
+
+	/* set sk_mark */
+	im->sk_mark = sk_mark;
+	/* dbg_info */
+	//printk("xyz_dbg: %s, im->sk_mark is %x, addr is %x\n", __FUNCTION__, im->sk_mark, addr);
+	
+	im->users=1;
+	im->interface=in_dev;
+	in_dev_hold(in_dev);
+	im->multiaddr=addr;
+	/* initial mode is (EX, empty) */
+	im->sfmode = MCAST_EXCLUDE;
+	im->sfcount[MCAST_INCLUDE] = 0;
+	im->sfcount[MCAST_EXCLUDE] = 1;
+	im->sources = NULL;
+	im->tomb = NULL;
+	im->crcount = 0;
+	atomic_set(&im->refcnt, 1);
+	spin_lock_init(&im->lock);
+#ifdef CONFIG_IP_MULTICAST
+	im->tm_running=0;
+	init_timer(&im->timer);
+	im->timer.data=(unsigned long)im;
+	im->timer.function=&igmp_timer_expire;
+	im->unsolicit_count = IGMP_Unsolicited_Report_Count;
+	im->reporter = 0;
+	im->gsquery = 0;
+#endif
+	im->loaded = 0;
+	write_lock_bh(&in_dev->mc_list_lock);
+	im->next=in_dev->mc_list;
+	in_dev->mc_list=im;
+	write_unlock_bh(&in_dev->mc_list_lock);
+#ifdef CONFIG_IP_MULTICAST
+	igmpv3_del_delrec(in_dev, im->multiaddr);
+#endif
+	igmp_group_added(im);
+	if (!in_dev->dead)
+		ip_rt_multicast_event(in_dev);
+out:
+	return;
+}
+#endif
 
 /*
  *	Multicast list managers
@@ -1280,6 +1406,42 @@ void ip_mc_rejoin_group(struct ip_mc_list *im)
 #endif
 }
 EXPORT_SYMBOL(ip_mc_rejoin_group);
+
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+/*
+ *	A socket has left a multicast group on device dev
+ */
+
+void ip_mc_dec_group_tc(struct in_device *in_dev, __be32 addr, __u32 sk_mark)
+{
+	struct ip_mc_list *i = NULL, **ip = NULL;
+
+	ASSERT_RTNL();
+
+	for (ip=&in_dev->mc_list; (i=*ip)!=NULL; ip=&i->next) {
+		if (i->multiaddr==addr) {
+			
+			/* update sk_mark */
+			//printk("xyz_dbg:%s, i->sk_mark is %x,and sk_mark is %x\n", __FUNCTION__, i->sk_mark, sk_mark);
+			i->sk_mark = sk_mark;
+			
+			if (--i->users == 0) {
+				write_lock_bh(&in_dev->mc_list_lock);
+				*ip = i->next;
+				write_unlock_bh(&in_dev->mc_list_lock);
+				igmp_group_dropped(i);
+
+				if (!in_dev->dead)
+					ip_rt_multicast_event(in_dev);
+
+				ip_ma_put(i);
+				return;
+			}
+			break;
+		}
+	}
+}
+#endif
 
 /*
  *	A socket has left a multicast group on device dev
@@ -1792,6 +1954,18 @@ int ip_mc_join_group(struct sock *sk , struct ip_mreqn *imr)
 		err = -ENODEV;
 		goto done;
 	}
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+	struct ip_mc_list *im = NULL;
+	for (im=in_dev->mc_list; im; im=im->next) {
+		if (im->multiaddr == addr) {
+			/* update im->sk_mark from sk_mark */
+			im->sk_mark = sk->sk_mark;
+				
+			/* dbg_info */
+			//printk("xyz_dbg: %s, (update)im->sk_mark is %x\n", __FUNCTION__, im->sk_mark);
+		}
+	}
+#endif
 
 	err = -EADDRINUSE;
 	ifindex = imr->imr_ifindex;
@@ -1813,7 +1987,12 @@ int ip_mc_join_group(struct sock *sk , struct ip_mreqn *imr)
 	iml->sflist = NULL;
 	iml->sfmode = MCAST_EXCLUDE;
 	rcu_assign_pointer(inet->mc_list, iml);
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+		ip_mc_inc_group_tc(in_dev, addr, sk->sk_mark);
+#else
 	ip_mc_inc_group(in_dev, addr);
+#endif
+
 	err = 0;
 done:
 	rtnl_unlock();
@@ -1893,7 +2072,12 @@ int ip_mc_leave_group(struct sock *sk, struct ip_mreqn *imr)
 		rcu_assign_pointer(*imlp, iml->next);
 
 		if (in_dev)
+#ifdef CONFIG_TCSUPPORT_IGMP_QOS
+			ip_mc_dec_group_tc(in_dev, group, sk->sk_mark);
+#else
 			ip_mc_dec_group(in_dev, group);
+#endif
+
 		rtnl_unlock();
 		/* decrease mem now to avoid the memleak warning */
 		atomic_sub(sizeof(*iml), &sk->sk_omem_alloc);
@@ -2350,6 +2534,7 @@ int ip_check_mc(struct in_device *in_dev, __be32 mc_addr, __be32 src_addr, u16 p
 	read_unlock(&in_dev->mc_list_lock);
 	return rv;
 }
+
 
 #if defined(CONFIG_PROC_FS)
 struct igmp_mc_iter_state {

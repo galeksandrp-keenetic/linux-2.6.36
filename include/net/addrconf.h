@@ -260,6 +260,12 @@ static inline int ipv6_addr_is_isatap(const struct in6_addr *addr)
 	return ((addr->s6_addr32[2] | htonl(0x02000000)) == htonl(0x02005EFE));
 }
 
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+static inline int is_wan_dev(struct net_device *dev)
+{
+	return (strstr(dev->name, "nas") != NULL || strstr(dev->name, "ppp") != NULL);
+}
+#endif
 #ifdef CONFIG_PROC_FS
 extern int if6_proc_init(void);
 extern void if6_proc_exit(void);

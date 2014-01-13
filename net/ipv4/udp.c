@@ -107,6 +107,10 @@
 #include <net/xfrm.h>
 #include "udp_impl.h"
 
+#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../nat/hw_nat/ra_nat.h"
+#endif
+
 struct udp_table udp_table __read_mostly;
 EXPORT_SYMBOL(udp_table);
 
@@ -753,6 +757,10 @@ static int udp_push_pending_frames(struct sock *sk)
 		uh->check = CSUM_MANGLED_0;
 
 send:
+	
+#ifdef CONFIG_TCSUPPORT_QOS
+		skb->mark = sk->sk_mark; /*It's for marking rtp packets*/
+#endif
 	err = ip_push_pending_frames(sk);
 	if (err) {
 		if (err == -ENOBUFS && !inet->recverr) {
@@ -1141,6 +1149,12 @@ try_again:
 	if (!skb)
 		goto out;
 
+#if 1//def CONFIG_TCSUPPORT_IGMP_QOS
+		//sk->sk_mark = skb->mark;
+		sk->sk_mark |= (skb->mark & (~0xf0)); /* not change QoS info stored into sk->sk_mark */
+		/* dbg info */
+//		printk("laoyou_dbg:%s, sk->sk_mark is %x, skb=%x, sk=%x\n", __FUNCTION__, sk->sk_mark, (unsigned int)skb, (unsigned int)sk);
+#endif
 	ulen = skb->len - sizeof(struct udphdr);
 	if (len > ulen)
 		len = ulen;
@@ -1665,6 +1679,15 @@ drop:
 
 int udp_rcv(struct sk_buff *skb)
 {
+#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	if( IS_SPACE_AVAILABLED(skb) &&
+			((FOE_MAGIC_TAG(skb) == FOE_MAGIC_PCI) ||
+			 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ||
+			 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE))){
+		FOE_ALG(skb)=1;
+	}
+#endif
+
 	return __udp4_lib_rcv(skb, &udp_table, IPPROTO_UDP);
 }
 

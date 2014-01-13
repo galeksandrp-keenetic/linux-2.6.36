@@ -302,7 +302,7 @@ int ip6_mc_source(int add, int omode, struct sock *sk,
 {
 	struct in6_addr *source, *group;
 	struct ipv6_mc_socklist *pmc;
-	struct net_device *dev;
+	struct net_device *dev __maybe_unused;
 	struct inet6_dev *idev;
 	struct ipv6_pinfo *inet6 = inet6_sk(sk);
 	struct ip6_sf_socklist *psl;
@@ -440,7 +440,7 @@ int ip6_mc_msfilter(struct sock *sk, struct group_filter *gsf)
 {
 	struct in6_addr *group;
 	struct ipv6_mc_socklist *pmc;
-	struct net_device *dev;
+	struct net_device *dev __maybe_unused;
 	struct inet6_dev *idev;
 	struct ipv6_pinfo *inet6 = inet6_sk(sk);
 	struct ip6_sf_socklist *newpsl, *psl;
@@ -536,7 +536,7 @@ int ip6_mc_msfget(struct sock *sk, struct group_filter *gsf,
 	struct in6_addr *group;
 	struct ipv6_mc_socklist *pmc;
 	struct inet6_dev *idev;
-	struct net_device *dev;
+	struct net_device *dev __maybe_unused;
 	struct ipv6_pinfo *inet6 = inet6_sk(sk);
 	struct ip6_sf_socklist *psl;
 	struct net *net = sock_net(sk);
@@ -995,6 +995,7 @@ int ipv6_chk_mcast_addr(struct net_device *dev, const struct in6_addr *group,
 	rcu_read_unlock();
 	return rv;
 }
+
 
 static void mld_gq_start_timer(struct inet6_dev *idev)
 {

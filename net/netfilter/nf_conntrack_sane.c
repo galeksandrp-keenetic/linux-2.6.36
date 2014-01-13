@@ -28,6 +28,11 @@
 #include <net/netfilter/nf_conntrack_expect.h>
 #include <linux/netfilter/nf_conntrack_sane.h>
 
+#if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
+#include <asm/tc3162/tc3162.h>
+#endif
+
+
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Michal Schmidt <mschmidt@redhat.com>");
 MODULE_DESCRIPTION("SANE connection tracking helper");
@@ -191,8 +196,11 @@ static int __init nf_conntrack_sane_init(void)
 {
 	int i, j = -1, ret = 0;
 	char *tmpname;
-
+#if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
+    sane_buffer = kmalloc(NF_CONNTRACK_BUF_SIZE, GFP_KERNEL);
+#else
 	sane_buffer = kmalloc(65536, GFP_KERNEL);
+#endif
 	if (!sane_buffer)
 		return -ENOMEM;
 

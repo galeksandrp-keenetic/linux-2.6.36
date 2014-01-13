@@ -255,7 +255,7 @@ static unsigned int		rt_hash_log  __read_mostly;
 static DEFINE_PER_CPU(struct rt_cache_stat, rt_cache_stat);
 #define RT_CACHE_STAT_INC(field) __this_cpu_inc(rt_cache_stat.field)
 
-static inline unsigned int rt_hash(__be32 daddr, __be32 saddr, int idx,
+__IMEM static inline unsigned int rt_hash(__be32 daddr, __be32 saddr, int idx,
 				   int genid)
 {
 	return jhash_3words((__force u32)daddr, (__force u32)saddr,
@@ -1525,7 +1525,7 @@ void ip_rt_send_redirect(struct sk_buff *skb)
 {
 	struct rtable *rt = skb_rtable(skb);
 	struct in_device *in_dev;
-	int log_martians;
+	int log_martians __maybe_unused;
 
 	rcu_read_lock();
 	in_dev = __in_dev_get_rcu(rt->dst.dev);
@@ -2272,7 +2272,7 @@ martian_source_keep_err:
 	goto done;
 }
 
-int ip_route_input_common(struct sk_buff *skb, __be32 daddr, __be32 saddr,
+__IMEM int ip_route_input_common(struct sk_buff *skb, __be32 daddr, __be32 saddr,
 			   u8 tos, struct net_device *dev, bool noref)
 {
 	struct rtable * rth;

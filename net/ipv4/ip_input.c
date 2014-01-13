@@ -145,6 +145,9 @@
 #include <linux/mroute.h>
 #include <linux/netlink.h>
 
+#ifdef CONFIG_TCSUPPORT_RA_HWNAT
+#include <linux/foe_hook.h>
+#endif
 /*
  *	Process Router Attention IP option (RFC 2113)
  */
@@ -261,6 +264,10 @@ int ip_local_deliver(struct sk_buff *skb)
 			return 0;
 	}
 
+#if defined(CONFIG_TCSUPPORT_RA_HWNAT) && !defined(CONFIG_TCSUPPORT_MT7510_FE)
+	if (ra_sw_nat_hook_free)
+		ra_sw_nat_hook_free(skb);
+#endif
 	return NF_HOOK(NFPROTO_IPV4, NF_INET_LOCAL_IN, skb, skb->dev, NULL,
 		       ip_local_deliver_finish);
 }
@@ -314,7 +321,7 @@ drop:
 	return -1;
 }
 
-static int ip_rcv_finish(struct sk_buff *skb)
+__IMEM static int ip_rcv_finish(struct sk_buff *skb)
 {
 	const struct iphdr *iph = ip_hdr(skb);
 	struct rtable *rt;
@@ -372,7 +379,7 @@ drop:
 /*
  * 	Main IP Receive routine.
  */
-int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev)
+__IMEM int ip_rcv(struct sk_buff *skb, struct net_device *dev, struct packet_type *pt, struct net_device *orig_dev)
 {
 	struct iphdr *iph;
 	u32 len;

@@ -165,7 +165,11 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.mtu6			= IPV6_MIN_MTU,
 	.accept_ra		= 1,
 	.accept_redirects	= 1,
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+	.autoconf		= 0,
+#else
 	.autoconf		= 1,
+#endif
 	.force_mld_version	= 0,
 	.dad_transmits		= 1,
 	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
@@ -179,7 +183,11 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
 	.max_addresses		= IPV6_MAX_ADDRESSES,
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+	.accept_ra_defrtr	= 0,
+#else
 	.accept_ra_defrtr	= 1,
+#endif
 	.accept_ra_pinfo	= 1,
 #ifdef CONFIG_IPV6_ROUTER_PREF
 	.accept_ra_rtr_pref	= 1,
@@ -192,6 +200,9 @@ static struct ipv6_devconf ipv6_devconf __read_mostly = {
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
 	.disable_ipv6		= 0,
 	.accept_dad		= 1,
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+	.slaac_addr		="",
+#endif
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
@@ -200,7 +211,11 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.mtu6			= IPV6_MIN_MTU,
 	.accept_ra		= 1,
 	.accept_redirects	= 1,
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+	.autoconf		= 0,
+#else
 	.autoconf		= 1,
+#endif
 	.dad_transmits		= 1,
 	.rtr_solicits		= MAX_RTR_SOLICITATIONS,
 	.rtr_solicit_interval	= RTR_SOLICITATION_INTERVAL,
@@ -213,7 +228,11 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
 	.max_addresses		= IPV6_MAX_ADDRESSES,
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+	.accept_ra_defrtr	= 0,
+#else
 	.accept_ra_defrtr	= 1,
+#endif
 	.accept_ra_pinfo	= 1,
 #ifdef CONFIG_IPV6_ROUTER_PREF
 	.accept_ra_rtr_pref	= 1,
@@ -226,6 +245,9 @@ static struct ipv6_devconf ipv6_devconf_dflt __read_mostly = {
 	.accept_source_route	= 0,	/* we do not accept RH0 by default. */
 	.disable_ipv6		= 0,
 	.accept_dad		= 1,
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+	.slaac_addr		="",
+#endif
 };
 
 /* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
@@ -717,7 +739,7 @@ static void ipv6_del_addr(struct inet6_ifaddr *ifp)
 	struct inet6_ifaddr *ifa, *ifn;
 	struct inet6_dev *idev = ifp->idev;
 	int state;
-	int hash;
+	int hash __maybe_unused;
 	int deleted = 0, onlink = 0;
 	unsigned long expires = jiffies;
 
@@ -1921,6 +1943,10 @@ ok:
 				in6_dev_put(in6_dev);
 				return;
 			}
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+			/*Add for outputing slaac address by RA*/
+			sprintf(in6_dev->cnf.slaac_addr, NIP6_FMT" %d", NIP6(addr), pinfo->prefix_len);
+#endif
 
 			update_lft = create = 1;
 			ifp->cstamp = jiffies;
@@ -2387,11 +2413,37 @@ static void addrconf_dev_config(struct net_device *dev)
 	if (IS_ERR(idev))
 		return;
 
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+	/*Disable lan device add linklocal address,except br0*/
+	if(is_wan_dev(dev) || (strstr(dev->name, "br") != NULL)){
+		memset(&addr, 0, sizeof(struct in6_addr));
+		addr.s6_addr32[0] = htonl(0xFE800000);
+		
+		//printk("addrconf_dev_config:interface name:%s",dev->name);
+		/*set br0 local link address as fe80::1*/
+		if(strstr(dev->name, "br") != NULL){
+			addr.s6_addr[8] = 0;
+			addr.s6_addr[9] = 0;
+			addr.s6_addr[10] = 0;
+			addr.s6_addr[11] = 0;
+			addr.s6_addr[12] = 0;
+			addr.s6_addr[13] = 0;
+			addr.s6_addr[14] = 0;
+			addr.s6_addr[15] = 1;
+			addrconf_add_linklocal(idev, &addr);
+		}
+		else{
+		if (ipv6_generate_eui64(addr.s6_addr + 8, dev) == 0)
+			addrconf_add_linklocal(idev, &addr);
+		}
+	}
+#else
 	memset(&addr, 0, sizeof(struct in6_addr));
 	addr.s6_addr32[0] = htonl(0xFE800000);
 
 	if (ipv6_generate_eui64(addr.s6_addr + 8, dev) == 0)
 		addrconf_add_linklocal(idev, &addr);
+#endif
 }
 
 #if defined(CONFIG_IPV6_SIT) || defined(CONFIG_IPV6_SIT_MODULE)
@@ -2657,8 +2709,7 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 	struct net *net = dev_net(dev);
 	struct inet6_dev *idev;
 	struct inet6_ifaddr *ifa;
-	LIST_HEAD(keep_list);
-	int state;
+	int state, i;
 
 	ASSERT_RTNL();
 
@@ -2682,6 +2733,23 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 		/* Step 1.5: remove snmp6 entry */
 		snmp6_unregister_dev(idev);
 
+	}
+
+	/* Step 2: clear hash table */
+	for (i = 0; i < IN6_ADDR_HSIZE; i++) {
+		struct hlist_head *h = &inet6_addr_lst[i];
+		struct hlist_node *n;
+
+		spin_lock_bh(&addrconf_hash_lock);
+	restart:
+		hlist_for_each_entry_rcu(ifa, n, h, addr_lst) {
+			if (ifa->idev == idev) {
+				hlist_del_init_rcu(&ifa->addr_lst);
+				addrconf_del_timer(ifa);
+				goto restart;
+			}
+		}
+		spin_unlock_bh(&addrconf_hash_lock);
 	}
 
 	write_lock_bh(&idev->lock);
@@ -2717,60 +2785,23 @@ static int addrconf_ifdown(struct net_device *dev, int how)
 				       struct inet6_ifaddr, if_list);
 		addrconf_del_timer(ifa);
 
-		/* If just doing link down, and address is permanent
-		   and not link-local, then retain it. */
-		if (!how &&
-		    (ifa->flags&IFA_F_PERMANENT) &&
-		    !(ipv6_addr_type(&ifa->addr) & IPV6_ADDR_LINKLOCAL)) {
-			list_move_tail(&ifa->if_list, &keep_list);
+		list_del(&ifa->if_list);
 
-			/* If not doing DAD on this address, just keep it. */
-			if ((dev->flags&(IFF_NOARP|IFF_LOOPBACK)) ||
-			    idev->cnf.accept_dad <= 0 ||
-			    (ifa->flags & IFA_F_NODAD))
-				continue;
+		write_unlock_bh(&idev->lock);
 
-			/* If it was tentative already, no need to notify */
-			if (ifa->flags & IFA_F_TENTATIVE)
-				continue;
+		spin_lock_bh(&ifa->state_lock);
+		state = ifa->state;
+		ifa->state = INET6_IFADDR_STATE_DEAD;
+		spin_unlock_bh(&ifa->state_lock);
 
-			/* Flag it for later restoration when link comes up */
-			ifa->flags |= IFA_F_TENTATIVE;
-			ifa->state = INET6_IFADDR_STATE_DAD;
-
-			write_unlock_bh(&idev->lock);
-
-			in6_ifa_hold(ifa);
-		} else {
-			list_del(&ifa->if_list);
-
-			/* clear hash table */
-			spin_lock_bh(&addrconf_hash_lock);
-			hlist_del_init_rcu(&ifa->addr_lst);
-			spin_unlock_bh(&addrconf_hash_lock);
-
-			write_unlock_bh(&idev->lock);
-			spin_lock_bh(&ifa->state_lock);
-			state = ifa->state;
-			ifa->state = INET6_IFADDR_STATE_DEAD;
-			spin_unlock_bh(&ifa->state_lock);
-
-			if (state == INET6_IFADDR_STATE_DEAD)
-				goto put_ifa;
+		if (state != INET6_IFADDR_STATE_DEAD) {
+			__ipv6_ifa_notify(RTM_DELADDR, ifa);
+			atomic_notifier_call_chain(&inet6addr_chain, NETDEV_DOWN, ifa);
 		}
-
-		__ipv6_ifa_notify(RTM_DELADDR, ifa);
-		if (ifa->state == INET6_IFADDR_STATE_DEAD)
-			atomic_notifier_call_chain(&inet6addr_chain,
-						   NETDEV_DOWN, ifa);
-
-put_ifa:
 		in6_ifa_put(ifa);
 
 		write_lock_bh(&idev->lock);
 	}
-
-	list_splice(&keep_list, &idev->addr_list);
 
 	write_unlock_bh(&idev->lock);
 
@@ -2800,8 +2831,12 @@ static void addrconf_rs_timer(unsigned long data)
 	read_lock(&idev->lock);
 	if (idev->dead || !(idev->if_flags & IF_READY))
 		goto out;
-
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+	/*Enable WAN interface to send RS for SLAAC mode*/
+	if(!is_wan_dev(idev->dev))
+#else
 	if (idev->cnf.forwarding)
+#endif
 		goto out;
 
 	/* Announcement received after solicitation was sent */
@@ -2964,7 +2999,12 @@ static void addrconf_dad_completed(struct inet6_ifaddr *ifp)
 	   start sending router solicitations.
 	 */
 
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+	/*Enable WAN interface to send RS for SLAAC mode*/
+	if(is_wan_dev(ifp->idev->dev) &&
+#else
 	if (ifp->idev->cnf.forwarding == 0 &&
+#endif
 	    ifp->idev->cnf.rtr_solicits > 0 &&
 	    (dev->flags&IFF_LOOPBACK) == 0 &&
 	    (ipv6_addr_type(&ifp->addr) & IPV6_ADDR_LINKLOCAL)) {
@@ -4445,6 +4485,15 @@ static struct addrconf_sysctl_table
 			.mode		= 0644,
 			.proc_handler	= proc_dointvec,
 		},
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+		{
+			.procname	=	"slaac_addr",
+			.data		=	&ipv6_devconf.slaac_addr,
+			.maxlen		=	64,
+			.mode		=	0644,
+			.proc_handler	=	&proc_dostring,
+		},
+#endif
 		{
 			.procname       = "force_tllao",
 			.data           = &ipv6_devconf.force_tllao,

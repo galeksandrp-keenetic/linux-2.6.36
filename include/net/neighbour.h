@@ -67,6 +67,9 @@ struct neigh_parms {
 	int	proxy_delay;
 	int	proxy_qlen;
 	int	locktime;
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+	char dlf_route[64];
+#endif
 };
 
 struct neigh_statistics {

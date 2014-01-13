@@ -334,7 +334,24 @@ static int do_ipv6_setsockopt(struct sock *sk, int level, int optname,
 		np->rxopt.bits.rxflow = valbool;
 		retv = 0;
 		break;
+#if 1//def CONFIG_TCSUPPORT_IGMP_QOS
+	case IPV6_SKB_MARK:  
+	{
+		__u32 skb_mark = 0;
+		if (optlen < sizeof(__u32))
+			goto e_inval;
+		retv = -EFAULT;
+		if (copy_from_user(&skb_mark, optval, sizeof(__u32)))
+			break;
+		sk->sk_mark = skb_mark;
+		retv = 0;
 
+		/* dbg_info set*/
+		//printk("xyz_dbg-6:%s, skb_mark is %x\n", __FUNCTION__, skb_mark);
+				
+		break;
+	}
+#endif
 	case IPV6_RECVPATHMTU:
 		if (optlen < sizeof(int))
 			goto e_inval;
@@ -1027,6 +1044,24 @@ static int do_ipv6_getsockopt(struct sock *sk, int level, int optname,
 	case IPV6_2292RTHDR:
 		val = np->rxopt.bits.osrcrt;
 		break;
+#if 1//def CONFIG_TCSUPPORT_IGMP_QOS || defined(CONFIG_TCSUPPORT_REDIRECT_PORTMASK)
+	case IPV6_SKB_MARK:
+	{
+		__u32 skb_mark = 0;
+		len = sizeof(__u32);
+		skb_mark = sk->sk_mark;
+		release_sock(sk);
+		
+		/* dbg_info get */
+		//printk("v6 get xyz_dbg:%s, skb_mark is %x\n", __FUNCTION__, skb_mark);
+		
+		if (put_user(len, optlen))
+			return -EFAULT;
+		if (copy_to_user(optval, &skb_mark, len))
+			return -EFAULT;
+		return 0;
+	}	
+#endif
 
 	case IPV6_HOPOPTS:
 	case IPV6_RTHDRDSTOPTS:

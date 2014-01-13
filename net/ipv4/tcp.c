@@ -1707,6 +1707,12 @@ do_prequeue:
 
 		tcp_rcv_space_adjust(sk);
 
+
+#if 1//def CONFIG_TCSUPPORT_IGMP_QOS
+		sk->sk_mark = skb->mark;
+		/* dbg info */
+//		printk("xyz_dbg:%s, sk->sk_mark is %x\n", __FUNCTION__, sk->sk_mark);
+#endif
 skip_copy:
 		if (tp->urg_data && after(tp->copied_seq, tp->urg_seq)) {
 			tp->urg_data = 0;

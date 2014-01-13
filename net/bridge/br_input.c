@@ -18,10 +18,23 @@
 #include <linux/netfilter_bridge.h>
 #include "br_private.h"
 
+#if !defined(CONFIG_TCSUPPORT_CT)
+#ifdef CONFIG_PORT_BINDING
+extern int (*portbind_sw_hook)(void);
+extern int (*portbind_check_hook)(char *inIf, char *outIf);
+#endif
+#endif
+
+#ifdef CONFIG_TCSUPPORT_EPON_MAPPING
+extern int (*xpon_mode_get_hook)(void);
+extern int (*epon_sfu_mapping_hook)(struct sk_buff *skb, int port);
+#endif
+
 /* Bridge group multicast address 802.1d (pg 51). */
 const u8 br_group_address[ETH_ALEN] = { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x00 };
 
-static int br_pass_frame_up(struct sk_buff *skb)
+
+__IMEM static int br_pass_frame_up(struct sk_buff *skb)
 {
 	struct net_device *indev, *brdev = BR_INPUT_SKB_CB(skb)->brdev;
 	struct net_bridge *br = netdev_priv(brdev);
@@ -40,7 +53,7 @@ static int br_pass_frame_up(struct sk_buff *skb)
 }
 
 /* note: already called with rcu_read_lock */
-int br_handle_frame_finish(struct sk_buff *skb)
+__IMEM int br_handle_frame_finish(struct sk_buff *skb)
 {
 	const unsigned char *dest = eth_hdr(skb)->h_dest;
 	struct net_bridge_port *p = br_port_get_rcu(skb->dev);
@@ -54,8 +67,11 @@ int br_handle_frame_finish(struct sk_buff *skb)
 
 	/* insert into forwarding database after filtering to avoid spoofing */
 	br = p->br;
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+	br_fdb_update(br, p, eth_hdr(skb)->h_source, skb);
+#else
 	br_fdb_update(br, p, eth_hdr(skb)->h_source);
-
+#endif
 	if (is_multicast_ether_addr(dest) &&
 	    br_multicast_rcv(br, p, skb))
 		goto drop;
@@ -79,27 +95,95 @@ int br_handle_frame_finish(struct sk_buff *skb)
 			if ((mdst && !hlist_unhashed(&mdst->mglist)) ||
 			    br_multicast_is_router(br))
 				skb2 = skb;
+#if defined(CONFIG_PORT_BINDING) || defined(CONFIG_TCSUPPORT_PORTBIND)
+#if !defined(CONFIG_TCSUPPORT_CT) 
+		#if defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
+			if (portbind_sw_hook) 
+		#else
+			if (portbind_sw_hook && (portbind_sw_hook() == 1)) 
+		#endif
+			{	
+				br_multicast_pb_forward(mdst, p, skb, skb2);
+			}
+#endif
+			else {
+				br_multicast_forward(mdst, skb, skb2);
+			}
+#else			
 			br_multicast_forward(mdst, skb, skb2);
+#endif
 			skb = NULL;
 			if (!skb2)
 				goto out;
 		} else
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+		{
+#endif
 			skb2 = skb;
-
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+			/*drop the muticast packet if it is not in the muticast table*/
+			if(br_multicast_should_drop(br, skb)){
+				br_multicast_dump_packet_info(skb, 1);
+				goto up;
+			}
+		}	
+#endif	
 		br->dev->stats.multicast++;
-	} else if ((dst = __br_fdb_get(br, dest)) && dst->is_local) {
+	} else
+	{
+#if defined(CONFIG_PORT_BINDING) || defined(CONFIG_TCSUPPORT_PORTBIND)
+#if !defined(CONFIG_TCSUPPORT_CT) 
+	#if defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
+		if (portbind_sw_hook) 
+	#else
+		if (portbind_sw_hook && (portbind_sw_hook() == 1)) 
+	#endif
+		{
+		//printk("In port is %s\n", p->dev->name);
+			dst = __br_fdb_pb_get(br, p, dest);
+		}
+#endif
+		else {
+			dst = __br_fdb_get(br, dest);
+		}
+#else
+		dst = __br_fdb_get(br, dest);
+#endif
+
+		if (dst && dst->is_local) {
 		skb2 = skb;
 		/* Do not forward the packet since it's local. */
 		skb = NULL;
+	}
 	}
 
 	if (skb) {
 		if (dst)
 			br_forward(dst->dst, skb, skb2);
 		else
+		{
+#if defined(CONFIG_PORT_BINDING) || defined(CONFIG_TCSUPPORT_PORTBIND)
+#if !defined(CONFIG_TCSUPPORT_CT) 
+		#if defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
+			if (portbind_sw_hook) 
+		#else
+			if (portbind_sw_hook && (portbind_sw_hook() == 1)) 
+		#endif
+			{	
+				br_flood_pb_forward(br, p, skb, skb2);
+			}
+#endif
+			else {
+				br_flood_forward(br, skb, skb2);
+			}
+#else
 			br_flood_forward(br, skb, skb2);
+#endif
+		}
 	}
-
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE	
+up:
+#endif
 	if (skb2)
 		return br_pass_frame_up(skb2);
 
@@ -115,7 +199,12 @@ static int br_handle_local_finish(struct sk_buff *skb)
 {
 	struct net_bridge_port *p = br_port_get_rcu(skb->dev);
 
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+	br_fdb_update(p->br, p, eth_hdr(skb)->h_source, skb);
+#else
 	br_fdb_update(p->br, p, eth_hdr(skb)->h_source);
+#endif
+
 	return 0;	 /* process further */
 }
 
@@ -135,7 +224,7 @@ static inline int is_link_local(const unsigned char *dest)
  * Return NULL if skb is handled
  * note: already called with rcu_read_lock
  */
-struct sk_buff *br_handle_frame(struct sk_buff *skb)
+__IMEM struct sk_buff *br_handle_frame(struct sk_buff *skb)
 {
 	struct net_bridge_port *p;
 	const unsigned char *dest = eth_hdr(skb)->h_dest;
@@ -172,6 +261,66 @@ struct sk_buff *br_handle_frame(struct sk_buff *skb)
 forward:
 	switch (p->state) {
 	case BR_STATE_FORWARDING:
+/* McMCC, fixme!? */
+#if defined(CONFIG_PORT_BINDING) || defined(CONFIG_TCSUPPORT_REDIRECT_WITH_PORTMASK)
+		/*_____________________________________________
+		** remark packet from different lan interfac,
+		** use the highest 4 bits.
+		**
+		** eth0	  	0x10000000
+		** eth0.1 	0x10000000
+		** eth0.2 	0x20000000
+		** eth0.3 	0x30000000
+		** eth0.4 	0x40000000
+		** ra0	  	0x50000000
+		** ra1    	0x60000000
+		** ra2    	0x70000000
+		** ra3    	0x80000000
+		** usb0   	0x90000000
+		** wds0~3  	0xA0000000
+		**_________________________________________
+		*/
+#define		WLAN_DEV_OFFSET 		5
+#define		USB_DEV_OFFSET		9
+#define		WDS_DEV_OFFSET		10
+#define		DEV_OFFSET			28
+		switch (skb->dev->name[0]) {
+			case 'e':
+		#ifdef CONFIG_TCSUPPORT_TC2031
+				/* device name format must be eth0 */
+				skb->mark |= 0x10000000;
+		#else
+				/* device name format must be eth0.x */
+				if (skb->dev->name[4] == '.')
+					skb->mark |= (skb->dev->name[5] - '0') << DEV_OFFSET;
+		#endif
+#ifdef CONFIG_TCSUPPORT_EPON_MAPPING
+				if(xpon_mode_get_hook && epon_sfu_mapping_hook && (2 == xpon_mode_get_hook()) ){
+					//printk("EPONMAP: %s skb->dev->name[5]=%s \n", __FUNCTION__, skb->dev->name);
+					if (skb->dev->name[4] != '.'){
+						epon_sfu_mapping_hook(skb, 0); // only one lan port
+					}else{
+						epon_sfu_mapping_hook(skb, (skb->dev->name[5] - '1') );
+					}
+				}
+#endif
+				break;
+			case 'r':
+				/* device name must be rax */
+				skb->mark |= ((skb->dev->name[2] - '0') + WLAN_DEV_OFFSET) << DEV_OFFSET;
+				break;
+			case 'u':
+				/* device name must be usbx */
+				skb->mark |= ((skb->dev->name[3] - '0') + USB_DEV_OFFSET) << DEV_OFFSET;
+				break;
+			case 'w':
+				/* device name must be wdsx */
+				skb->mark |= (WDS_DEV_OFFSET) << DEV_OFFSET;
+				break;
+			default:
+				break;
+		}
+#endif
 		rhook = rcu_dereference(br_should_route_hook);
 		if (rhook != NULL) {
 			if (rhook(skb))

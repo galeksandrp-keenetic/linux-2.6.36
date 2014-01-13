@@ -180,6 +180,9 @@ struct xt_counters_info {
 
 #ifdef __KERNEL__
 
+#define xt_match_param xt_action_param
+#define xt_target_param xt_action_param
+
 #include <linux/netdevice.h>
 
 /**

@@ -29,6 +29,10 @@
 #include <net/netfilter/ipv4/nf_defrag_ipv4.h>
 #include <net/netfilter/nf_log.h>
 
+#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../../nat/hw_nat/ra_nat.h"
+#endif
+
 int (*nf_nat_seq_adjust_hook)(struct sk_buff *skb,
 			      struct nf_conn *ct,
 			      enum ip_conntrack_info ctinfo);
@@ -113,6 +117,15 @@ static unsigned int ipv4_confirm(unsigned int hooknum,
 	if (!helper)
 		goto out;
 
+#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	if( IS_SPACE_AVAILABLED(skb)  &&
+		((FOE_MAGIC_TAG(skb) == FOE_MAGIC_PCI) ||
+		 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ||
+		 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE))){
+	    FOE_ALG(skb)=1;
+	}
+#endif
+
 	ret = helper->help(skb, skb_network_offset(skb) + ip_hdrlen(skb),
 			   ct, ctinfo);
 	if (ret != NF_ACCEPT) {
@@ -135,7 +148,7 @@ out:
 	return nf_conntrack_confirm(skb);
 }
 
-static unsigned int ipv4_conntrack_in(unsigned int hooknum,
+__IMEM static unsigned int ipv4_conntrack_in(unsigned int hooknum,
 				      struct sk_buff *skb,
 				      const struct net_device *in,
 				      const struct net_device *out,

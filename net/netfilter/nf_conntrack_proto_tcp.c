@@ -28,7 +28,9 @@
 #include <net/netfilter/nf_log.h>
 #include <net/netfilter/ipv4/nf_conntrack_ipv4.h>
 #include <net/netfilter/ipv6/nf_conntrack_ipv6.h>
-
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+#include <linux/pktflow.h>
+#endif
 /* "Be conservative in what you do,
     be liberal in what you accept from others."
     If it's non-zero, we mark only out of window RST segments as INVALID. */
@@ -657,6 +659,9 @@ static bool tcp_in_window(const struct nf_conn *ct,
 		 before(sack, receiver->td_end + 1),
 		 after(sack, receiver->td_end - MAXACKWINDOW(sender) - 1));
 
+#if defined(CONFIG_TCSUPPORT_HWNAT) || defined(CONFIG_TCSUPPORT_RA_HWNAT) || defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	res = 1;
+#else
 	if (before(seq, sender->td_maxend + 1) &&
 	    after(end, sender->td_end - receiver->td_maxwin - 1) &&
 	    before(sack, receiver->td_end + 1) &&
@@ -735,7 +740,7 @@ static bool tcp_in_window(const struct nf_conn *ct,
 			: "SEQ is under the lower bound (already ACKed data retransmitted)"
 			: "SEQ is over the upper bound (over the window of the receiver)");
 	}
-
+#endif
 	pr_debug("tcp_in_window: res=%u sender end=%u maxend=%u maxwin=%u "
 		 "receiver end=%u maxend=%u maxwin=%u\n",
 		 res, sender->td_end, sender->td_maxend, sender->td_maxwin,
@@ -1010,6 +1015,15 @@ static int tcp_packet(struct nf_conn *ct,
 		 old_state, new_state);
 
 	ct->proto.tcp.state = new_state;
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+	if (th->fin) {
+    	if (pktflow_nfct_close_hook) 
+        	pktflow_nfct_close_hook(ct);
+		clear_bit(IPS_PKTFLOW_BIT, &ct->status);
+	}
+	if (ct->proto.tcp.state != TCP_CONNTRACK_ESTABLISHED) 
+   		pktflow_free(skb);
+#endif
 	if (old_state != new_state
 	    && new_state == TCP_CONNTRACK_FIN_WAIT)
 		ct->proto.tcp.seen[dir].flags |= IP_CT_TCP_FLAG_CLOSE_INIT;

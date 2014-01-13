@@ -36,7 +36,7 @@ ip6t_mangle_out(struct sk_buff *skb, const struct net_device *out)
 	unsigned int ret;
 	struct in6_addr saddr, daddr;
 	u_int8_t hop_limit;
-	u_int32_t flowlabel, mark;
+	u_int32_t flowlabel __maybe_unused, mark;
 
 #if 0
 	/* root is playing with raw sockets. */

@@ -41,7 +41,7 @@ static int xfrm6_beet_output(struct xfrm_state *x, struct sk_buff *skb)
 {
 	struct ipv6hdr *top_iph;
 	struct ip_beet_phdr *ph;
-	struct iphdr *iphv4;
+	struct iphdr *iphv4 __maybe_unused;
 	int optlen, hdr_len;
 
 	iphv4 = ip_hdr(skb);

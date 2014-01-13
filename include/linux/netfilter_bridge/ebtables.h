@@ -30,6 +30,8 @@
  * reclaim a part of this int for backwards compatible extensions.
  * The 4 lsb are more than enough to store the verdict. */
 #define EBT_VERDICT_BITS 0x0000000F
+#define EBT_VLAN_MARK      0x00000008  /*Rodney_20090724*/
+#define EBT_VLAN_REMARKING 0x00000010  /*Rodney_20090724*/
 
 struct xt_match;
 struct xt_target;
@@ -104,8 +106,21 @@ struct ebt_entries {
 #define EBT_802_3 0x04
 #define EBT_SOURCEMAC 0x08
 #define EBT_DESTMAC 0x10
+#if defined(CONFIG_TCSUPPORT_PON_MAC_FILTER)
+#define EBT_SOURCEMACSTART 0x100
+#define EBT_SOURCEMACEND 0x200
+#define EBT_DESTMACSTART 0x400
+#define EBT_DESTMACEND 0x800
+#endif
+
+#if defined(CONFIG_TCSUPPORT_PON_MAC_FILTER)
+#define EBT_F_MASK (EBT_NOPROTO | EBT_802_3 | EBT_SOURCEMAC | EBT_DESTMAC \
+   | EBT_SOURCEMACSTART |EBT_SOURCEMACEND |EBT_DESTMACSTART |EBT_DESTMACEND \
+   | EBT_ENTRY_OR_ENTRIES)
+#else
 #define EBT_F_MASK (EBT_NOPROTO | EBT_802_3 | EBT_SOURCEMAC | EBT_DESTMAC \
    | EBT_ENTRY_OR_ENTRIES)
+#endif
 
 #define EBT_IPROTO 0x01
 #define EBT_IIN 0x02
@@ -114,8 +129,21 @@ struct ebt_entries {
 #define EBT_IDEST 0x10
 #define EBT_ILOGICALIN 0x20
 #define EBT_ILOGICALOUT 0x40
+#if defined(CONFIG_TCSUPPORT_PON_MAC_FILTER)
+#define EBT_ISOURCESTART 0x100
+#define EBT_ISOURCEEND 0x200
+#define EBT_IDESTSTART 0x400
+#define EBT_IDESTEND 0x800
+#endif
+#if defined(CONFIG_TCSUPPORT_PON_MAC_FILTER)
+#define EBT_INV_MASK (EBT_IPROTO | EBT_IIN | EBT_IOUT | EBT_ILOGICALIN \
+   | EBT_ISOURCESTART |EBT_ISOURCEEND |EBT_IDESTSTART |EBT_IDESTEND \
+   | EBT_ILOGICALOUT | EBT_ISOURCE | EBT_IDEST)
+#else
 #define EBT_INV_MASK (EBT_IPROTO | EBT_IIN | EBT_IOUT | EBT_ILOGICALIN \
    | EBT_ILOGICALOUT | EBT_ISOURCE | EBT_IDEST)
+#endif
+
 
 struct ebt_entry_match {
 	union {
@@ -171,6 +199,16 @@ struct ebt_entry {
 	unsigned char sourcemsk[ETH_ALEN];
 	unsigned char destmac[ETH_ALEN];
 	unsigned char destmsk[ETH_ALEN];
+#if defined(CONFIG_TCSUPPORT_PON_MAC_FILTER)
+	unsigned char sourcemacstart[ETH_ALEN];
+	unsigned char sourcestartmsk[ETH_ALEN];
+	unsigned char sourcemacend[ETH_ALEN];
+	unsigned char sourceendmsk[ETH_ALEN];
+	unsigned char destmacstart[ETH_ALEN];
+	unsigned char deststartmsk[ETH_ALEN];
+	unsigned char destmacend[ETH_ALEN];
+	unsigned char destendmsk[ETH_ALEN];
+#endif
 	/* sizeof ebt_entry + matches */
 	unsigned int watchers_offset;
 	/* sizeof ebt_entry + matches + watchers */

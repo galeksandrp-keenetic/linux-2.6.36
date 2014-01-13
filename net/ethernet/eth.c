@@ -76,7 +76,7 @@ __setup("ether=", netdev_boot_setup);
  * Set the protocol type. For a packet of type ETH_P_802_3/2 we put the length
  * in here instead.
  */
-int eth_header(struct sk_buff *skb, struct net_device *dev,
+__IMEM int eth_header(struct sk_buff *skb, struct net_device *dev,
 	       unsigned short type,
 	       const void *daddr, const void *saddr, unsigned len)
 {
@@ -155,7 +155,7 @@ EXPORT_SYMBOL(eth_rebuild_header);
  * assume 802.3 if the type field is short enough to be a length.
  * This is normal practice and works for any 'now in use' protocol.
  */
-__be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev)
+__IMEM __be16 eth_type_trans(struct sk_buff *skb, struct net_device *dev)
 {
 	struct ethhdr *eth;
 

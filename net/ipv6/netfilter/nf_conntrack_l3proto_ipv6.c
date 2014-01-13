@@ -31,6 +31,12 @@
 #include <net/netfilter/ipv6/nf_conntrack_ipv6.h>
 #include <net/netfilter/nf_log.h>
 
+#if defined(CONFIG_RA_SW_NAT) || defined(CONFIG_RA_SW_NAT_MODULE)
+#include "../../nat/sw_nat/ra_nat.h"
+#elif  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../../nat/hw_nat/ra_nat.h"
+#endif
+
 static bool ipv6_pkt_to_tuple(const struct sk_buff *skb, unsigned int nhoff,
 			      struct nf_conntrack_tuple *tuple)
 {
@@ -177,6 +183,19 @@ static unsigned int ipv6_confirm(unsigned int hooknum,
 		pr_debug("proto header not found\n");
 		return NF_ACCEPT;
 	}
+
+#if defined(CONFIG_RA_SW_NAT) || defined(CONFIG_RA_SW_NAT_MODULE)
+	if( (skb_headroom(skb) >=4)  && (FOE_MAGIC_TAG(skb) == FOE_MAGIC_NUM) ) {
+	    FOE_HASH_NUM(skb) |= FOE_ALG_FLAGS;
+					            }
+#elif  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	if( IS_SPACE_AVAILABLED(skb)  &&
+		((FOE_MAGIC_TAG(skb) == FOE_MAGIC_PCI) ||
+		 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ||
+		 (FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE))){
+	    FOE_ALG(skb)=1;
+	}
+#endif
 
 	ret = helper->help(skb, protoff, ct, ctinfo);
 	if (ret != NF_ACCEPT) {

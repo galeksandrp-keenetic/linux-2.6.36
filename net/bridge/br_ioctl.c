@@ -21,6 +21,10 @@
 #include <asm/uaccess.h>
 #include "br_private.h"
 
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+int port_reverse = 0;
+EXPORT_SYMBOL(port_reverse);
+#endif
 /* called with RTNL */
 static int get_bridge_ifindices(struct net *net, int *indices, int num)
 {
@@ -81,6 +85,34 @@ static int get_fdb_entries(struct net_bridge *br, void __user *userbuf,
 
 	return num;
 }
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+static int get_mc_fdb_entries(struct net_bridge *br, void __user *userbuf,
+			   unsigned long maxnum, unsigned long offset)
+{
+	int num = 0;
+	void *buf = NULL;
+	size_t size = 0;
+
+	/* Clamp size to PAGE_SIZE, test maxnum to avoid overflow */
+	if (maxnum > PAGE_SIZE/sizeof(struct __mc_fdb_entry))
+		maxnum = PAGE_SIZE/sizeof(struct __mc_fdb_entry);
+
+	size = maxnum * sizeof(struct __mc_fdb_entry);
+
+	buf = kmalloc(size, GFP_USER);
+	if (!buf)
+		return -ENOMEM;
+
+	num = br_mdb_fillbuf(br, buf, maxnum, offset);
+	if (num > 0) {
+		if (copy_to_user(userbuf, buf, num*sizeof(struct __mc_fdb_entry)))
+			num = -EFAULT;
+	}
+	kfree(buf);
+
+	return num;
+}
+#endif
 
 /* called with RTNL */
 static int add_del_if(struct net_bridge *br, int ifindex, int isadd)
@@ -146,6 +178,12 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		b.tcn_timer_value = br_timer_value(&br->tcn_timer);
 		b.topology_change_timer_value = br_timer_value(&br->topology_change_timer);
 		b.gc_timer_value = br_timer_value(&br->gc_timer);
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+		b.igmpsnoop_ageing_time = br->multicast_membership_interval;
+		b.igmpsnoop_enabled = !br->multicast_disabled;
+		b.igmpsnoop_quickleave = br->quick_leave;
+		b.igmpsnoop_dbg = (__u8)get_snooping_debug();
+#endif
 		rcu_read_unlock();
 
 		if (copy_to_user((void __user *)args[1], &b, sizeof(b)))
@@ -247,6 +285,9 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 		p.message_age_timer_value = br_timer_value(&pt->message_age_timer);
 		p.forward_delay_timer_value = br_timer_value(&pt->forward_delay_timer);
 		p.hold_timer_value = br_timer_value(&pt->hold_timer);
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+		p.is_router = pt->multicast_router;
+#endif
 
 		rcu_read_unlock();
 
@@ -311,6 +352,40 @@ static int old_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	case BRCTL_GET_FDB_ENTRIES:
 		return get_fdb_entries(br, (void __user *)args[1],
 				       args[2], args[3]);
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+	case BRCTL_SET_IGMPSNOOPING_STATE:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+		br_multicast_toggle(br, args[1]);
+		return 0;
+
+	case BRCTL_SET_IGMPSNOOPING_AGEING_TIME:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+		spin_lock_bh(&br->lock);
+		br->multicast_membership_interval = clock_t_to_jiffies(args[1]);
+		spin_unlock_bh(&br->lock);
+		return 0;
+
+	case BRCTL_GET_MC_FDB_ENTRIES:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+		return get_mc_fdb_entries(br, (void __user *)args[1],
+				       args[2], args[3]);
+
+	case BRCTL_SET_IGMPSNOOPING_QUICKLEAVE:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+			br->quick_leave = args[1];	
+		return 0;
+		
+	case BRCTL_SET_IGMPSNOOPING_DBG:
+		if (!capable(CAP_NET_ADMIN))
+			return -EPERM;
+		set_snooping_debug((int)args[1]);
+		printk("snoop debug=[%d]\n", get_snooping_debug());
+		return 0;
+#endif
 	}
 
 	return -EOPNOTSUPP;

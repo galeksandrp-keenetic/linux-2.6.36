@@ -31,6 +31,18 @@
 #include "vlan.h"
 #include "vlanproc.h"
 #include <linux/if_vlan.h>
+#ifdef CONFIG_TCSUPPORT_VLAN_TAG
+extern int (*remove_vtag_hook)(struct sk_buff *skb, struct net_device *dev);
+extern int (*insert_vtag_hook)(struct sk_buff **pskb);
+//#if !defined(CONFIG_TCSUPPORT_FTP_THROUGHPUT)
+extern int (*check_vtag_hook)(void);
+//#endif
+#endif
+
+
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+extern int (*pon_store_tag_hook)(struct sk_buff *skb, struct net_device *orig_dev);
+#endif
 
 /*
  *	Rebuild the Ethernet MAC header. This is called after an ARP
@@ -115,6 +127,9 @@ static inline void vlan_set_encap_proto(struct sk_buff *skb,
 		skb->protocol = htons(ETH_P_802_2);
 }
 
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+EXPORT_SYMBOL(vlan_skb_recv);
+#endif
 /*
  *	Determine the packet's protocol ID. The rule here is that we
  *	assume 802.3 if the type field is short enough to be a length.
@@ -145,6 +160,12 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	struct net_device *vlan_dev;
 	u16 vlan_id;
 	u16 vlan_tci;
+#if defined(CONFIG_TCSUPPORT_VLAN_TAG)
+	u16 *proto = NULL;
+#endif
+#if defined(CONFIG_TCSUPPORT_PON_VLAN)
+	int ret = 0;
+#endif
 
 	skb = skb_share_check(skb, GFP_ATOMIC);
 	if (skb == NULL)
@@ -157,6 +178,22 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	vlan_tci = ntohs(vhdr->h_vlan_TCI);
 	vlan_id = vlan_tci & VLAN_VID_MASK;
 
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+#if 0
+	if(orig_dev->name[0] == 'e')
+		skb->pon_vlan_flag |= PON_PKT_FROM_LAN;
+	else if(orig_dev->name[0] == 'n')
+	{
+		skb->pon_vlan_flag |= PON_PKT_FROM_WAN;
+		skb->pon_vlan_flag |= PON_PKT_ROUTING_FLAG;
+	}
+#endif
+	if(ptype->type != ETH_P_8021Q)
+	{
+		goto Pon_Handle;
+	}
+#endif
+
 	rcu_read_lock();
 	vlan_dev = __find_vlan_dev(dev, vlan_id);
 
@@ -168,14 +205,91 @@ int vlan_skb_recv(struct sk_buff *skb, struct net_device *dev,
 	 */
 
 	if (!vlan_dev) {
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+Pon_Handle:
+	if(pon_store_tag_hook)
+	{
+		ret = pon_store_tag_hook(skb, orig_dev);
+		if(ret == 0)
+		{
+			netif_rx(skb);
+			return 0;
+		}
+		else if(ret == -1)
+		{
+			kfree_skb(skb);
+			return -1;
+		}
+		else
+		{
+			//HGU mode,do nothing
+		}
+	}
+#endif
+	#ifdef CONFIG_TCSUPPORT_VLAN_TAG
+		if (check_vtag_hook && (check_vtag_hook() == 1)) {
+			if (remove_vtag_hook) {
+				 if (remove_vtag_hook(skb, orig_dev) == -1) {
+				 	/* must free skb !! */
+					kfree_skb(skb);
+					rcu_read_unlock();
+					return -1;
+				 }
+				 else {
+				 	netif_rx(skb);
+					rcu_read_unlock();
+					return 0;
+				 }
+			}
+			else {
+				goto Normal_Handle;
+			}
+		}
+		else {
+Normal_Handle:
+#if !defined(CONFIG_TCSUPPORT_CT) 
+			if((orig_dev != NULL) && ((orig_dev->name[0] == 'b') || (orig_dev->name[0] == 'n'))) 
+#endif
+			{
+				proto = vhdr->h_vlan_encapsulated_proto;
+				skb->protocol = proto;
+				/* Take off the VLAN header (4 bytes currently) */
+				skb_pull_rcsum(skb, VLAN_HLEN);
+				skb->dev = orig_dev;
+				netif_rx(skb);
+				rcu_read_unlock();
+				return 0;
+			}
+			else {
+				pr_debug("%s: ERROR: No net_device for VID: %u on dev: %s\n",
+					 __func__, vlan_id, dev->name);
+				kfree_skb(skb);
+				rcu_read_unlock();
+				return -1;
+
+			}
+		}
+	#else
 		if (vlan_id) {
 			pr_debug("%s: ERROR: No net_device for VID: %u on dev: %s\n",
 				 __func__, vlan_id, dev->name);
 			goto err_unlock;
 		}
 		rx_stats = NULL;
+	#endif
 	} else {
 		skb->dev = vlan_dev;
+
+#if !defined(CONFIG_TCSUPPORT_CT) 
+#ifdef CONFIG_PORT_BINDING
+		if (skb->dev->name[0] == 'e') {
+		//	skb->mark |= MASK_ORIGIN_DEV;
+			skb->portbind_mark |= MASK_ORIGIN_DEV;
+			memcpy(skb->orig_dev_name, skb->dev->name, IFNAMSIZ);
+			//printk("vlan_skb_recv: begin orig_dev name is [%s], orig_dev name is [%s]\n", skb->orig_dev_name, orig_dev->name);
+		}
+#endif
+#endif
 
 		rx_stats = per_cpu_ptr(vlan_dev_info(skb->dev)->vlan_rx_stats,
 					smp_processor_id());
@@ -307,6 +421,38 @@ static int vlan_dev_hard_header(struct sk_buff *skb, struct net_device *dev,
 		rc += vhdrlen;
 	return rc;
 }
+#ifdef CONFIG_TCSUPPORT_BRIDGE_FASTPATH
+
+int vlan_dev_fastbridge_hard_start_xmit(struct sk_buff *skb, struct net_device *dev)
+{
+	int i = skb_get_queue_mapping(skb);
+	struct netdev_queue *txq = netdev_get_tx_queue(dev, i);
+	unsigned short veth_TCI;
+
+	/* Construct the second two bytes. This field looks something
+	 * like:
+	 * usr_priority: 3 bits	 (high bits)
+	 * CFI		 1 bit
+	 * VLAN ID	 12 bits (low bits)
+	 */
+	veth_TCI = vlan_dev_info(dev)->vlan_id;
+	veth_TCI |= vlan_dev_get_egress_qos_mask(dev, skb);
+	skb = __vlan_put_tag(skb, veth_TCI);
+
+	if (!skb) {
+		txq->tx_dropped++;
+		return 0;
+	}
+
+	txq->tx_packets++;
+	txq->tx_bytes +=  skb->len;
+	skb->dev = vlan_dev_info(dev)->real_dev;
+	
+	return skb->dev->netdev_ops->ndo_start_xmit(skb, skb->dev);	 
+}
+EXPORT_SYMBOL(vlan_dev_fastbridge_hard_start_xmit);
+
+#endif
 
 static netdev_tx_t vlan_dev_hard_start_xmit(struct sk_buff *skb,
 					    struct net_device *dev)
@@ -316,6 +462,8 @@ static netdev_tx_t vlan_dev_hard_start_xmit(struct sk_buff *skb,
 	struct vlan_ethhdr *veth = (struct vlan_ethhdr *)(skb->data);
 	unsigned int len;
 	int ret;
+
+
 
 	/* Handle non-VLAN frames if they are sent to us, for example by DHCP.
 	 *

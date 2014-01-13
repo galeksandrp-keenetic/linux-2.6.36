@@ -23,7 +23,7 @@
 #include "br_private.h"
 
 /* net device transmit always called with BH disabled */
-netdev_tx_t br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
+__IMEM netdev_tx_t br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct net_bridge *br = netdev_priv(dev);
 	const unsigned char *dest = skb->data;
@@ -63,7 +63,18 @@ netdev_tx_t br_dev_xmit(struct sk_buff *skb, struct net_device *dev)
 		if (mdst || BR_INPUT_SKB_CB_MROUTERS_ONLY(skb))
 			br_multicast_deliver(mdst, skb);
 		else
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+		{
+			if(br_multicast_should_drop(br, skb)){
+				br_multicast_dump_packet_info(skb, 0);
+				kfree_skb(skb);
+				goto out;
+			}
+#endif			
 			br_flood_deliver(br, skb);
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+		}
+#endif
 	} else if ((dst = __br_fdb_get(br, dest)) != NULL)
 		br_deliver(dst->dst, skb);
 	else

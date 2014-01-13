@@ -139,6 +139,22 @@ same_src(const struct nf_conn *ct,
 		t->src.u3.ip == tuple->src.u3.ip &&
 		t->src.u.all == tuple->src.u.all);
 }
+/***************************************************************/
+typedef unsigned char uint8;
+void 
+dumpCell(uint8* src, int len){
+	int i=0;
+
+	printk("\r\nCell content %08x (len:%d) as flow:\r\n", src,len);
+	for(i=0; i<len; i++){
+		if((i&7)==0){
+			printk("\r\n");
+		}
+		printk(" %02x", src[i]);
+	}
+	printk("\r\n");
+}/*end dumpCell*/
+/**************************************************************/
 
 /* Only called for SRC manip */
 static int
@@ -151,10 +167,29 @@ find_appropriate_src(struct net *net, u16 zone,
 	const struct nf_conn_nat *nat;
 	const struct nf_conn *ct;
 	const struct hlist_node *n;
-
+	int rcu_cnt =0;
 	rcu_read_lock();
 	hlist_for_each_entry_rcu(nat, n, &net->ipv4.nat_bysource[h], bysource) {
+		rcu_cnt++;
+		if(rcu_cnt >= 10000){
+			rcu_read_unlock();
+			printk("***********nat num >10000   ***********\n");
+			return 0;
+			}
+
 		ct = nat->ct;
+
+		if(((((unsigned int)nat->bysource.next & 0xf0000000)!= 0x80000000) && (nat->bysource.next != NULL))
+			||((((unsigned int)nat->bysource.pprev & 0xf0000000) != 0x80000000) && (nat->bysource.pprev != NULL))
+			||(((unsigned int)ct & 0xf0000000) != 0x80000000)){
+				printk("\r\nDBG:: CT = NULL  h = %d",h);
+				printk("\r\nDBG::  null_ct_cnt = %d\r\n",rcu_cnt);
+					if(nat){
+						printk("\r\nDBG:: nat =%08x\n",nat);
+						dumpCell(nat,sizeof(struct nf_conn_nat));	
+					}		
+			}
+
 		if (same_src(ct, tuple) && nf_ct_zone(ct) == zone) {
 			/* Copy source part from reply tuple. */
 			nf_ct_invert_tuplepr(result,
@@ -289,8 +324,8 @@ nf_nat_setup_info(struct nf_conn *ct,
 	if (!nat) {
 		nat = nf_ct_ext_add(ct, NF_CT_EXT_NAT, GFP_ATOMIC);
 		if (nat == NULL) {
-			pr_debug("failed to add NAT extension\n");
-			return NF_ACCEPT;
+			pr_debug("\r\nrcu_debug: failed to add NAT extension\n");
+			return NF_DROP;
 		}
 	}
 
@@ -325,7 +360,6 @@ nf_nat_setup_info(struct nf_conn *ct,
 	/* Place in source hash if this is the first time. */
 	if (have_to_hash) {
 		unsigned int srchash;
-
 		srchash = hash_by_src(net, nf_ct_zone(ct),
 				      &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple);
 		spin_lock_bh(&nf_nat_lock);
@@ -549,7 +583,7 @@ static void nf_nat_cleanup_conntrack(struct nf_conn *ct)
 
 	NF_CT_ASSERT(nat->ct->status & IPS_NAT_DONE_MASK);
 
-	spin_lock_bh(&nf_nat_lock);
+ spin_lock_bh(&nf_nat_lock);
 	hlist_del_rcu(&nat->bysource);
 	spin_unlock_bh(&nf_nat_lock);
 }

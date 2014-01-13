@@ -1196,7 +1196,7 @@ EXPORT_SYMBOL(neigh_compat_output);
 
 /* Slow and careful. */
 
-int neigh_resolve_output(struct sk_buff *skb)
+__IMEM int neigh_resolve_output(struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb_dst(skb);
 	struct neighbour *neigh;
@@ -1242,7 +1242,7 @@ EXPORT_SYMBOL(neigh_resolve_output);
 
 /* As fast as possible without hh cache */
 
-int neigh_connected_output(struct sk_buff *skb)
+__IMEM int neigh_connected_output(struct sk_buff *skb)
 {
 	int err;
 	struct dst_entry *dst = skb_dst(skb);
@@ -2563,7 +2563,11 @@ EXPORT_SYMBOL(neigh_app_ns);
 
 #ifdef CONFIG_SYSCTL
 
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+#define NEIGH_VARS_MAX 20
+#else
 #define NEIGH_VARS_MAX 19
+#endif
 
 static struct neigh_sysctl_table {
 	struct ctl_table_header *sysctl_header;
@@ -2655,6 +2659,14 @@ static struct neigh_sysctl_table {
 			.mode		= 0644,
 			.proc_handler	= proc_dointvec_ms_jiffies,
 		},
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+		{
+			.procname	= "default_route",
+			.maxlen		= 64,
+			.mode		= 0644,
+			.proc_handler	= &proc_dostring,
+		},
+#endif
 		{
 			.procname	= "gc_interval",
 			.maxlen		= sizeof(int),
@@ -2724,13 +2736,28 @@ int neigh_sysctl_register(struct net_device *dev, struct neigh_parms *p,
 	if (dev) {
 		dev_name_source = dev->name;
 		/* Terminate the table early */
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+		t->neigh_vars[14].data  = &p->dlf_route;
+		memset(&t->neigh_vars[15], 0, sizeof(t->neigh_vars[15]));
+#else
 		memset(&t->neigh_vars[14], 0, sizeof(t->neigh_vars[14]));
+#endif
+
 	} else {
 		dev_name_source = neigh_path[NEIGH_CTL_PATH_DEV].procname;
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+		t->neigh_vars[14].data  = &p->dlf_route;
+		t->neigh_vars[15].data = (int *)(p + 1);
+		t->neigh_vars[16].data = (int *)(p + 1) + 1;
+		t->neigh_vars[17].data = (int *)(p + 1) + 2;
+		t->neigh_vars[18].data = (int *)(p + 1) + 3;
+
+#else
 		t->neigh_vars[14].data = (int *)(p + 1);
 		t->neigh_vars[15].data = (int *)(p + 1) + 1;
 		t->neigh_vars[16].data = (int *)(p + 1) + 2;
 		t->neigh_vars[17].data = (int *)(p + 1) + 3;
+#endif
 	}
 
 

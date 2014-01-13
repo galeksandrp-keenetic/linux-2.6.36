@@ -16,6 +16,27 @@
 #include <net/protocol.h>
 #include <net/udp.h>
 
+#if defined(CONFIG_MTK_CRYPTO_DRIVER) || defined(CONFIG_RALINK_HWCRYPTO) || defined(CONFIG_RALINK_HWCRYPTO_MODULE)
+#ifdef CONFIG_TCSUPPORT_IPSEC_PASSTHROUGH
+extern int
+ipsec_esp_input_handler(
+	struct xfrm_state *x,
+	struct sk_buff *skb
+);
+
+#else
+extern int
+ipsec_esp_input(
+	struct xfrm_state *x, 
+	struct sk_buff *skb
+);
+#endif
+extern int
+ipsec_esp_output(
+	struct xfrm_state *x, 
+	struct sk_buff *skb
+);
+#else
 struct esp_skb_cb {
 	struct xfrm_skb_cb xfrm;
 	void *tmp;
@@ -315,6 +336,7 @@ static void esp_input_done(struct crypto_async_request *base, int err)
 
 	xfrm_input_resume(skb, esp_input_done2(skb, err));
 }
+#endif /* #if defined (CONFIG_RALINK_HWCRYPTO) || defined (CONFIG_RALINK_HWCRYPTO_MODULE) */
 
 /*
  * Note: detecting truncated vs. non-truncated authentication data is very
@@ -381,6 +403,7 @@ static int esp_input(struct xfrm_state *x, struct sk_buff *skb)
 out:
 	return err;
 }
+#endif /* #ifdef CONFIG_MTK_CRYPTO_DRIVER   */
 
 static u32 esp4_get_mtu(struct xfrm_state *x, int mtu)
 {
@@ -611,8 +634,17 @@ static const struct xfrm_type esp_type =
 	.init_state	= esp_init_state,
 	.destructor	= esp_destroy,
 	.get_mtu	= esp4_get_mtu,
+#if defined(CONFIG_MTK_CRYPTO_DRIVER) || defined(CONFIG_RALINK_HWCRYPTO) || defined(CONFIG_RALINK_HWCRYPTO_MODULE)
+#ifdef CONFIG_TCSUPPORT_IPSEC_PASSTHROUGH
+	.input		= ipsec_esp_input_handler,
+#else
+	.input		= ipsec_esp_input,
+#endif
+	.output		= ipsec_esp_output
+#else
 	.input		= esp_input,
 	.output		= esp_output
+#endif
 };
 
 static const struct net_protocol esp4_protocol = {

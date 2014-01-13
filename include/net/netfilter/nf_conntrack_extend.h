@@ -56,13 +56,16 @@ static inline void nf_ct_ext_destroy(struct nf_conn *ct)
 		__nf_ct_ext_destroy(ct);
 }
 
+void __nf_ct_ext_free_rcu(struct rcu_head *head);
+
 /* Free operation. If you want to free a object referred from private area,
  * please implement __nf_ct_ext_free() and call it.
  */
 static inline void nf_ct_ext_free(struct nf_conn *ct)
 {
 	if (ct->ext)
-		kfree(ct->ext);
+		//kfree(ct->ext);
+		call_rcu(&ct->ext->rcu, __nf_ct_ext_free_rcu);
 }
 
 /* Add this type, returns pointer to data or NULL. */

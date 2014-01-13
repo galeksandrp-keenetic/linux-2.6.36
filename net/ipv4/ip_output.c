@@ -80,6 +80,15 @@
 #include <linux/mroute.h>
 #include <linux/netlink.h>
 #include <linux/tcp.h>
+#ifdef CONFIG_TCSUPPORT_IPSEC_PASSTHROUGH
+#include <net/mtk_esp.h>
+#endif
+
+
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include "../../net/nat/hw_nat/ra_nat.h"
+#include "../../net/nat/hw_nat/frame_engine.h"
+#endif
 
 int sysctl_ip_default_ttl __read_mostly = IPDEFTTL;
 
@@ -97,6 +106,7 @@ int __ip_local_out(struct sk_buff *skb)
 
 	iph->tot_len = htons(skb->len);
 	ip_send_check(iph);
+
 	return nf_hook(NFPROTO_IPV4, NF_INET_LOCAL_OUT, skb, NULL,
 		       skb_dst(skb)->dev, dst_output);
 }
@@ -170,12 +180,18 @@ int ip_build_and_send_pkt(struct sk_buff *skb, struct sock *sk,
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
 
+#ifdef CONFIG_QOS
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+		skb->mark |= QOS_DEFAULT_MARK;
+#endif
+#endif
+
 	/* Send it out. */
 	return ip_local_out(skb);
 }
 EXPORT_SYMBOL_GPL(ip_build_and_send_pkt);
 
-static inline int ip_finish_output2(struct sk_buff *skb)
+__IMEM static inline int ip_finish_output2(struct sk_buff *skb)
 {
 	struct dst_entry *dst = skb_dst(skb);
 	struct rtable *rt = (struct rtable *)dst;
@@ -202,6 +218,12 @@ static inline int ip_finish_output2(struct sk_buff *skb)
 		skb = skb2;
 	}
 
+#ifdef CONFIG_QOS
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+		skb->mark |= QOS_DEFAULT_MARK;
+#endif
+#endif
+
 	if (dst->hh)
 		return neigh_hh_output(dst->hh, skb);
 	else if (dst->neighbour)
@@ -221,7 +243,7 @@ static inline int ip_skb_dst_mtu(struct sk_buff *skb)
 	       skb_dst(skb)->dev->mtu : dst_mtu(skb_dst(skb));
 }
 
-static int ip_finish_output(struct sk_buff *skb)
+__IMEM static int ip_finish_output(struct sk_buff *skb)
 {
 #if defined(CONFIG_NETFILTER) && defined(CONFIG_XFRM)
 	/* Policy lookup after SNAT yielded a new policy */
@@ -230,6 +252,18 @@ static int ip_finish_output(struct sk_buff *skb)
 		return dst_output(skb);
 	}
 #endif
+
+#ifdef CONFIG_TCSUPPORT_IPSEC_PASSTHROUGH
+	if(1 == skb->ipsec_pt_flag)
+	{
+		struct adapterlistpara_s ptr;
+		ptr.para = 0;
+		ptr.skb = skb;
+		ipsec_set_adatpterlist_para(&ptr);
+		skb->ipsec_pt_flag = 0;
+	}
+#endif	
+	
 	if (skb->len > ip_skb_dst_mtu(skb) && !skb_is_gso(skb))
 		return ip_fragment(skb, ip_finish_output2);
 	else
@@ -297,7 +331,7 @@ int ip_mc_output(struct sk_buff *skb)
 			    !(IPCB(skb)->flags & IPSKB_REROUTED));
 }
 
-int ip_output(struct sk_buff *skb)
+__IMEM int ip_output(struct sk_buff *skb)
 {
 	struct net_device *dev = skb_dst(skb)->dev;
 
@@ -392,6 +426,11 @@ packet_routed:
 
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
+
+#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	FOE_MAGIC_TAG(skb) = 0;
+	FOE_AI(skb) = UN_HIT;
+#endif
 
 	res = ip_local_out(skb);
 	rcu_read_unlock();
@@ -1450,6 +1489,8 @@ void __init ip_init(void)
 	inet_initpeers();
 
 #if defined(CONFIG_IP_MULTICAST) && defined(CONFIG_PROC_FS)
+#ifdef CONFIG_IGMP
 	igmp_mc_proc_init();
+#endif
 #endif
 }

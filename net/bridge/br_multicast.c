@@ -33,6 +33,28 @@
 
 #include "br_private.h"
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+static int snoopingdebug = 0;
+
+#define DEBUGP_SNOOP(x, args...) if(snoopingdebug) printk(x, ## args)
+static void br_multicast_leave_group(struct net_bridge * br,struct net_bridge_port * port,struct br_ip * group);
+static void br_ip4_multicast_leave_group(struct net_bridge * br,struct net_bridge_port * port,__be32 group);
+static void br_multicast_send_query(struct net_bridge *br,
+				    struct net_bridge_port *port, u32 sent);
+static void __br_multicast_send_query(struct net_bridge *br,
+				      struct net_bridge_port *port,
+				      struct br_ip *ip);
+static void __br_multicast_enable_port(struct net_bridge_port *port);
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+static void br_ip6_multicast_leave_group(struct net_bridge *br,
+					 struct net_bridge_port *port,
+					 const struct in6_addr *group);
+#endif
+
+
+#endif
+
+
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 static inline int ipv6_is_local_multicast(const struct in6_addr *addr)
 {
@@ -84,6 +106,152 @@ static inline int br_ip_hash(struct net_bridge_mdb_htable *mdb,
 	}
 	return 0;
 }
+
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+
+/*   merge form TC2 main trunck
+ * Convert IP6 address to printable (loggable) representation.
+ */
+static char digits[] = "0123456789abcdef";
+static int ip6round = 0;
+
+char* ip6_sprintf(const struct in6_addr *addr)
+{
+	static char ip6buf[8][48];
+	int i = 0;
+	char *cp = NULL;
+	const u_int16_t *a = (const u_int16_t *)addr;
+	const u_int8_t *d = NULL;
+	int dcolon = 0;
+
+	ip6round = (ip6round + 1) & 7;
+	cp = ip6buf[ip6round];
+
+	for (i = 0; i < 8; i++) {
+		if (dcolon == 1) {
+			if (*a == 0) {
+				if (i == 7)
+					*cp++ = ':';
+				a++;
+				continue;
+			} else
+				dcolon = 2;
+		}
+		if (*a == 0) {
+			if (dcolon == 0 && *(a + 1) == 0) {
+				if (i == 0)
+					*cp++ = ':';
+				*cp++ = ':';
+				dcolon = 1;
+			} else {
+				*cp++ = '0';
+				*cp++ = ':';
+			}
+			a++;
+			continue;
+		}
+		d = (const u_char *)a;
+		{
+			char ch[4] = {0};
+			char i, j;
+			ch[0] = digits[*d >> 4];
+			ch[1] = digits[*d++ & 0xf];
+			ch[2] = digits[*d >> 4];
+			ch[3] = digits[*d & 0xf];
+			for(i=0; i<4; i++)
+			{
+				if(ch[i] != '0')
+					break;
+			}
+			if(i==4)
+				*cp++ = digits[0];
+			else
+				for(j=i; j<4; j++) *cp++ = ch[j];
+		}
+		*cp++ = ':';
+		a++;
+	}
+	*--cp = 0;
+	return (ip6buf[ip6round]);
+}
+
+int get_snooping_debug()
+{
+	return snoopingdebug;
+}
+void set_snooping_debug(int value)
+{
+	snoopingdebug = value;
+}
+
+static inline int has_expired(const struct net_bridge *br,
+				  const struct net_bridge_port_group *bpg)
+{
+	return time_before_eq((bpg->ageing_time + br->multicast_membership_interval+(br->quick_leave?0:2*HZ)), jiffies);
+}
+
+int br_mdb_fillbuf(struct net_bridge *br, void *buf,
+		   unsigned long maxnum, unsigned long skip)
+{
+	struct __mc_fdb_entry *fe = buf;
+	struct net_bridge_mdb_htable *mdb = NULL;
+	struct net_bridge_port_group *bpg = NULL;
+	int i = 0, num = 0;
+	long result = 0;
+	struct hlist_node *h = NULL;
+	struct net_bridge_mdb_entry *f = NULL;
+	
+	mdb = br->mdb;
+	if(!mdb)
+		return 0;
+	memset(buf, 0, maxnum*sizeof(struct __mc_fdb_entry));
+	
+	rcu_read_lock();
+	spin_lock(&br->multicast_lock);
+	for (i = 0; i < mdb->max; i++) {
+		hlist_for_each_entry_rcu(f, h, &mdb->mhash[i], hlist[mdb->ver]) {
+			if (num >= maxnum)
+				goto out;
+			if (skip) {
+				--skip;
+				continue;
+			}
+			bpg = f->ports;
+			while(bpg){
+				if (has_expired(br, bpg)){
+					bpg = bpg->next;
+					continue;
+				}
+				if(bpg->version ==4){
+					sprintf(fe->group_addr,NIPQUAD_FMT ,NIPQUAD(bpg->addr.u.ip4));
+					sprintf(fe->src_addr, NIPQUAD_FMT, NIPQUAD(bpg->src_entry.src.s_addr));
+				}
+				else if(bpg->version == 6){
+					strncpy(fe->group_addr,ip6_sprintf(&bpg->addr.u.ip6),sizeof(fe->group_addr));
+					strncpy(fe->src_addr,ip6_sprintf(&bpg->src_entry.src6),sizeof(fe->src_addr));
+				}
+				fe->port_no = bpg->port->port_no;
+				fe->version = bpg->version;
+				memcpy(fe->group_mac, bpg->group_mac, ETH_ALEN);
+				memcpy(fe->host_addr, bpg->port->macAddr.addr, ETH_ALEN);
+				
+				fe->filter_mode = bpg->src_entry.filt_mode;
+				result = jiffies - bpg->ageing_time;
+				fe->ageing_timer_value = jiffies_to_clock_t((result>0) ? result : 0);
+				bpg = bpg->next;
+				++fe;
+				++num;
+			}
+			
+		}
+	}
+
+ out:
+ 	spin_unlock(&br->multicast_lock);
+	rcu_read_unlock();
+	return num;
+}
+#endif
 
 static struct net_bridge_mdb_entry *__br_mdb_ip_get(
 	struct net_bridge_mdb_htable *mdb, struct br_ip *dst, int hash)
@@ -261,7 +429,17 @@ static void br_multicast_del_pg(struct net_bridge *br,
 	for (pp = &mp->ports; (p = *pp); pp = &p->next) {
 		if (p != pg)
 			continue;
-
+	#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+		if(pg->version == 4){
+			DEBUGP_SNOOP("mc_fdb_delete delete dev=%s group=" NIPQUAD_FMT " src ip=" NIPQUAD_FMT "\n",  
+			pg->port->dev->name, NIPQUAD(pg->addr.u.ip4),NIPQUAD(pg->src_entry.src.s_addr));
+		}
+		else if(pg->version == 6)
+		{
+			DEBUGP_SNOOP("mc_fdb_delete deleteV6 dev=%s group=[%s] src ip=[%s]\n",  
+			pg->port->dev->name, ip6_sprintf(&pg->addr.u.ip6),ip6_sprintf(&pg->src_entry.src6));
+		}	
+	#endif
 		rcu_assign_pointer(*pp, p->next);
 		hlist_del_init(&p->mglist);
 		del_timer(&p->timer);
@@ -271,12 +449,78 @@ static void br_multicast_del_pg(struct net_bridge *br,
 		if (!mp->ports && hlist_unhashed(&mp->mglist) &&
 		    netif_running(br->dev))
 			mod_timer(&mp->timer, jiffies);
-
 		return;
 	}
 
 	WARN_ON(1);
 }
+
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+static void br_multicast_del_pg_byPort(struct net_bridge *br,
+				struct net_bridge_port *port)
+{
+	struct net_bridge_mdb_htable *mdb = NULL;
+	struct net_bridge_mdb_entry *mp = NULL;
+	//struct net_bridge_port_group *p = NULL;
+	struct hlist_node	*h = NULL;
+	int i = 0;
+	if(!br || !port)
+		return;
+	mdb = br->mdb;
+	if(!mdb)
+		return;
+
+	struct net_bridge_port_group *pg;
+		struct hlist_node *p, *n;
+	
+		spin_lock(&br->multicast_lock);
+		hlist_for_each_entry_safe(pg, p, n, &port->mglist, mglist)
+			br_multicast_del_pg(br, pg);
+		spin_unlock(&br->multicast_lock);
+#if 0
+	rcu_read_lock();
+	spin_lock(&br->multicast_lock);
+	for(i=0; i<mdb->max; i++){
+		hlist_for_each_entry_rcu(mp, h, &mdb->mhash[i], hlist[mdb->ver]){
+			p = mp->ports;
+			while(p){
+				if (p->port->port_no == port->port_no){
+					br_multicast_del_pg(br, p);	
+				}
+				p = p->next;
+			}
+		}
+	}
+	spin_unlock(&br->multicast_lock);
+	rcu_read_unlock();
+#endif	
+}
+EXPORT_SYMBOL(br_multicast_del_pg_byPort);
+
+static void MultiIP2MAC(struct in6_addr *pIpaddr, unsigned char *mac)
+{
+	if(pIpaddr == NULL || mac == NULL)
+		return;
+
+	*mac = 0x33;
+	*(mac + 1) = 0x33;
+	*(mac + 2) = pIpaddr->s6_addr[12];
+	*(mac + 3) = pIpaddr->s6_addr[13];
+	*(mac + 4) = pIpaddr->s6_addr[14];
+	*(mac + 5) = pIpaddr->s6_addr[15];
+
+	return;
+}
+
+static void br_multicas_group_expired_query(struct net_bridge *br,
+				    struct net_bridge_port *port, struct br_ip br_group)
+{
+	if (!netif_running(br->dev) || br->multicast_disabled)
+		return;
+	__br_multicast_send_query(br, port, &br_group);
+}
+
+#endif
 
 static void br_multicast_port_group_expired(unsigned long data)
 {
@@ -288,6 +532,15 @@ static void br_multicast_port_group_expired(unsigned long data)
 	    hlist_unhashed(&pg->mglist))
 		goto out;
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	if (pg->leave_count > 0)
+	{
+			pg->leave_count--;
+			br_multicas_group_expired_query(br, pg->port, pg->addr);
+			mod_timer(&pg->timer, (jiffies + 2*HZ));
+	}
+	else
+#endif		
 	br_multicast_del_pg(br, pg);
 
 out:
@@ -344,15 +597,44 @@ static struct sk_buff *br_ip4_multicast_alloc_query(struct net_bridge *br,
 						    __be32 group)
 {
 	struct sk_buff *skb;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	struct igmpv3_query *ih = NULL;
+#else
 	struct igmphdr *ih;
+#endif
 	struct ethhdr *eth;
 	struct iphdr *iph;
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	struct rtable *rt = NULL;
+	struct net_device *dev = NULL;
+	
+	dev = br->dev;
+#endif
 	skb = netdev_alloc_skb_ip_align(br->dev, sizeof(*eth) + sizeof(*iph) +
 						 sizeof(*ih) + 4);
 	if (!skb)
 		goto out;
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	{
+		struct flowi fl = { .oif = dev->ifindex,
+				    .nl_u = { .ip4_u = {
+				    .daddr = IGMPV3_ALL_MCR } },
+				    .proto = IPPROTO_IGMP };
+		if (ip_route_output_key(dev_net(dev), &rt, &fl)) {
+			kfree_skb(skb);
+			return;
+		}
+	}
+/*
+	if (rt->rt_src == 0) {
+		kfree_skb(skb);
+		ip_rt_put(rt);
+		return;
+	}
+	*/
+#endif
 	skb->protocol = htons(ETH_P_IP);
 
 	skb_reset_mac_header(skb);
@@ -379,8 +661,13 @@ static struct sk_buff *br_ip4_multicast_alloc_query(struct net_bridge *br,
 	iph->frag_off = htons(IP_DF);
 	iph->ttl = 1;
 	iph->protocol = IPPROTO_IGMP;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE	
+	iph->saddr = rt->rt_src;
+	iph->daddr = htonl(0xe0000016U);//htonl(INADDR_ALLHOSTS_GROUP);0xe0000016U
+#else
 	iph->saddr = 0;
 	iph->daddr = htonl(INADDR_ALLHOSTS_GROUP);
+#endif
 	((u8 *)&iph[1])[0] = IPOPT_RA;
 	((u8 *)&iph[1])[1] = 4;
 	((u8 *)&iph[1])[2] = 0;
@@ -389,14 +676,22 @@ static struct sk_buff *br_ip4_multicast_alloc_query(struct net_bridge *br,
 	skb_put(skb, 24);
 
 	skb_set_transport_header(skb, skb->len);
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	ih = igmpv3_query_hdr(skb);
+#else
 	ih = igmp_hdr(skb);
+#endif
 	ih->type = IGMP_HOST_MEMBERSHIP_QUERY;
 	ih->code = (group ? br->multicast_last_member_interval :
 			    br->multicast_query_response_interval) /
 		   (HZ / IGMP_TIMER_SCALE);
 	ih->group = group;
 	ih->csum = 0;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	ih->csum = ip_compute_csum((void *)ih, sizeof(struct igmpv3_query));
+#else
 	ih->csum = ip_compute_csum((void *)ih, sizeof(struct igmphdr));
+#endif
 	skb_put(skb, sizeof(*ih));
 
 	__skb_pull(skb, sizeof(*eth));
@@ -428,7 +723,9 @@ static struct sk_buff *br_ip6_multicast_alloc_query(struct net_bridge *br,
 	eth = eth_hdr(skb);
 
 	memcpy(eth->h_source, br->dev->dev_addr, 6);
+#if !defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
 	ipv6_eth_mc_map(group, eth->h_dest);
+#endif
 	eth->h_proto = htons(ETH_P_IPV6);
 	skb_put(skb, sizeof(*eth));
 
@@ -440,8 +737,15 @@ static struct sk_buff *br_ip6_multicast_alloc_query(struct net_bridge *br,
 	ip6h->payload_len = htons(8 + sizeof(*mldq));
 	ip6h->nexthdr = IPPROTO_HOPOPTS;
 	ip6h->hop_limit = 1;
+#if !defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
 	ipv6_addr_set(&ip6h->saddr, 0, 0, 0, 0);
+#endif
 	ipv6_addr_set(&ip6h->daddr, htonl(0xff020000), 0, 0, htonl(1));
+
+#if defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+	ipv6_dev_get_saddr(dev_net(br->dev),br->dev, &ip6h->daddr,0, &ip6h->saddr);
+	ipv6_eth_mc_map(&ip6h->daddr, eth->h_dest);
+#endif
 
 	hopopt = (u8 *)(ip6h + 1);
 	hopopt[0] = IPPROTO_ICMPV6;		/* next hdr */
@@ -505,7 +809,9 @@ static void br_multicast_send_group_query(struct net_bridge_mdb_entry *mp)
 	skb = br_multicast_alloc_query(br, &mp->addr);
 	if (!skb)
 		goto timer;
-
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	DEBUGP_SNOOP("group_query  dev=%s \n",	br->dev->name);
+#endif
 	netif_rx(skb);
 
 timer:
@@ -539,6 +845,14 @@ static void br_multicast_send_port_group_query(struct net_bridge_port_group *pg)
 	skb = br_multicast_alloc_query(br, &pg->addr);
 	if (!skb)
 		goto timer;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	if(pg->version == 6)
+		DEBUGP_SNOOP("port_group_query dev=%s group=[%s] src ip=[%s]\n",  
+		pg->port->dev->name, ip6_sprintf(&pg->addr.u.ip6),ip6_sprintf(&pg->src_entry.src.s_addr));
+	else
+		DEBUGP_SNOOP("port_group_query dev=%s group=" NIPQUAD_FMT " src ip=" NIPQUAD_FMT"\n",  
+		pg->port->dev->name, NIPQUAD(pg->addr.u.ip4),NIPQUAD(pg->src_entry.src.s_addr));
+#endif
 
 	br_deliver(port, skb);
 
@@ -638,6 +952,72 @@ err:
 	return mp;
 }
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+static struct net_bridge_port_group *br_multicast_get_port_group(
+	struct net_bridge *br, struct net_bridge_port *port,
+	struct br_ip *group, int check_saddr)
+{
+	struct net_bridge_mdb_htable *mdb = br->mdb;
+	struct net_bridge_mdb_entry *mp = NULL;
+	struct net_bridge_port_group *pg = NULL;
+	int hash = 0;
+
+	if (!mdb || !port) {
+		return NULL;
+	}
+
+	hash = br_ip_hash(mdb, group);
+
+	mp = br_multicast_get_group(br, port, group, hash);
+	if(unlikely(IS_ERR(mp)||!mp)){
+		return NULL;
+	}
+	spin_lock(&br->multicast_lock);
+	pg = mp->ports;
+	while(pg){
+		if(pg->port == port){ 
+			if((check_saddr == 1) && (pg->src_entry.src.s_addr == port->src_entry.src.s_addr)){
+				spin_unlock(&br->multicast_lock);
+				return pg;
+			}
+			if(check_saddr == 0){
+				spin_unlock(&br->multicast_lock);
+				return pg;
+			}
+		}
+		pg = pg->next;
+	}
+	spin_unlock(&br->multicast_lock);
+	return NULL;
+}
+/*
+		check the info is in port group or not.
+	return:
+		1: check OK
+		0: fail.
+*/
+static int br_multicast_equal_port_group(struct net_bridge_port_group *pg, 
+	struct net_bridge_port *port, struct br_ip *group)
+{
+	if(!pg || !port || !group)
+		return 0;
+	if((pg->version != port->version) ||(pg->port != port))
+		return 0;
+
+	if(port->version == 4)
+	{
+		if(pg->src_entry.src.s_addr == port->src_entry.src.s_addr)
+			return 1;
+	}
+	else if(port->version == 6)
+	{
+		if(ipv6_addr_equal(&pg->src_entry.src6, &port->src_entry.src6))//group ip
+			return 1;
+	}
+	
+	return 0;
+}
+#endif
 static struct net_bridge_mdb_entry *br_multicast_new_group(
 	struct net_bridge *br, struct net_bridge_port *port,
 	struct br_ip *group)
@@ -713,8 +1093,25 @@ static int br_multicast_add_group(struct net_bridge *br,
 	}
 
 	for (pp = &mp->ports; (p = *pp); pp = &p->next) {
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE	
+		if(br_multicast_equal_port_group(p, port, group)){
+			if(port->version == 4){
+				DEBUGP_SNOOP("br_multicast_add_group update portgroup dev=%s group=" NIPQUAD_FMT " src ip=" NIPQUAD_FMT "\n", 
+				port->dev->name, NIPQUAD(group->u.ip4),NIPQUAD(port->src_entry.src.s_addr));
+				}
+			else{
+				DEBUGP_SNOOP("br_multicast_add_group updateV6 portgroup dev=%s group=[%s] src ip=[%s]\n", 
+				port->dev->name, ip6_sprintf(&group->u.ip6),ip6_sprintf(&port->src_entry.src6));
+				
+			}
+			memcpy(&p->src_entry, &port->src_entry, sizeof(port->src_entry));
+			goto found;
+		}		
+#else
 		if (p->port == port)
 			goto found;
+#endif
+
 		if ((unsigned long)p->port < (unsigned long)port)
 			break;
 	}
@@ -724,6 +1121,20 @@ static int br_multicast_add_group(struct net_bridge *br,
 	if (unlikely(!p))
 		goto err;
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	if(port->version == 4){
+		DEBUGP_SNOOP("br_multicast_add_group new portgroup dev=%s group=" NIPQUAD_FMT " src ip=" NIPQUAD_FMT "\n", 
+			port->dev->name, NIPQUAD(group->u.ip4),NIPQUAD(port->src_entry.src.s_addr));
+	}
+	else{
+		DEBUGP_SNOOP("br_multicast_add_group newV6 portgroup dev=%s group=[%s] src ip=[%s]\n", 
+			port->dev->name, ip6_sprintf(&group->u.ip6), ip6_sprintf(&port->src_entry.src6));
+		}
+	memcpy(&p->src_entry, &port->src_entry, sizeof(port->src_entry)); 
+	memcpy(p->group_mac, port->groupMacAddr.addr, sizeof(port->groupMacAddr.addr));
+	memcpy(p->host_mac, port->macAddr.addr, sizeof(port->macAddr.addr));
+	p->version = port->version;
+#endif
 	p->addr = *group;
 	p->port = port;
 	p->next = *pp;
@@ -734,8 +1145,11 @@ static int br_multicast_add_group(struct net_bridge *br,
 		    (unsigned long)p);
 
 	rcu_assign_pointer(*pp, p);
-
 found:
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE	
+	p->ageing_time = now;
+	p->leave_count = 3;
+#endif
 	mod_timer(&p->timer, now + br->multicast_membership_interval);
 out:
 	err = 0;
@@ -760,6 +1174,33 @@ static int br_ip4_multicast_add_group(struct net_bridge *br,
 	return br_multicast_add_group(br, port, &br_group);
 }
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+static struct net_bridge_port_group *br_ip4_multicast_get_port_group(
+	struct net_bridge *br, struct net_bridge_port *port,
+	__be32 addr, int check_saddr){
+		struct br_ip br_group;
+
+		br_group.u.ip4 = addr;
+		br_group.proto = htons(ETH_P_IP);
+		
+		return br_multicast_get_port_group(br, port, &br_group, check_saddr);
+	}
+
+static void br_ip4_igmpv3_leave_group(struct net_bridge *br,
+					 struct net_bridge_port *port,__be32 group, 
+					 struct net_bridge_port_group *pg)
+{
+		if(br->quick_leave){
+			spin_lock(&br->multicast_lock);
+			br_multicast_del_pg(br, pg);
+			spin_unlock(&br->multicast_lock);
+		}
+		else
+			br_ip4_multicast_leave_group(br, port, group);
+}
+
+#endif
+
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 static int br_ip6_multicast_add_group(struct net_bridge *br,
 				      struct net_bridge_port *port,
@@ -771,10 +1212,38 @@ static int br_ip6_multicast_add_group(struct net_bridge *br,
 		return 0;
 
 	ipv6_addr_copy(&br_group.u.ip6, group);
-	br_group.proto = htons(ETH_P_IP);
+	br_group.proto = htons(ETH_P_IPV6);
 
 	return br_multicast_add_group(br, port, &br_group);
 }
+
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+static struct net_bridge_port_group *br_ip6_multicast_get_port_group(
+	struct net_bridge *br, 
+	struct net_bridge_port *port,
+	const struct in6_addr *group,int check_saddr)
+{
+	struct br_ip br_group;
+
+	ipv6_addr_copy(&br_group.u.ip6, group);
+	br_group.proto = htons(ETH_P_IPV6);
+		
+	return br_multicast_get_port_group(br, port, &br_group, check_saddr);
+}
+static void br_ip6_mld_leave_group(struct net_bridge *br,
+					 struct net_bridge_port *port,struct in6_addr *group, 
+					 struct net_bridge_port_group *pg)
+{
+		if(br->quick_leave){
+			spin_lock(&br->multicast_lock);
+			br_multicast_del_pg(br, pg);
+			spin_unlock(&br->multicast_lock);
+		}
+		else
+			br_ip6_multicast_leave_group(br, port, group);
+}
+
+#endif
 #endif
 
 static void br_multicast_router_expired(unsigned long data)
@@ -794,6 +1263,34 @@ out:
 	spin_unlock(&br->multicast_lock);
 }
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+static void br_muticast_start_querier(struct net_bridge *br)
+{
+	struct net_bridge_port *port;
+
+	br_multicast_open(br);
+
+	list_for_each_entry(port,&br->port_list,list){
+		if(port->state == BR_STATE_DISABLED ||
+			port->state == BR_STATE_BLOCKING)
+			continue;
+
+		__br_multicast_enable_port(port);
+	}
+}
+static void br_multicast_querier_expired(unsigned long data)
+{
+	struct net_bridge *br = (void *)data;
+	
+	spin_lock(&br->multicast_lock);
+	if(!netif_running(br->dev) || br->multicast_disabled)
+		goto out;
+
+	br_muticast_start_querier(br);
+out:
+	spin_unlock(&br->multicast_lock);
+}
+#endif
 static void br_multicast_local_router_expired(unsigned long data)
 {
 }
@@ -807,6 +1304,26 @@ static void __br_multicast_send_query(struct net_bridge *br,
 	skb = br_multicast_alloc_query(br, ip);
 	if (!skb)
 		return;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+			if(port)
+			{
+			if(htons(ETH_P_IPV6) == ip->proto)
+				DEBUGP_SNOOP("multicast query dev=%s port_no=(%d) group=[%s]\n",  
+				br->dev->name,port->port_no, ip6_sprintf(&ip->u.ip6));
+			else
+				DEBUGP_SNOOP("multicast query dev=%s port_no=(%d) group=" NIPQUAD_FMT "\n",  
+				br->dev->name,port->port_no, NIPQUAD(ip->u.ip4));
+			}	
+			else
+			{
+			if(htons(ETH_P_IPV6) == ip->proto)
+				DEBUGP_SNOOP("multicast query V6 dev=%s group=[%s]\n",  
+				br->dev->name, ip6_sprintf(&ip->u.ip6));
+			else
+				DEBUGP_SNOOP("multicast query V6 dev=%s group=" NIPQUAD_FMT "\n",  
+				br->dev->name, NIPQUAD(ip->u.ip4));
+			}
+#endif
 
 	if (port) {
 		__skb_push(skb, sizeof(struct ethhdr));
@@ -932,6 +1449,11 @@ static int br_ip4_multicast_igmp3_report(struct net_bridge *br,
 	int num;
 	int type;
 	int err = 0;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	int num_src = 0;
+	int dirty = 0;
+	struct net_bridge_port_group *pg = NULL;
+#endif
 	__be32 group;
 
 	if (!pskb_may_pull(skb, sizeof(*ih)))
@@ -940,7 +1462,11 @@ static int br_ip4_multicast_igmp3_report(struct net_bridge *br,
 	ih = igmpv3_report_hdr(skb);
 	num = ntohs(ih->ngrec);
 	len = sizeof(*ih);
-
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	if(NULL == port)
+		return -EINVAL;
+	memset(&port->src_entry, 0, sizeof(port->src_entry));
+#endif	
 	for (i = 0; i < num; i++) {
 		len += sizeof(*grec);
 		if (!pskb_may_pull(skb, len))
@@ -950,12 +1476,20 @@ static int br_ip4_multicast_igmp3_report(struct net_bridge *br,
 		group = grec->grec_mca;
 		type = grec->grec_type;
 
+	#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+		if(group == UPNP_MCAST)
+			continue;
+		DEBUGP_SNOOP("igmpv3 packet type=%d group=" NIPQUAD_FMT " ,grec_nsrcs=%d\n",
+					type, NIPQUAD(group), (grec->grec_nsrcs));
+	#endif
+		
 		len += ntohs(grec->grec_nsrcs) * 4;
 		if (!pskb_may_pull(skb, len))
 			return -EINVAL;
 
 		/* We treat this as an IGMPv2 report for now. */
 		switch (type) {
+#ifndef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
 		case IGMPV3_MODE_IS_INCLUDE:
 		case IGMPV3_MODE_IS_EXCLUDE:
 		case IGMPV3_CHANGE_TO_INCLUDE:
@@ -963,16 +1497,86 @@ static int br_ip4_multicast_igmp3_report(struct net_bridge *br,
 		case IGMPV3_ALLOW_NEW_SOURCES:
 		case IGMPV3_BLOCK_OLD_SOURCES:
 			break;
+#else
+		case IGMPV3_MODE_IS_INCLUDE:
+		case IGMPV3_CHANGE_TO_INCLUDE:
+		case IGMPV3_ALLOW_NEW_SOURCES:
+			for(num_src=0; num_src<grec->grec_nsrcs; num_src++){
+				port->src_entry.src.s_addr = grec->grec_src[num_src];
+				pg =br_ip4_multicast_get_port_group(br, port, group, type==IGMPV3_ALLOW_NEW_SOURCES?1:0);
+				if((NULL != pg) && (pg->src_entry.filt_mode == MCAST_EXCLUDE)){
+					spin_lock(&br->multicast_lock);
+					br_multicast_del_pg(br, pg);
+					spin_unlock(&br->multicast_lock);
+				}
+				port->src_entry.filt_mode = MCAST_INCLUDE;
+				err = br_ip4_multicast_add_group(br, port, group);
+				if (err)
+					goto out;
+			}
 
+			if(grec->grec_nsrcs == 0){
+				if(IGMPV3_ALLOW_NEW_SOURCES == type)
+					break;
+				port->src_entry.src.s_addr = 0;
+				pg =br_ip4_multicast_get_port_group(br, port, group, 1);
+				if(pg){
+					br_ip4_igmpv3_leave_group(br, port, group, pg);
+				}
+			}
+			break;
+		case IGMPV3_MODE_IS_EXCLUDE:
+		case IGMPV3_CHANGE_TO_EXCLUDE:
+		case IGMPV3_BLOCK_OLD_SOURCES:
+			for(num_src=0; num_src<grec->grec_nsrcs; num_src++){
+				dirty = 0;
+				port->src_entry.src.s_addr = grec->grec_src[num_src];
+				pg =br_ip4_multicast_get_port_group(br, port, group, 1);
+				if((NULL!=pg) && (pg->src_entry.filt_mode == MCAST_INCLUDE)){
+					spin_lock(&br->multicast_lock);
+					br_multicast_del_pg(br, pg);
+					spin_unlock(&br->multicast_lock);
+					dirty = 1;
+				}
+				if((IGMPV3_BLOCK_OLD_SOURCES != type) && dirty){
+					port->src_entry.filt_mode = MCAST_INCLUDE;
+				}else{
+					port->src_entry.filt_mode = MCAST_EXCLUDE;
+				}
+				err = br_ip4_multicast_add_group(br, port, group);
+				if (err)
+					goto out;
+			}
+
+			if(grec->grec_nsrcs == 0){
+				if(type == IGMPV3_BLOCK_OLD_SOURCES)
+					break;
+				pg =br_ip4_multicast_get_port_group(br, port, group, 0);
+				if(pg){
+					spin_lock(&br->multicast_lock);
+					br_multicast_del_pg(br, pg);
+					spin_unlock(&br->multicast_lock);
+				}
+				port->src_entry.src.s_addr = 0;
+				port->src_entry.filt_mode = MCAST_EXCLUDE;
+				err = br_ip4_multicast_add_group(br, port, group);
+				if (err)
+					goto out;
+			}
+			break;
+#endif
 		default:
 			continue;
 		}
-
+#ifndef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
 		err = br_ip4_multicast_add_group(br, port, group);
 		if (err)
 			break;
+#endif
 	}
-
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+out:
+#endif
 	return err;
 }
 
@@ -983,6 +1587,10 @@ static int br_ip6_multicast_mld2_report(struct net_bridge *br,
 {
 	struct icmp6hdr *icmp6h;
 	struct mld2_grec *grec;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	struct net_bridge_port_group *pg = NULL;
+	int num_src = 0;
+#endif
 	int i;
 	int len;
 	int num;
@@ -1000,36 +1608,71 @@ static int br_ip6_multicast_mld2_report(struct net_bridge *br,
 
 		nsrcs = skb_header_pointer(skb,
 					   len + offsetof(struct mld2_grec,
-							  grec_mca),
+#ifndef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+							 grec_mca),
+#else
+							 grec_nsrcs),
+#endif
 					   sizeof(_nsrcs), &_nsrcs);
 		if (!nsrcs)
 			return -EINVAL;
 
 		if (!pskb_may_pull(skb,
 				   len + sizeof(*grec) +
-				   sizeof(struct in6_addr) * (*nsrcs)))
+				   sizeof(struct in6_addr) * ntohs(*nsrcs)))
 			return -EINVAL;
 
 		grec = (struct mld2_grec *)(skb->data + len);
-		len += sizeof(*grec) + sizeof(struct in6_addr) * (*nsrcs);
+		len += sizeof(*grec) + sizeof(struct in6_addr) * ntohs(*nsrcs);
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+		DEBUGP_SNOOP("mld report(v2) type=%d group_addr=[%s]\n",
+				grec->grec_type, ip6_sprintf(&grec->grec_mca));
+
+		if(port)
+			MultiIP2MAC(&grec->grec_mca, port->groupMacAddr.addr);
+#endif
 		/* We treat these as MLDv1 reports for now. */
 		switch (grec->grec_type) {
-		case MLD2_MODE_IS_INCLUDE:
 		case MLD2_MODE_IS_EXCLUDE:
-		case MLD2_CHANGE_TO_INCLUDE:
 		case MLD2_CHANGE_TO_EXCLUDE:
 		case MLD2_ALLOW_NEW_SOURCES:
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+			//ipv6_addr_copy(&port->src_entry.src6, &grec->grec_src[num]);
+			br_ip6_multicast_add_group(br, port, &grec->grec_mca);
+			break;
+#endif
+		case MLD2_MODE_IS_INCLUDE:
+		case MLD2_CHANGE_TO_INCLUDE:
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+			if(grec->grec_nsrcs){
+					//ipv6_addr_copy(&port->src_entry.src6, &grec->grec_src[num]);
+					br_ip6_multicast_add_group(br, port, &grec->grec_mca);
+				}
+			else{
+				pg = br_ip6_multicast_get_port_group(br, port, &grec->grec_mca, 0);
+				if(pg){
+					br_ip6_mld_leave_group(br, port, &grec->grec_mca, pg);
+				}
+			}
+			break;
+#endif
 		case MLD2_BLOCK_OLD_SOURCES:
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+			pg = br_ip6_multicast_get_port_group(br, port, &grec->grec_mca, 0);
+			if(pg)
+				br_ip6_mld_leave_group(br, port, &grec->grec_mca, pg);
+#endif
 			break;
 
 		default:
 			continue;
 		}
-
+#ifndef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
 		err = br_ip6_multicast_add_group(br, port, &grec->grec_mca);
 		if (!err)
 			break;
+#endif
 	}
 
 	return err;
@@ -1260,6 +1903,11 @@ static void br_multicast_leave_group(struct net_bridge *br,
 		goto out;
 
 	now = jiffies;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	time  =now + br->multicast_membership_interval*
+		     br->multicast_last_member_interval;
+	if(br->quick_leave)
+#endif
 	time = now + br->multicast_last_member_count *
 		     br->multicast_last_member_interval;
 
@@ -1278,9 +1926,24 @@ static void br_multicast_leave_group(struct net_bridge *br,
 	}
 
 	for (p = mp->ports; p; p = p->next) {
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+/*
+		if ((p->port != port) ||
+			(p->src_entry.src.s_addr != port->src_entry.src.s_addr))
+*/
+		if(!br_multicast_equal_port_group(p, port, group))
+#else
 		if (p->port != port)
+#endif
 			continue;
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+		if(br->quick_leave){
+			br_multicast_del_pg(br, p);
+			goto out;
+		}
+#endif		
+		
 		if (!hlist_unhashed(&p->mglist) &&
 		    (timer_pending(&p->timer) ?
 		     time_after(p->timer.expires, time) :
@@ -1340,6 +2003,9 @@ static int br_multicast_ipv4_rcv(struct net_bridge *br,
 	unsigned len;
 	unsigned offset;
 	int err;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	struct net_bridge_port_group *pg = NULL;
+#endif
 
 	/* We treat OOM as packet loss for now. */
 	if (!pskb_may_pull(skb, sizeof(*iph)))
@@ -1360,6 +2026,10 @@ static int br_multicast_ipv4_rcv(struct net_bridge *br,
 
 	if (iph->protocol != IPPROTO_IGMP)
 		return 0;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	if(iph->daddr == UPNP_MCAST)//flooding UPNP packets
+		return 0;
+#endif
 
 	len = ntohs(iph->tot_len);
 	if (skb->len < len || len < ip_hdrlen(skb))
@@ -1399,7 +2069,13 @@ static int br_multicast_ipv4_rcv(struct net_bridge *br,
 
 	BR_INPUT_SKB_CB(skb)->igmp = 1;
 	ih = igmp_hdr(skb2);
-
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	if(port){
+		memcpy(port->macAddr.addr, eth_hdr(skb)->h_source,ETH_ALEN);
+		memset(&port->src_entry, 0, sizeof(port->src_entry));
+		port->version = 4;
+	}
+#endif
 	switch (ih->type) {
 	case IGMP_HOST_MEMBERSHIP_REPORT:
 	case IGMPV2_HOST_MEMBERSHIP_REPORT:
@@ -1413,7 +2089,14 @@ static int br_multicast_ipv4_rcv(struct net_bridge *br,
 		err = br_ip4_multicast_query(br, port, skb2);
 		break;
 	case IGMP_HOST_LEAVE_MESSAGE:
+	#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+		pg =br_ip4_multicast_get_port_group(br, port, ih->group, 1);
+		if(pg){
+			br_ip4_igmpv3_leave_group(br, port, ih->group, pg);
+		}
+	#else	
 		br_ip4_multicast_leave_group(br, port, ih->group);
+	#endif
 		break;
 	}
 
@@ -1425,14 +2108,91 @@ err_out:
 	return err;
 }
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+/*
+	to check if we should allow muticast packet pass.
+
+	return:
+	    0:	not allow
+	    1:	allow
+	    2:	pg's filt_mode = MCAST_EXCLUDE, and the skb(muticast packet)'s s_addr
+	    		is not equel pg's s_addr, that means the skb is not be "EXCLUDE"
+	    		(In this case, if skb is not in any of the "pg", we should let it pass)
+*/
+static  int br_multicast_ipv4_port_pass(struct net_bridge_port_group *pg,
+					       struct net_bridge_port *p,
+						   const struct sk_buff *skb){
+	struct net_device *dev = BR_INPUT_SKB_CB(skb)->brdev;
+	struct net_bridge *br = netdev_priv(dev);
+	__be32 s_addr = 0;
+		
+		s_addr = ip_hdr(skb)->saddr;
+		if((NULL != pg) &&(!has_expired(br, pg))){
+			if((pg->src_entry.filt_mode == MCAST_INCLUDE)
+					&& (pg->src_entry.src.s_addr == s_addr))
+					return 1;
+			else if(pg->src_entry.filt_mode == MCAST_EXCLUDE){
+				if(0 == pg->src_entry.src.s_addr)
+					return 1;
+				else if(pg->src_entry.src.s_addr != s_addr)
+					return 2;
+				else if(pg->src_entry.src.s_addr == s_addr)
+					return 0;
+			}
+		}
+		return 0;
+
+}
+
+static int br_multicast_ipv4_should_drop(struct net_bridge *br, 
+	const struct sk_buff *skb)
+{
+	struct iphdr *iph;
+	struct igmphdr *ih;
+	const unsigned char *dmac;
+	const u8 multicast_address[ETH_ALEN] = { 0x01, 0x00, 0x5e, 0x00, 0x00, 0x00 };
+	
+	if (!pskb_may_pull(skb, sizeof(*iph)))
+		return 0;
+
+	iph = ip_hdr(skb);
+	if (iph->protocol == IPPROTO_IGMP)
+		return 0;
+
+	if (iph->ihl < 5 || iph->version != 4)
+		return 0;
+
+	if (!pskb_may_pull(skb, ip_hdrlen(skb)))
+		return 0;
+
+	iph = ip_hdr(skb);
+
+	if (unlikely(ip_fast_csum((u8 *)iph, iph->ihl)))
+		return 0;
+	
+	if(iph->daddr == UPNP_MCAST)//flooding UPNP packets
+		return 0;
+	if(ipv4_is_local_multicast(iph->daddr))//flooding RIPv2 packets and so on, 224.0.0.*
+		return 0;
+
+	dmac = eth_hdr(skb)->h_dest;
+	if (memcmp(multicast_address, dmac, 3) != 0)
+		return 0;
+	
+	return 1;
+}
+#endif
 #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
 static int br_multicast_ipv6_rcv(struct net_bridge *br,
 				 struct net_bridge_port *port,
 				 struct sk_buff *skb)
 {
 	struct sk_buff *skb2 = skb;
-	struct ipv6hdr *ip6h;
-	struct icmp6hdr *icmp6h;
+	struct ipv6hdr *ip6h = NULL;
+	struct icmp6hdr *icmp6h = NULL;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	struct net_bridge_port_group *pg = NULL;
+#endif
 	u8 nexthdr;
 	unsigned len;
 	int offset;
@@ -1454,7 +2214,7 @@ static int br_multicast_ipv6_rcv(struct net_bridge *br,
 	    ip6h->payload_len == 0)
 		return 0;
 
-	len = ntohs(ip6h->payload_len);
+	len = ntohs(ip6h->payload_len) + sizeof(*ip6h);
 	if (skb->len < len)
 		return -EINVAL;
 
@@ -1496,22 +2256,50 @@ static int br_multicast_ipv6_rcv(struct net_bridge *br,
 		err = pskb_trim_rcsum(skb2, len);
 		if (err)
 			goto out;
+		err = -EINVAL;
 	}
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	ip6h = ipv6_hdr(skb2);
+#endif
 
 	switch (skb2->ip_summed) {
 	case CHECKSUM_COMPLETE:
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+		if(!csum_ipv6_magic(&ip6h->saddr,&ip6h->daddr,skb2->len,
+			IPPROTO_ICMPV6,skb2->csum))
+#else
 		if (!csum_fold(skb2->csum))
+#endif
 			break;
 		/*FALLTHROUGH*/
 	case CHECKSUM_NONE:
+#ifndef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
 		skb2->csum = 0;
 		if (skb_checksum_complete(skb2))
+#else
+		skb2->csum = ~csum_unfold(csum_ipv6_magic(&ip6h->saddr,
+											&ip6h->daddr,
+											skb2->len,
+											IPPROTO_ICMPV6,0));
+		if(__skb_checksum_complete(skb2))
+#endif
 			goto out;
 	}
 
 	err = 0;
 
 	BR_INPUT_SKB_CB(skb)->igmp = 1;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	if(port){
+		struct mld_msg *mld = (struct mld_msg *)icmp6h;
+		MultiIP2MAC(&mld->mld_mca, port->groupMacAddr.addr);
+		memcpy(port->macAddr.addr, eth_hdr(skb)->h_source,ETH_ALEN);
+		memset(&port->src_entry, 0, sizeof(port->src_entry));
+		port->version = 6;
+	}
+	DEBUGP_SNOOP("MLD packet income type=%d host=" MAC_FMT " dstMac=" MAC_FMT "\n",  
+			 icmp6h->icmp6_type, NMAC(eth_hdr(skb)->h_source),NMAC(eth_hdr(skb)->h_dest));
+#endif
 
 	switch (icmp6h->icmp6_type) {
 	case ICMPV6_MGM_REPORT:
@@ -1529,8 +2317,16 @@ static int br_multicast_ipv6_rcv(struct net_bridge *br,
 		break;
 	case ICMPV6_MGM_REDUCTION:
 	    {
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+			struct mld_msg *mld = (struct mld_msg *)icmp6h;
+			pg = br_ip6_multicast_get_port_group(br, port, &mld->mld_mca, 0);
+			if(pg){
+				br_ip6_mld_leave_group(br, port, &mld->mld_mca, pg);
+			}
+#else
 		struct mld_msg *mld = (struct mld_msg *)icmp6h;
 		br_ip6_multicast_leave_group(br, port, &mld->mld_mca);
+#endif
 	    }
 	}
 
@@ -1540,8 +2336,155 @@ out:
 		kfree_skb(skb2);
 	return err;
 }
+
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+static  int br_multicast_ipv6_port_pass(struct net_bridge_port_group *pg,
+					       struct net_bridge_port *p,
+						   const struct sk_buff *skb){
+		struct net_device *dev = BR_INPUT_SKB_CB(skb)->brdev;
+		struct net_bridge *br = netdev_priv(dev);
+		struct ipv6hdr *ip6h = NULL;
+		unsigned char	group_mac[ETH_ALEN];
+	
+		if((NULL != pg) &&(!has_expired(br, pg))){
+			ip6h = ipv6_hdr( skb);
+			MultiIP2MAC(&ip6h->daddr, group_mac);
+			if(!compare_ether_addr(group_mac, pg->group_mac))
+			{
+				return 1;
+			}
+		}
+		
+		return 0;
+}
+
+static int br_multicast_ipv6_should_drop(struct net_bridge *br, const struct sk_buff *skb)
+{
+	const unsigned char *dest = eth_hdr(skb)->h_dest;
+	struct ipv6hdr *ip6h = NULL;
+	u8 nexthdr = 0;
+	int offset = 0;
+	
+	if (!pskb_may_pull(skb, sizeof(*ip6h)))
+			return 0;
+
+	ip6h = ipv6_hdr(skb);
+	nexthdr = ip6h->nexthdr;
+	if (nexthdr == IPPROTO_ICMPV6 
+		|| ip6h->daddr.s6_addr16[0]== 0xFF02
+		|| ip6h->daddr.s6_addr16[0]== 0xFF01)
+		return 0;
+	
+	if((IPPROTO_UDP != nexthdr)
+		&& (IPPROTO_FRAGMENT != nexthdr))
+		return 0;
+		
+	if(nexthdr == IPPROTO_HOPOPTS){
+		offset = ipv6_skip_exthdr(skb, sizeof(*ip6h), &nexthdr);
+		if (nexthdr == IPPROTO_ICMPV6){
+			return 0;
+		}
+	}
+
+	/*IPv6 Multicast packet*/
+	if(0x33 == dest[0] && 0x33 == dest[1])
+		return 1;
+	return 0;
+}
+#endif
 #endif
 
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+int br_multicast_port_pass(struct net_bridge_port_group *pg,
+					       struct net_bridge_port *p,
+						   const struct sk_buff *skb){
+
+	switch (skb->protocol) {
+	case htons(ETH_P_IP):
+		return br_multicast_ipv4_port_pass(pg, p, skb);
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	case htons(ETH_P_IPV6):
+		return br_multicast_ipv6_port_pass(pg, p, skb);
+#endif
+	}
+	return 0;
+}
+/**
+	to judge if need drop a muticast packet.
+**/
+int br_multicast_should_drop(struct net_bridge *br, const struct sk_buff *skb)
+{
+	if (br->multicast_disabled)
+		return 0;
+
+	switch (skb->protocol) {
+	case htons(ETH_P_IP):
+		return br_multicast_ipv4_should_drop(br, skb);
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	case htons(ETH_P_IPV6):
+		return br_multicast_ipv6_should_drop(br, skb);
+#endif
+	}
+	return 0;
+}
+
+/*  
+*	dump a muticast packet's information  
+*/
+void br_multicast_dump_packet_info(const struct sk_buff *skb, int checkPoint)
+{
+	struct iphdr *iph = NULL;
+	struct igmphdr *ih = NULL;
+	struct ipv6hdr *iph6 = NULL;
+	u8 nexthdr = 0;
+	if(snoopingdebug){
+		switch (skb->protocol) {
+			case htons(ETH_P_IP):
+				iph = ip_hdr(skb);
+				if(iph->version ==4){
+					
+					DEBUGP_SNOOP("----drop packet information-----checkpoint(%d)-------\n", checkPoint);
+					DEBUGP_SNOOP("protocol = %d(1.ICMP;2.IGMP;17.UDP)\n", iph->protocol);
+					DEBUGP_SNOOP("check packet saddr=" NIPQUAD_FMT " daddr=" NIPQUAD_FMT"\n",  
+						 NIPQUAD(iph ->saddr),NIPQUAD(iph ->daddr));
+					if(iph->protocol == IPPROTO_IGMP)
+					{
+						ih = igmp_hdr(skb);
+						DEBUGP_SNOOP(" group=" NIPQUAD_FMT "\n", NIPQUAD(ih->group));
+					}
+					DEBUGP_SNOOP("------------ ---end of information------------\n");
+				}
+				break;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+				case htons(ETH_P_IPV6):
+					iph6 = ipv6_hdr(skb);
+					nexthdr = iph6->nexthdr;
+					if(iph6->version == 6)
+					{
+						DEBUGP_SNOOP("----drop packet information--v6---checkpoint(%d)-------\n", checkPoint);
+						DEBUGP_SNOOP("check packet saddr=[%s] daddr=[%s]\n",  
+						 ip6_sprintf(&iph6->saddr),ip6_sprintf(&iph6->daddr));
+						if(nexthdr == IPPROTO_ICMPV6){
+							DEBUGP_SNOOP("this packet is normal ICMPv6\n");
+						}
+						if(nexthdr == IPPROTO_HOPOPTS){
+							ipv6_skip_exthdr(skb, sizeof(*iph6), &nexthdr);
+							if (nexthdr == IPPROTO_ICMPV6)
+							{
+								DEBUGP_SNOOP("this packet is MLD ICMPv6\n");
+							}
+						
+						}
+					DEBUGP_SNOOP("------------ ---end of information------------\n");	
+					}
+					break;
+				default:	
+					DEBUGP_SNOOP("------------unknow packet format------------\n");
+#endif
+			}
+		}
+}
+#endif
 int br_multicast_rcv(struct net_bridge *br, struct net_bridge_port *port,
 		     struct sk_buff *skb)
 {
@@ -1597,9 +2540,14 @@ void br_multicast_init(struct net_bridge *br)
 	setup_timer(&br->multicast_router_timer,
 		    br_multicast_local_router_expired, 0);
 	setup_timer(&br->multicast_querier_timer,
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+		    br_multicast_querier_expired, (unsigned long)br);
+#else
 		    br_multicast_local_router_expired, 0);
+#endif
 	setup_timer(&br->multicast_query_timer, br_multicast_query_expired,
 		    (unsigned long)br);
+
 }
 
 void br_multicast_open(struct net_bridge *br)

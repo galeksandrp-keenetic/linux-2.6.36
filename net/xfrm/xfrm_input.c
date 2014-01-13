@@ -13,7 +13,9 @@
 #include <net/dst.h>
 #include <net/ip.h>
 #include <net/xfrm.h>
-
+#ifdef CONFIG_TCSUPPORT_RA_HWNAT
+#include <linux/foe_hook.h>
+#endif
 static struct kmem_cache *secpath_cachep __read_mostly;
 
 void __secpath_destroy(struct sec_path *sp)
@@ -186,8 +188,31 @@ int xfrm_input(struct sk_buff *skb, int nexthdr, __be32 spi, int encap_type)
 
 		XFRM_SKB_CB(skb)->seq.input = seq;
 
+#if 0//def CONFIG_TCSUPPORT_RA_HWNAT
+/* Don't let HWNAT has the change to learn ipsec packets!
+ * Once HWNAT learned ipsec packets, it will forward packets
+ * directly from Rx to Tx, which will cause ipsec packets
+ * not being decrypted.
+ */
+    if (ra_sw_nat_hook_free)
+        ra_sw_nat_hook_free(skb);
+#endif
+
+#if defined(CONFIG_MTK_CRYPTO_DRIVER) || defined(CONFIG_RALINK_HWCRYPTO) || defined(CONFIG_RALINK_HWCRYPTO_MODULE)
+		if (family == AF_INET)
+		{
+			if (x->type->input(x, skb) == 1)
+			{
+				return 0;
+			}
+			else
+				goto drop;
+		}
+		else
+#else
 		nexthdr = x->type->input(x, skb);
 
+#endif
 		if (nexthdr == -EINPROGRESS)
 			return 0;
 

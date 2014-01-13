@@ -66,6 +66,19 @@ struct pppoatm_vcc {
 	struct tasklet_struct wakeup_tasklet;
 };
 
+
+#if defined(CONFIG_TCSUPPORT_CPU_MT7510)
+void (*pppoatm_config_hook)(int linkMode, int linkType) = NULL;
+EXPORT_SYMBOL(pppoatm_config_hook);
+
+int (*pppoatm_init_hook)(struct atm_vcc *atmvcc, int encaps) = NULL;
+EXPORT_SYMBOL(pppoatm_init_hook);
+
+int (*pppoatm_push_hook)(struct atm_vcc *atmvcc, struct sk_buff *skb) = NULL;
+EXPORT_SYMBOL(pppoatm_push_hook);
+#endif
+
+
 /*
  * Header used for LLC Encapsulated PPP (4 bytes) followed by the LCP protocol
  * ID (0xC021) used in autodetection
@@ -134,6 +147,9 @@ static void pppoatm_unassign_vcc(struct atm_vcc *atmvcc)
 /* Called when an AAL5 PDU comes in */
 static void pppoatm_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 {
+#if defined(CONFIG_TCSUPPORT_CPU_MT7510)
+	int ret;
+#endif
 	struct pppoatm_vcc *pvcc = atmvcc_to_pvcc(atmvcc);
 	pr_debug("\n");
 	if (skb == NULL) {			/* VCC was closed */
@@ -143,6 +159,19 @@ static void pppoatm_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 		return;
 	}
 	atm_return(atmvcc, skb->truesize);
+
+#if defined(CONFIG_TCSUPPORT_CPU_MT7510)
+	if (pppoatm_push_hook){
+		ret = pppoatm_push_hook(atmvcc, skb);
+		if (ret == -1){
+			goto error;
+		} else if (ret == -2){
+			return;
+		}
+	}
+	else
+#endif
+	{
 	switch (pvcc->encaps) {
 	case e_llc:
 		if (skb->len < LLC_LEN ||
@@ -175,6 +204,8 @@ static void pppoatm_push(struct atm_vcc *atmvcc, struct sk_buff *skb)
 	case e_vc:
 		break;
 	}
+	}
+
 	ppp_input(&pvcc->chan, skb);
 	return;
 
@@ -216,7 +247,11 @@ static int pppoatm_send(struct ppp_channel *chan, struct sk_buff *skb)
 				return DROP_PACKET;
 		} else if (!atm_may_send(pvcc->atmvcc, skb->truesize))
 			goto nospace;
+
+		#if !defined(CONFIG_TCSUPPORT_CPU_MT7510)
 		memcpy(skb_push(skb, LLC_LEN), pppllc, LLC_LEN);
+		#endif
+
 		break;
 	case e_vc:
 		if (!atm_may_send(pvcc->atmvcc, skb->truesize))
@@ -251,6 +286,12 @@ static int pppoatm_devppp_ioctl(struct ppp_channel *chan, unsigned int cmd,
 {
 	switch (cmd) {
 	case PPPIOCGFLAGS:
+	#if defined(CONFIG_TCSUPPORT_CPU_MT7510)
+		if (pppoatm_config_hook){
+			// choose router mode & pppoa type
+			pppoatm_config_hook(0, 1);
+		}
+	#endif
 		return put_user(chan_to_pvcc(chan)->flags, (int __user *) arg)
 		    ? -EFAULT : 0;
 	case PPPIOCSFLAGS:
@@ -280,6 +321,22 @@ static int pppoatm_assign_vcc(struct atm_vcc *atmvcc, void __user *arg)
 	if (be.encaps != PPPOATM_ENCAPS_AUTODETECT &&
 	    be.encaps != PPPOATM_ENCAPS_VC && be.encaps != PPPOATM_ENCAPS_LLC)
 		return -EINVAL;
+
+#if defined(CONFIG_TCSUPPORT_CPU_MT7510)
+	if (pppoatm_init_hook){
+		printk("enter pppoatm_init_hook function\n");
+		err = pppoatm_init_hook(atmvcc, (be.encaps-1));
+		if (err){
+			printk("pppoatm_init_hook: error detected\n");
+			return err;
+		} else {
+			printk("pppoatm_init_hook: success\n");
+		}
+	} else {
+		printk("pppoatm_init_hook function: (NULL)\n");
+	}
+#endif
+
 	pvcc = kzalloc(sizeof(*pvcc), GFP_KERNEL);
 	if (pvcc == NULL)
 		return -ENOMEM;
@@ -343,19 +400,35 @@ static struct atm_ioctl pppoatm_ioctl_ops = {
 	.ioctl	= pppoatm_ioctl,
 };
 
+#if defined(CONFIG_TCSUPPORT_CPU_MT7510)
+int pppoatm_init(void)
+#else
 static int __init pppoatm_init(void)
+#endif
 {
 	register_atm_ioctl(&pppoatm_ioctl_ops);
 	return 0;
 }
 
+
+#if defined(CONFIG_TCSUPPORT_CPU_MT7510)
+void pppoatm_exit(void)
+#else
 static void __exit pppoatm_exit(void)
+#endif
 {
 	deregister_atm_ioctl(&pppoatm_ioctl_ops);
 }
 
+#if defined(CONFIG_TCSUPPORT_CPU_MT7510)
+EXPORT_SYMBOL(pppoatm_init);
+EXPORT_SYMBOL(pppoatm_exit);
+#endif
+
+#if !defined(CONFIG_TCSUPPORT_CPU_MT7510)
 module_init(pppoatm_init);
 module_exit(pppoatm_exit);
+#endif
 
 MODULE_AUTHOR("Mitchell Blank Jr <mitch@sfgoth.com>");
 MODULE_DESCRIPTION("RFC2364 PPP over ATM/AAL5");

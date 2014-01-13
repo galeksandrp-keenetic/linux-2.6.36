@@ -4,7 +4,8 @@
 
 menuconfig BRIDGE_NF_EBTABLES
 	tristate "Ethernet Bridge tables (ebtables) support"
-	depends on BRIDGE && BRIDGE_NETFILTER
+#	depends on BRIDGE && BRIDGE_NETFILTER
+	depends on BRIDGE
 	select NETFILTER_XTABLES
 	help
 	  ebtables is a general, extensible frame/packet identification
@@ -141,6 +142,22 @@ config BRIDGE_EBT_ARPREPLY
 	help
 	  This option adds the arp reply target, which allows
 	  automatically sending arp replies to arp requests.
+
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config BRIDGE_EBT_FTOS
+    tristate "ebt: ftos target support"
+	depends on BRIDGE_NF_EBTABLES
+	help
+	  This option adds the FTOS target, which allows altering the TOS, IPP
+	  or DSCP.
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config BRIDGE_EBT_TC
+    tristate "ebt: tc target support"
+	depends on BRIDGE_NF_EBTABLES && IPV6
+	help
+	  This option adds the TC target, which allows altering the TC
 
 	  To compile it as a module, choose M here.  If unsure, say N.
 

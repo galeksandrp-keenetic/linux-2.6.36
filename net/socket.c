@@ -904,6 +904,19 @@ void vlan_ioctl_set(int (*hook) (struct net *, void __user *))
 	mutex_unlock(&vlan_ioctl_mutex);
 }
 EXPORT_SYMBOL(vlan_ioctl_set);
+#ifdef CONFIG_SMUX
+static DEFINE_MUTEX(smux_ioctl_mutex);
+static int (*smux_ioctl_hook) (void __user *arg);
+
+void smux_ioctl_set(int (*hook) (void __user *))
+{
+	mutex_lock(&smux_ioctl_mutex);
+	smux_ioctl_hook = hook;
+	mutex_unlock(&smux_ioctl_mutex);
+}
+
+EXPORT_SYMBOL(smux_ioctl_set);
+#endif /* CONFIG_SMUX */
 
 static DEFINE_MUTEX(dlci_ioctl_mutex);
 static int (*dlci_ioctl_hook) (unsigned int, void __user *);
@@ -995,6 +1008,17 @@ static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 				err = vlan_ioctl_hook(net, argp);
 			mutex_unlock(&vlan_ioctl_mutex);
 			break;
+#ifdef CONFIG_SMUX
+		case SIOCSIFSMUX:
+			err = -ENOPKG;
+			if(!smux_ioctl_hook)
+				request_module("smux");
+			mutex_lock(&smux_ioctl_mutex);
+			if(smux_ioctl_hook)
+				err = smux_ioctl_hook(argp);
+			mutex_unlock(&smux_ioctl_mutex);
+			break;
+#endif /* CONFIG_SMUX */
 		case SIOCADDDLCI:
 		case SIOCDELDLCI:
 			err = -ENOPKG;

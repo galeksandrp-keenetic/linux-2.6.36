@@ -1383,6 +1383,10 @@ static int sip_help_tcp(struct sk_buff *skb, unsigned int protoff,
 	    ctinfo != IP_CT_ESTABLISHED + IP_CT_IS_REPLY)
 		return NF_ACCEPT;
 
+	/*for SIP ALG switch*/
+	if(!nf_conntrack_sip_enable)
+		return NF_ACCEPT;//sip switch is off, just accept packet and do not do ALG 
+
 	/* No Data ? */
 	th = skb_header_pointer(skb, protoff, sizeof(_tcph), &_tcph);
 	if (th == NULL)
@@ -1445,6 +1449,10 @@ static int sip_help_udp(struct sk_buff *skb, unsigned int protoff,
 {
 	unsigned int dataoff, datalen;
 	const char *dptr;
+
+	/*for SIP ALG switch*/
+	if(!nf_conntrack_sip_enable)
+		return NF_ACCEPT;//sip switch is off, just accept packet and do not do ALG 
 
 	/* No Data ? */
 	dataoff = protoff + sizeof(struct udphdr);
@@ -1530,6 +1538,11 @@ static int __init nf_conntrack_sip_init(void)
 
 		for (j = 0; j < ARRAY_SIZE(sip[i]); j++) {
 			sip[i][j].tuple.src.u.udp.port = htons(ports[i]);
+
+			sip[i][j].tuple.src.l3num = 0xFFFF;
+			sip[i][j].tuple.src.u.udp.port = htons(0xFFFF);
+			sip[i][j].tuple.dst.protonum = 0xFF;
+			
 			sip[i][j].expect_policy = sip_exp_policy;
 			sip[i][j].expect_class_max = SIP_EXPECT_MAX;
 			sip[i][j].me = THIS_MODULE;

@@ -33,6 +33,10 @@
 #include <net/netfilter/nf_conntrack_zones.h>
 #include <linux/netfilter/nf_conntrack_h323.h>
 
+#if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
+#include <asm/tc3162/tc3162.h>
+#endif
+
 /* Parameters */
 static unsigned int default_rrq_ttl __read_mostly = 300;
 module_param(default_rrq_ttl, uint, 0600);
@@ -569,6 +573,12 @@ static int h245_help(struct sk_buff *skb, unsigned int protoff,
 	int datalen;
 	int dataoff;
 	int ret;
+
+	/*for H.323 ALG switch*/
+	if(!nf_conntrack_h323_enable){
+		return NF_ACCEPT;//h323 switch is off, just accept packet and do not do ALG 
+	}
+
 
 	/* Until there's been traffic both ways, don't look in packets. */
 	if (ctinfo != IP_CT_ESTABLISHED &&
@@ -1115,6 +1125,11 @@ static int q931_help(struct sk_buff *skb, unsigned int protoff,
 	int datalen;
 	int dataoff;
 	int ret;
+
+	/*for H.323 ALG switch*/	
+	if(!nf_conntrack_h323_enable){		
+		return NF_ACCEPT;//h323 switch is off, just accept packet and do not do ALG 
+	}
 
 	/* Until there's been traffic both ways, don't look in packets. */
 	if (ctinfo != IP_CT_ESTABLISHED &&
@@ -1696,6 +1711,12 @@ static int ras_help(struct sk_buff *skb, unsigned int protoff,
 	int datalen = 0;
 	int ret;
 
+	/*for H.323 ALG switch*/
+	if(!nf_conntrack_h323_enable){
+		return NF_ACCEPT;//h323 switch is off, just accept packet and do not do ALG 
+	}
+
+
 	pr_debug("nf_ct_ras: skblen = %u\n", skb->len);
 
 	spin_lock_bh(&nf_h323_lock);
@@ -1774,8 +1795,11 @@ static void __exit nf_conntrack_h323_fini(void)
 static int __init nf_conntrack_h323_init(void)
 {
 	int ret;
-
+#if defined(CONFIG_MIPS_TC3162) || defined(CONFIG_MIPS_TC3262)
+       h323_buffer = kmalloc(NF_CONNTRACK_BUF_SIZE, GFP_KERNEL);
+#else
 	h323_buffer = kmalloc(65536, GFP_KERNEL);
+#endif
 	if (!h323_buffer)
 		return -ENOMEM;
 	ret = nf_conntrack_helper_register(&nf_conntrack_helper_h245);

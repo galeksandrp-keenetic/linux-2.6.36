@@ -38,6 +38,10 @@ MODULE_DESCRIPTION("IPv4 packet filter");
 /*#define DEBUG_ALLOW_ALL*/ /* Useful for remote debugging */
 /*#define DEBUG_IP_FIREWALL_USER*/
 
+#if defined (CONFIG_NAT_FCONE) || defined (CONFIG_NAT_RCONE)
+unsigned char wan_name[IFNAMSIZ];
+#endif
+
 #ifdef DEBUG_IP_FIREWALL
 #define dprintf(format, args...) pr_info(format , ## args)
 #else
@@ -1326,6 +1330,10 @@ do_add_counters(struct net *net, const void __user *user,
 	int ret = 0;
 	void *loc_cpu_entry;
 	struct ipt_entry *iter;
+#if defined (CONFIG_NAT_FCONE) || defined (CONFIG_NAT_RCONE)
+	struct ipt_entry_target *f;
+#endif
+
 #ifdef CONFIG_COMPAT
 	struct compat_xt_counters_info compat_tmp;
 
@@ -1384,8 +1392,15 @@ do_add_counters(struct net *net, const void __user *user,
 	loc_cpu_entry = private->entries[curcpu];
 	xt_info_wrlock(curcpu);
 	xt_entry_foreach(iter, loc_cpu_entry, private->size) {
-		ADD_COUNTER(iter->counters, paddc[i].bcnt, paddc[i].pcnt);
-		++i;
+#if defined (CONFIG_NAT_FCONE) || defined (CONFIG_NAT_RCONE)
+	    f=ipt_get_target(iter);
+	    if(strcmp(f->u.kernel.target->name,"MASQUERADE")==0 && strlen(iter->ip.outiface)!=0) {
+		memset(wan_name,0,sizeof(wan_name));
+		memcpy(wan_name,iter->ip.outiface, strlen(iter->ip.outiface));
+	    }
+#endif
+	    ADD_COUNTER(iter->counters, paddc[i].bcnt, paddc[i].pcnt);
+	    ++i;
 	}
 	xt_info_wrunlock(curcpu);
  unlock_up_free:
@@ -2257,7 +2272,15 @@ static int __init ip_tables_init(void)
 	if (ret < 0)
 		goto err5;
 
-	pr_info("(C) 2000-2006 Netfilter Core Team\n");
+	pr_info("(C) 2000-2006 Netfilter Core Team, ");
+#if defined (CONFIG_NAT_FCONE)
+	printk("Type=Fully Cone\n");
+#elif defined (CONFIG_NAT_RCONE)
+	printk("Type=Restricted Cone\n");
+#else
+	printk("Type=Linux\n");
+#endif
+
 	return 0;
 
 err5:

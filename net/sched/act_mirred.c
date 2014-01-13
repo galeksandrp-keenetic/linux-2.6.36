@@ -197,6 +197,14 @@ static int tcf_mirred(struct sk_buff *skb, struct tc_action *a,
 
 	skb2->skb_iif = skb->dev->ifindex;
 	skb2->dev = dev;
+#ifdef CONFIG_QOS
+#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
+		skb2->imq_flags |= IMQ_F_ENQUEUE;
+		/*after to IMQ, next time not to IMQ*/
+		if(skb2!=skb)
+		skb->mark &= ~QOS_DEFAULT_MARK;
+#endif
+#endif
 	dev_queue_xmit(skb2);
 	err = 0;
 

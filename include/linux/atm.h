@@ -129,6 +129,7 @@
 #define ATM_VBR		3
 #define ATM_ABR		4
 #define ATM_ANYCLASS	5		/* compatible with everything */
+#define ATM_nrtVBR		6
 
 #define ATM_MAX_PCR	-1		/* maximum available PCR */
 
@@ -136,9 +137,11 @@ struct atm_trafprm {
 	unsigned char	traffic_class;	/* traffic class (ATM_UBR, ...) */
 	int		max_pcr;	/* maximum PCR in cells per second */
 	int		pcr;		/* desired PCR in cells per second */
+	int		scr;	 	/* desired SCR in cells per second */
 	int		min_pcr;	/* minimum PCR in cells per second */
 	int		max_cdv;	/* maximum CDV in microseconds */
 	int		max_sdu;	/* maximum SDU in bytes */
+	int     mbs;        /* maximum burst size (MBS) in cells */ 
         /* extra params for ABR */
         unsigned int 	icr;         	/* Initial Cell Rate (24-bit) */
         unsigned int	tbe;		/* Transient Buffer Exposure (24-bit) */ 

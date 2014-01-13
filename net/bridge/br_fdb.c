@@ -24,13 +24,25 @@
 #include <asm/atomic.h>
 #include <asm/unaligned.h>
 #include "br_private.h"
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+#include <linux/pktflow.h>
+#endif
 
-static struct kmem_cache *br_fdb_cache __read_mostly;
+#if !defined(CONFIG_TCSUPPORT_CT) 
+#ifdef CONFIG_PORT_BINDING
+extern int (*portbind_sw_hook)(void);
+extern int (*portbind_check_hook)(char *inIf, char *outIf);
+#endif
+#endif
+
+__DMEM static struct kmem_cache *br_fdb_cache __read_mostly;
 static int fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 		      const unsigned char *addr);
 
 static u32 fdb_salt __read_mostly;
-
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+extern void pktflow_fdb(struct sk_buff *skb, struct net_bridge_fdb_entry *fdb);
+#endif
 int __init br_fdb_init(void)
 {
 	br_fdb_cache = kmem_cache_create("bridge_fdb_cache",
@@ -81,6 +93,10 @@ static void fdb_rcu_free(struct rcu_head *head)
 
 static inline void fdb_delete(struct net_bridge_fdb_entry *f)
 {
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+  	if (pktflow_fdb_delete_hook) 
+		pktflow_fdb_delete_hook(f);
+#endif
 	hlist_del_rcu(&f->hlist);
 	call_rcu(&f->rcu, fdb_rcu_free);
 }
@@ -214,8 +230,63 @@ void br_fdb_delete_by_port(struct net_bridge *br,
 	spin_unlock_bh(&br->hash_lock);
 }
 
+#if defined(CONFIG_PORT_BINDING) || defined(CONFIG_TCSUPPORT_PORTBIND)
+#if !defined(CONFIG_TCSUPPORT_CT) 
+/* No locking or refcounting, assumes caller has no preempt (rcu_read_lock) */
+__IMEM struct net_bridge_fdb_entry *__br_fdb_pb_get(struct net_bridge *br, struct net_bridge_port *p,
+					  const unsigned char *addr)
+#endif
+{
+	struct hlist_node *h = NULL;
+	struct net_bridge_fdb_entry *fdb = NULL;
+
+#if !defined(CONFIG_TCSUPPORT_CT)
+	struct net_device *indev = NULL;
+	struct net_device *outdev = NULL;
+#endif
+
+	hlist_for_each_entry_rcu(fdb, h, &br->hash[br_mac_hash(addr)], hlist) {
+		if (!compare_ether_addr(fdb->addr.addr, addr)) {
+			if (unlikely(has_expired(br, fdb)))
+				break;
+
+			/* if packet is for cpe, just return */
+			if (fdb && fdb->is_local) {
+				return fdb;
+			}
+#if !defined(CONFIG_TCSUPPORT_CT)
+			indev = outdev = NULL;
+			/* check if inport and outport in same group */
+			if (p) {
+				indev = p->dev;
+			}
+			if (fdb && fdb->dst) {
+				outdev = fdb->dst->dev;
+			}
+			//printk("%s:indev->name is %s, outdev->name is %s.\n", __FUNCTION__, indev->name, outdev->name);
+			if ( (indev == NULL) ||
+				(outdev == NULL) || 
+		   (portbind_check_hook == NULL) ||
+		   (portbind_check_hook && portbind_check_hook(indev->name, outdev->name)) )
+#endif
+			{
+				return fdb;
+			}
+		#if 0
+			else {
+				/* not in the same group, we can choose search next or just return "NULL", here we choose search next. */
+				continue;
+			}
+		#endif
+		}
+	}
+
+	return NULL;
+}
+#endif
+
 /* No locking or refcounting, assumes caller has rcu_read_lock */
-struct net_bridge_fdb_entry *__br_fdb_get(struct net_bridge *br,
+__IMEM struct net_bridge_fdb_entry *__br_fdb_get(struct net_bridge *br,
 					  const unsigned char *addr)
 {
 	struct hlist_node *h;
@@ -373,9 +444,13 @@ int br_fdb_insert(struct net_bridge *br, struct net_bridge_port *source,
 	spin_unlock_bh(&br->hash_lock);
 	return ret;
 }
-
-void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+__IMEM void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
+		   const unsigned char *addr, struct sk_buff *skb)
+#else
+__IMEM void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 		   const unsigned char *addr)
+#endif
 {
 	struct hlist_head *head = &br->hash[br_mac_hash(addr)];
 	struct net_bridge_fdb_entry *fdb;
@@ -401,6 +476,9 @@ void br_fdb_update(struct net_bridge *br, struct net_bridge_port *source,
 			/* fastpath: update of existing entry */
 			fdb->dst = source;
 			fdb->ageing_timer = jiffies;
+			#if defined(CONFIG_TCSUPPORT_HWNAT)
+			pktflow_fdb(skb, fdb);
+			#endif
 		}
 	} else {
 		spin_lock(&br->hash_lock);

@@ -31,6 +31,9 @@
 
 /* Path to usermode spanning tree program */
 #define BR_STP_PROG	"/sbin/bridge-stp"
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+#define UPNP_MCAST htonl(0xEFFFFFFA)
+#endif
 
 typedef struct bridge_id bridge_id;
 typedef struct mac_addr mac_addr;
@@ -55,6 +58,9 @@ struct br_ip
 		struct in6_addr ip6;
 #endif
 	} u;
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+	mac_addr	macAddr;
+#endif
 	__be16		proto;
 };
 
@@ -69,6 +75,14 @@ struct net_bridge_fdb_entry
 	unsigned char			is_local;
 	unsigned char			is_static;
 };
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+struct net_bridge_mc_src_entry
+{
+	struct in_addr src;
+	struct in6_addr src6;
+	int filt_mode;
+};
+#endif
 
 struct net_bridge_port_group {
 	struct net_bridge_port		*port;
@@ -79,6 +93,14 @@ struct net_bridge_port_group {
 	struct timer_list		query_timer;
 	struct br_ip			addr;
 	u32				queries_sent;
+#if defined(CONFIG_BRIDGE_IGMP_SNOOPING) && defined(CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE)
+	unsigned long			ageing_time;
+	int				leave_count;
+	struct net_bridge_mc_src_entry src_entry; //for IGMPv3
+	unsigned char 			group_mac[6];	/*Multicast address*/
+	unsigned char 			host_mac[6];	/*host mac address*/
+	u8				version;//version = 4 or 6
+#endif
 };
 
 struct net_bridge_mdb_entry
@@ -140,6 +162,12 @@ struct net_bridge_port
 	struct timer_list		multicast_query_timer;
 	struct hlist_head		mglist;
 	struct hlist_node		rlist;
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE//variables below save value just temp use for "net_bridge_port_group"
+	struct net_bridge_mc_src_entry src_entry; //for IGMPv3 temp
+	mac_addr			macAddr;
+	mac_addr			groupMacAddr;
+	u8				version;//version = 4 or 6;
+#endif
 #endif
 
 #ifdef CONFIG_SYSFS
@@ -211,7 +239,9 @@ struct net_bridge
 	unsigned char			multicast_router;
 
 	u8				multicast_disabled:1;
-
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+	u8				quick_leave:1;
+#endif
 	u32				hash_elasticity;
 	u32				hash_max;
 
@@ -334,6 +364,16 @@ extern void br_fdb_changeaddr(struct net_bridge_port *p,
 extern void br_fdb_cleanup(unsigned long arg);
 extern void br_fdb_delete_by_port(struct net_bridge *br,
 				  const struct net_bridge_port *p, int do_all);
+
+#if !defined(CONFIG_TCSUPPORT_CT) 
+
+#ifdef CONFIG_PORT_BINDING
+extern struct net_bridge_fdb_entry *__br_fdb_pb_get(struct net_bridge *br, 
+						struct net_bridge_port *p,
+					  	const unsigned char *addr);
+#endif
+#endif
+
 extern struct net_bridge_fdb_entry *__br_fdb_get(struct net_bridge *br,
 						 const unsigned char *addr);
 extern int br_fdb_test_addr(struct net_device *dev, unsigned char *addr);
@@ -342,9 +382,15 @@ extern int br_fdb_fillbuf(struct net_bridge *br, void *buf,
 extern int br_fdb_insert(struct net_bridge *br,
 			 struct net_bridge_port *source,
 			 const unsigned char *addr);
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+extern void br_fdb_update(struct net_bridge *br,
+			  struct net_bridge_port *source,
+			  const unsigned char *addr, struct sk_buff *skb);
+#else
 extern void br_fdb_update(struct net_bridge *br,
 			  struct net_bridge_port *source,
 			  const unsigned char *addr);
+#endif
 
 /* br_forward.c */
 extern void br_deliver(const struct net_bridge_port *to,
@@ -354,6 +400,13 @@ extern void br_forward(const struct net_bridge_port *to,
 		struct sk_buff *skb, struct sk_buff *skb0);
 extern int br_forward_finish(struct sk_buff *skb);
 extern void br_flood_deliver(struct net_bridge *br, struct sk_buff *skb);
+#ifdef CONFIG_PORT_BINDING
+//extern void br_flood_pb_forward(struct net_bridge *br, struct net_bridge_port *p,
+//			struct sk_buff *skb, struct sk_buff *skb2);
+
+//extern void br_multicast_pb_forward(struct net_bridge_mdb_entry *mdst,struct net_bridge_port *p,
+//			  struct sk_buff *skb, struct sk_buff *skb2);
+#endif
 extern void br_flood_forward(struct net_bridge *br, struct sk_buff *skb,
 			     struct sk_buff *skb2);
 
@@ -382,6 +435,27 @@ extern int br_ioctl_deviceless_stub(struct net *net, unsigned int cmd, void __us
 extern int br_multicast_rcv(struct net_bridge *br,
 			    struct net_bridge_port *port,
 			    struct sk_buff *skb);
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+extern int br_mdb_fillbuf(struct net_bridge *br, void *buf,
+		   unsigned long maxnum, unsigned long skip);
+extern int get_snooping_debug();
+extern void set_snooping_debug(int value);
+extern int br_multicast_port_pass(struct net_bridge_port_group *pg,
+					       struct net_bridge_port *p,
+						   const struct sk_buff *skb);
+extern int br_multicast_should_drop(struct net_bridge *br, const struct sk_buff *skb);
+extern void br_multicast_dump_packet_info(const struct sk_buff *skb, int checkPoint);
+
+#endif
+
+#if !defined(CONFIG_TCSUPPORT_CT) 
+extern void br_flood_pb_forward(struct net_bridge *br, struct net_bridge_port *p,
+			struct sk_buff *skb, struct sk_buff *skb2);
+extern void br_multicast_pb_forward(struct net_bridge_mdb_entry *mdst,struct net_bridge_port *p,
+			  struct sk_buff *skb, struct sk_buff *skb2);
+
+#endif
+
 extern struct net_bridge_mdb_entry *br_mdb_get(struct net_bridge *br,
 					       struct sk_buff *skb);
 extern void br_multicast_add_port(struct net_bridge_port *port);
@@ -463,6 +537,36 @@ static inline bool br_multicast_is_router(struct net_bridge *br)
 {
 	return 0;
 }
+
+#if !defined(CONFIG_TCSUPPORT_CT) 
+
+static inline void br_flood_pb_forward(struct net_bridge *br, struct net_bridge_port *p,
+			struct sk_buff *skb, struct sk_buff *skb2)
+		{
+		}
+static inline void br_multicast_pb_forward(struct net_bridge_mdb_entry *mdst,struct net_bridge_port *p,
+			  struct sk_buff *skb, struct sk_buff *skb2)
+{
+}
+
+#endif
+
+
+#ifdef CONFIG_TCSUPPORT_IGMPSNOOPING_ENHANCE
+static inline int br_multicast_port_pass(struct net_bridge_port_group *pg,
+					       struct net_bridge_port *p,
+						   const struct sk_buff *skb){
+	return 0;
+}
+static inline int br_multicast_should_drop(struct net_bridge *br, const struct sk_buff *skb)
+{
+	return 0;
+}
+static inline void br_multicast_dump_packet_info(const struct sk_buff *skb, int checkPoint)
+{
+}
+
+#endif
 #endif
 
 /* br_netfilter.c */
@@ -536,5 +640,9 @@ extern void br_sysfs_delbr(struct net_device *dev);
 #define br_sysfs_addbr(dev)	(0)
 #define br_sysfs_delbr(dev)	do { } while(0)
 #endif /* CONFIG_SYSFS */
+
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+extern int port_reverse;
+#endif
 
 #endif

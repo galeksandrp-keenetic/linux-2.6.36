@@ -75,6 +75,8 @@ static inline struct vlan_dev_info *vlan_dev_info(const struct net_device *dev)
 #define VLAN_GRP_HASH_SHIFT	5
 #define VLAN_GRP_HASH_SIZE	(1 << VLAN_GRP_HASH_SHIFT)
 #define VLAN_GRP_HASH_MASK	(VLAN_GRP_HASH_SIZE - 1)
+#define EBT_VLAN_MARK        0x00000008  /*Rodney_20090724*/
+#define EBT_VLAN_REMARKING   0x00000010  /*Rodney_20090724*/
 
 /*  Find a VLAN device by the MAC address of its Ethernet device, and
  *  it's VLAN ID.  The default configuration is to have VLAN's scope

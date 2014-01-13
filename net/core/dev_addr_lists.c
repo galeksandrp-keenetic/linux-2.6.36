@@ -140,7 +140,7 @@ void __hw_addr_del_multiple(struct netdev_hw_addr_list *to_list,
 			    int addr_len, unsigned char addr_type)
 {
 	struct netdev_hw_addr *ha;
-	unsigned char type;
+	unsigned char type __maybe_unused;
 
 	list_for_each_entry(ha, &from_list->list, list) {
 		type = addr_type ? addr_type : ha->type;

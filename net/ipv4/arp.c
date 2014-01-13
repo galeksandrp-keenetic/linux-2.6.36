@@ -711,6 +711,7 @@ EXPORT_SYMBOL(arp_create);
  */
 void arp_xmit(struct sk_buff *skb)
 {
+
 	/* Send it off, maybe filter it using firewalling first.  */
 	NF_HOOK(NFPROTO_ARP, NF_ARP_OUT, skb, NULL, skb->dev, dev_queue_xmit);
 }
@@ -760,6 +761,8 @@ static int arp_process(struct sk_buff *skb)
 	int addr_type;
 	struct neighbour *n;
 	struct net *net = dev_net(dev);
+
+	
 
 	/* arp_rcv below verifies the ARP header and verifies the device
 	 * is ARP'able.
@@ -812,6 +815,8 @@ static int arp_process(struct sk_buff *skb)
 	    arp->ar_op != htons(ARPOP_REQUEST))
 		goto out;
 
+
+
 /*
  *	Extract fields
  */
@@ -853,7 +858,11 @@ static int arp_process(struct sk_buff *skb)
  */
 
 	/* Special case: IPv4 duplicate address detection packet (RFC2131) */
-	if (sip == 0) {
+	if (sip == 0
+#if 1
+|| sip == tip
+#endif
+	) {
 		if (arp->ar_op == htons(ARPOP_REQUEST) &&
 		    inet_addr_type(net, tip) == RTN_LOCAL &&
 		    !arp_ignore(in_dev, sip, tip))

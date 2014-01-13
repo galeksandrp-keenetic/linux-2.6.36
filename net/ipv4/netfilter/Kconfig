@@ -39,6 +39,7 @@ config NF_CONNTRACK_PROC_COMPAT
 config IP_NF_QUEUE
 	tristate "IP Userspace queueing via NETLINK (OBSOLETE)"
 	depends on NETFILTER_ADVANCED
+	depends on NETFILTER_XT_TARGET_IMQ=n
 	help
 	  Netfilter has the ability to queue packets to user space: the
 	  netlink device can be used to access them using this driver.
@@ -121,6 +122,12 @@ config IP_NF_TARGET_REJECT
 	  error should be issued in response to an incoming packet, rather
 	  than silently being dropped.
 
+	  To compile it as a module, choose M here.  If unsure, say N.
+
+config IP_NF_TARGET_ROUTE
+	tristate "ROUTE target support"
+	depends on IP_NF_MANGLE
+	help
 	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_LOG
@@ -257,10 +264,20 @@ config NF_NAT_IRC
 	depends on NF_CONNTRACK && NF_NAT
 	default NF_NAT && NF_CONNTRACK_IRC
 
+config NF_NAT_RTSP
+	tristate
+ 	depends on IP_NF_IPTABLES && NF_CONNTRACK && NF_NAT
+ 	default NF_NAT && NF_CONNTRACK_RTSP
+
 config NF_NAT_TFTP
 	tristate
 	depends on NF_CONNTRACK && NF_NAT
 	default NF_NAT && NF_CONNTRACK_TFTP
+
+config NF_NAT_RTSP                                            
+	tristate                                              
+	depends on NF_CONNTRACK && NF_NAT
+	default NF_NAT && NF_CONNTRACK_RTSP   
 
 config NF_NAT_AMANDA
 	tristate
@@ -293,6 +310,10 @@ config IP_NF_MANGLE
 	  which can effect how the packet is routed.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
+	  
+config IP_NF_TARGET_TRIGGER                     
+    tristate "TRIGGER target support"
+    default y
 
 config IP_NF_TARGET_CLUSTERIP
 	tristate "CLUSTERIP target support (EXPERIMENTAL)"

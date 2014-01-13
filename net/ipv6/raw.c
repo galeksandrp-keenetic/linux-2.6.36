@@ -468,6 +468,11 @@ static int rawv6_recvmsg(struct kiocb *iocb, struct sock *sk,
 	if (!skb)
 		goto out;
 
+#if 1//def CONFIG_TCSUPPORT_IGMP_QOS
+	sk->sk_mark = skb->mark;
+	/* dbg info */
+	//printk("xyz_dbg:%s, sk->sk_mark is %x\n", __FUNCTION__, sk->sk_mark);
+#endif
 	copied = skb->len;
 	if (copied > len) {
 		copied = len;
