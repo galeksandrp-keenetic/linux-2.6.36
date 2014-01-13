@@ -140,6 +140,10 @@ config MTD_CMDLINE_PARTS
 
 	  If unsure, say 'N'.
 
+config MTD_NDM_PARTS
+	bool "NDM partiotions parser"
+	depends on MTD_PARTITIONS = "y" && MTD = "y"
+
 config MTD_AFS_PARTS
 	tristate "ARM Firmware Suite partition parsing"
 	depends on ARM && MTD_PARTITIONS
@@ -343,5 +347,14 @@ source "drivers/mtd/onenand/Kconfig"
 source "drivers/mtd/lpddr/Kconfig"
 
 source "drivers/mtd/ubi/Kconfig"
+
+
+if CONFIG_MIPS_TC3262
+source "drivers/mtd/mtk/Kconfig"
+endif
+
+if CONFIG_RALINK_SOC
+source "drivers/mtd/ralink/Kconfig"
+endif
 
 endif # MTD

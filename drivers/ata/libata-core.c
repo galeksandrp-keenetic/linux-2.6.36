@@ -6167,10 +6167,6 @@ int ata_host_activate(struct ata_host *host, int irq,
 {
 	int i, rc;
 
-	rc = ata_host_start(host);
-	if (rc)
-		return rc;
-
 	/* Special case for polling mode */
 	if (!irq) {
 		WARN_ON(irq_handler);
@@ -6179,6 +6175,10 @@ int ata_host_activate(struct ata_host *host, int irq,
 
 	rc = devm_request_irq(host->dev, irq, irq_handler, irq_flags,
 			      dev_driver_string(host->dev), host);
+	if (rc)
+		return rc;
+
+	rc = ata_host_start(host);
 	if (rc)
 		return rc;
 

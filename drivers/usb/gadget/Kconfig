@@ -242,6 +242,7 @@ config USB_PXA25X
 	default USB_GADGET
 	select USB_GADGET_SELECTED
 
+
 # if there's only one gadget driver, using only two bulk endpoints,
 # don't waste memory for the other endpoints
 config USB_PXA25X_SMALL
@@ -505,6 +506,20 @@ config USB_LANGWELL
 	default USB_GADGET
 	select USB_GADGET_SELECTED
 
+config USB_GADGET_RT
+	boolean "Ralink USB Device Port"
+	depends on RALINK_MT7620 || RALINK_RT3352 || RALINK_MT7628
+	select USB_GADGET_SELECTED
+	select USB_GADGET_DUALSPEED
+	help
+	   Say "y" to link the driver statically, or "m" to build a
+	   dynamically linked module called "rt_udc" and force all
+	   gadget drivers to also be dynamically linked.
+
+config USB_RT
+	tristate
+	depends on USB_GADGET_RT
+	default USB_GADGET
 
 #
 # LAST -- dummy/emulated controller

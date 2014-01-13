@@ -79,7 +79,7 @@ static const char *rom_probe_types[] = {
 					"map_rom",
 					NULL };
 #ifdef CONFIG_MTD_PARTITIONS
-static const char *part_probe_types[] = { "cmdlinepart", "RedBoot", NULL };
+static const char *part_probe_types[] = { "cmdlinepart", "ndmpart", NULL };
 #endif
 
 static int physmap_flash_probe(struct platform_device *dev)

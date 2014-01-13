@@ -34,6 +34,16 @@
 #endif
 
 #include "usb.h"
+#ifdef CONFIG_MIPS_TC3262
+#if !defined(CONFIG_MIPS_RT63365)
+//IRQ for RT63365 USB is defined in host/ehci_ohci.c
+#include <asm/tc3162/tc3182_int_source.h>
+#endif
+#else
+#ifdef CONFIG_MIPS_TC3162U
+#include <asm/tc3162/tc3162.h>
+#endif
+#endif
 
 
 /* PCI-based HCs are common, but plenty of non-PCI HCs are used too */
@@ -187,6 +197,29 @@ int usb_hcd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 	if (pci_enable_device(dev) < 0)
 		return -ENODEV;
 	dev->current_state = PCI_D0;
+	
+#ifdef CONFIG_MIPS_TC3262
+       /*we do not use PCI interrupt so this value will be the interrupt 
+           number for interrupt controller.*/
+#if !defined(CONFIG_MIPS_RT63365)
+//IRQ for RT63365 USB is defined in host/ehci_ohci.c
+	if(driver->flags & HCD_USB2){//shnwind
+		dev->irq = USB20_INT;
+	}else if(driver->flags & HCD_USB11){
+		dev->irq = USB11_INT;
+	}
+#endif
+#else
+#ifdef CONFIG_MIPS_TC3162U
+       /*we do not use PCI interrupt so this value will be the interrupt 
+           number for interrupt controller.*/
+	if(driver->flags & HCD_USB2){//shnwind
+		dev->irq = PCI_A_INT;//PCI_A_INT;
+	}else if(driver->flags & HCD_USB11){
+		dev->irq = PCI_B_INT;//PCI_B_INT;
+	}
+#endif	
+#endif
 
 	if (!dev->irq) {
 		dev_err(&dev->dev,
@@ -240,6 +273,30 @@ int usb_hcd_pci_probe(struct pci_dev *dev, const struct pci_device_id *id)
 			goto err2;
 		}
 	}
+
+#ifdef CONFIG_MIPS_TC3262
+         /*shnwind some special PCI configure setting for USB20*/
+#if !defined(CONFIG_MIPS_RT63365)
+	if(driver->flags & HCD_USB2){
+		pci_write_config_dword(dev,0x40,0x000000e0);
+	 	pci_write_config_word(dev,0x0c,0xf808);
+	}else{
+		pci_write_config_word(dev,0x44,0xad54); //SET usb ok must set for sis phy, shnwind.
+	}
+
+#endif
+#else
+#ifdef CONFIG_MIPS_TC3162U
+         /*shnwind some special PCI configure setting for USB20*/
+	if(driver->flags & HCD_USB2){
+		pci_write_config_dword(dev,0x40,0x000000e0);
+	 	pci_write_config_word(dev,0x0c,0xf808);
+	}else{
+		pci_write_config_word(dev,0x44,0xad54);	//SET usb ok must set for sis phy, shnwind.
+	}
+	
+#endif
+#endif
 
 	pci_set_master(dev);
 

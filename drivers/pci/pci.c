@@ -24,6 +24,9 @@
 #include <linux/pm_runtime.h>
 #include <asm/setup.h>
 #include "pci.h"
+#if defined(CONFIG_MIPS_TC3262)
+#include <asm/tc3162/tc3162.h>
+#endif
 
 const char *pci_power_names[] = {
 	"error", "D0", "D1", "D2", "D3hot", "D3cold", "unknown",
@@ -179,6 +182,12 @@ static int __pci_bus_find_cap_start(struct pci_bus *bus,
 	u16 status;
 
 	pci_bus_read_config_word(bus, devfn, PCI_STATUS, &status);
+#if defined(CONFIG_MIPS_TC3262)
+	/* workaround for fixing the the bug (the value of configuration reg 0x100 is wrong)
+			& bonding mode problem (it doesn't to scan bus1/dev1,2.....) on MT7510 */
+	if(isMT751020)
+		return 0;
+#endif
 	if (!(status & PCI_STATUS_CAP_LIST))
 		return 0;
 

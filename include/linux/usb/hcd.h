@@ -76,6 +76,12 @@ struct usb_hcd {
 	struct kref		kref;		/* reference counter */
 
 	const char		*product_desc;	/* product/vendor string */
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+	int			speed;		/* Speed for this roothub.
+						 * May be different from
+						 * hcd->driver->flags & HCD_MASK
+						 */
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 	char			irq_descr[24];	/* driver + bus # */
 
 	struct timer_list	rh_timer;	/* drives root-hub polling */
@@ -99,6 +105,10 @@ struct usb_hcd {
 #define HCD_FLAG_POLL_RH		2	/* poll for rh status? */
 #define HCD_FLAG_POLL_PENDING		3	/* status has changed? */
 #define HCD_FLAG_WAKEUP_PENDING		4	/* root hub is resuming? */
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+#define HCD_FLAG_RH_RUNNING		5	/* root hub is running? */
+#define HCD_FLAG_DEAD			6	/* controller has died? */
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 	/* The flags can be tested using these macros; they are likely to
 	 * be slightly faster than test_bit().
@@ -108,10 +118,17 @@ struct usb_hcd {
 #define HCD_POLL_RH(hcd)	((hcd)->flags & (1U << HCD_FLAG_POLL_RH))
 #define HCD_POLL_PENDING(hcd)	((hcd)->flags & (1U << HCD_FLAG_POLL_PENDING))
 #define HCD_WAKEUP_PENDING(hcd)	((hcd)->flags & (1U << HCD_FLAG_WAKEUP_PENDING))
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+#define HCD_RH_RUNNING(hcd)	((hcd)->flags & (1U << HCD_FLAG_RH_RUNNING))
+#define HCD_DEAD(hcd)		((hcd)->flags & (1U << HCD_FLAG_DEAD))
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 	/* Flags that get set only during HCD registration or removal. */
 	unsigned		rh_registered:1;/* is root hub registered? */
 	unsigned		rh_pollable:1;	/* may we poll the root hub? */
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+	unsigned		msix_enabled:1;	/* driver has MSI-X enabled? */
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 	/* The next flag is a stopgap, to be removed when all the HCDs
 	 * support the new root-hub polling mechanism. */
@@ -137,7 +154,13 @@ struct usb_hcd {
 	 * bandwidth_mutex should be dropped after a successful control message
 	 * to the device, or resetting the bandwidth after a failed attempt.
 	 */
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+	struct mutex		*bandwidth_mutex;
+	struct usb_hcd		*shared_hcd;
+	struct usb_hcd		*primary_hcd;
+#else
 	struct mutex		bandwidth_mutex;
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 
 #define HCD_BUFFER_POOLS	4
@@ -167,7 +190,11 @@ struct usb_hcd {
 	 * this structure.
 	 */
 	unsigned long hcd_priv[0]
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+			__attribute__ ((aligned(sizeof(s64))));
+#else
 			__attribute__ ((aligned(sizeof(unsigned long))));
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 };
 
 /* 2.4 does this a bit differently ... */
@@ -200,6 +227,9 @@ struct hc_driver {
 	int	flags;
 #define	HCD_MEMORY	0x0001		/* HC regs use memory (else I/O) */
 #define	HCD_LOCAL_MEM	0x0002		/* HC needs local memory */
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+#define	HCD_SHARED	0x0004		/* Two (or more) usb_hcds share HW */
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 #define	HCD_USB11	0x0010		/* USB 1.1 */
 #define	HCD_USB2	0x0020		/* USB 2.0 */
 #define	HCD_USB3	0x0040		/* USB 3.0 */
@@ -232,6 +262,21 @@ struct hc_driver {
 				struct urb *urb, gfp_t mem_flags);
 	int	(*urb_dequeue)(struct usb_hcd *hcd,
 				struct urb *urb, int status);
+
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+	/*
+	 * (optional) these hooks allow an HCD to override the default DMA
+	 * mapping and unmapping routines.  In general, they shouldn't be
+	 * necessary unless the host controller has special DMA requirements,
+	 * such as alignment contraints.  If these are not specified, the
+	 * general usb_hcd_(un)?map_urb_for_dma functions will be used instead
+	 * (and it may be a good idea to call these functions in your HCD
+	 * implementation)
+	 */
+	int	(*map_urb_for_dma)(struct usb_hcd *hcd, struct urb *urb,
+				   gfp_t mem_flags);
+	void    (*unmap_urb_for_dma)(struct usb_hcd *hcd, struct urb *urb);
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 	/* hw synch, freeing endpoint resources that urb_dequeue can't */
 	void	(*endpoint_disable)(struct usb_hcd *hcd,
@@ -318,6 +363,20 @@ struct hc_driver {
 		 * address is set
 		 */
 	int	(*update_device)(struct usb_hcd *, struct usb_device *);
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+#ifdef CONFIG_XHCI_PM
+	int	(*set_usb2_hw_lpm)(struct usb_hcd *, struct usb_device *, int);
+	/* USB 3.0 Link Power Management */
+		/* Returns the USB3 hub-encoded value for the U1/U2 timeout. */
+	int	(*enable_usb3_lpm_timeout)(struct usb_hcd *,
+			struct usb_device *, enum usb3_link_state state);
+		/* The xHCI host controller can still fail the command to
+		 * disable the LPM timeouts, so this can return an error code.
+		 */
+	int	(*disable_usb3_lpm_timeout)(struct usb_hcd *,
+			struct usb_device *, enum usb3_link_state state);
+#endif
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 };
 
 extern int usb_hcd_link_urb_to_ep(struct usb_hcd *hcd, struct urb *urb);
@@ -329,6 +388,12 @@ extern int usb_hcd_submit_urb(struct urb *urb, gfp_t mem_flags);
 extern int usb_hcd_unlink_urb(struct urb *urb, int status);
 extern void usb_hcd_giveback_urb(struct usb_hcd *hcd, struct urb *urb,
 		int status);
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+extern int usb_hcd_map_urb_for_dma(struct usb_hcd *hcd, struct urb *urb,
+		gfp_t mem_flags);
+extern void usb_hcd_unmap_urb_setup_for_dma(struct usb_hcd *, struct urb *);
+extern void usb_hcd_unmap_urb_for_dma(struct usb_hcd *, struct urb *);
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 extern void usb_hcd_flush_endpoint(struct usb_device *udev,
 		struct usb_host_endpoint *ep);
 extern void usb_hcd_disable_endpoint(struct usb_device *udev,
@@ -344,6 +409,12 @@ extern int usb_hcd_get_frame_number(struct usb_device *udev);
 
 extern struct usb_hcd *usb_create_hcd(const struct hc_driver *driver,
 		struct device *dev, const char *bus_name);
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+extern struct usb_hcd *usb_create_shared_hcd(const struct hc_driver *driver,
+		struct device *dev, const char *bus_name,
+		struct usb_hcd *shared_hcd);
+extern int usb_hcd_is_primary_hcd(struct usb_hcd *hcd);
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 extern struct usb_hcd *usb_get_hcd(struct usb_hcd *hcd);
 extern void usb_put_hcd(struct usb_hcd *hcd);
 extern int usb_add_hcd(struct usb_hcd *hcd,
@@ -380,6 +451,13 @@ extern irqreturn_t usb_hcd_irq(int irq, void *__hcd);
 
 extern void usb_hc_died(struct usb_hcd *hcd);
 extern void usb_hcd_poll_rh_status(struct usb_hcd *hcd);
+
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+#ifdef CONFIG_XHCI_DEV_NOTE
+extern void usb_wakeup_notification(struct usb_device *hdev,
+		unsigned int portnum);
+#endif
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 /* The D0/D1 toggle bits ... USE WITH CAUTION (they're almost hcd-internal) */
 #define usb_gettoggle(dev, ep, out) (((dev)->toggle[out] >> (ep)) & 1)
@@ -468,6 +546,12 @@ extern void usb_ep0_reinit(struct usb_device *);
 
 
 /*-------------------------------------------------------------------------*/
+
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+/* class requests from USB 3.0 hub spec, table 10-5 */
+#define SetHubDepth		(0x3000 | HUB_SET_DEPTH)
+#define GetPortErrorCount	(0x8000 | HUB_GET_PORT_ERR_COUNT)
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 /*
  * Generic bandwidth allocation constants/support
@@ -614,14 +698,14 @@ static inline void usbmon_urb_complete(struct usb_bus *bus, struct urb *urb,
 #endif /* CONFIG_USB_MON || CONFIG_USB_MON_MODULE */
 
 /*-------------------------------------------------------------------------*/
-
+#if !defined(CONFIG_USB_MT7621_XHCI_HCD) && !defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
 /* hub.h ... DeviceRemovable in 2.4.2-ac11, gone in 2.4.10 */
 /* bleech -- resurfaced in 2.4.11 or 2.4.12 */
 #define bitmap	DeviceRemovable
 
+#endif // !CONFIG_USB_MT7621_XHCI_HCD
 
 /*-------------------------------------------------------------------------*/
-
 /* random stuff */
 
 #define	RUN_CONTEXT (in_irq() ? "in_irq" \

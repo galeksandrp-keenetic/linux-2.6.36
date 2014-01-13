@@ -19,7 +19,7 @@ config USB_C67X00_HCD
 
 config USB_XHCI_HCD
 	tristate "xHCI HCD (USB 3.0) support (EXPERIMENTAL)"
-	depends on USB && PCI && EXPERIMENTAL
+	depends on USB 
 	---help---
 	  The eXtensible Host Controller Interface (xHCI) is standard for USB 3.0
 	  "SuperSpeed" host controller hardware.
@@ -36,6 +36,35 @@ config USB_XHCI_HCD_DEBUGGING
 	  This should only be used for debugging xHCI driver bugs.
 
 	  If unsure, say N.
+
+config USB_MT7621_XHCI_HCD
+	tristate "MTK xHCI HCD support"
+	depends on USB && USB_XHCI_HCD
+
+config PERIODIC_ENP
+	bool "Periodic endpoint support"
+	depends on USB_MT7621_XHCI_HCD
+	default y
+
+config XHCI_DEV_NOTE
+	bool "xHCI HCD with device notification function"
+	depends on USB_MT7621_XHCI_HCD
+
+#config XHCI_PM
+#	tristate "xHCI HCD with U2/U3 LPM function (patch to USB core)"
+#	depends on USB_MT7621_XHCI_HCD
+
+config U3_PHY_GPIO_SUPPORT
+	depends on USB_MT7621_XHCI_HCD && MT7621_FPGA
+	bool "U3 PHY GPIO access registers support"
+
+config C60802_SUPPORT
+	depends on USB_MT7621_XHCI_HCD && MT7621_FPGA
+	bool "U3 PHY C60802 support"
+
+config D60802_SUPPORT
+	depends on USB_MT7621_XHCI_HCD && MT7621_FPGA
+        bool "U3 PHY D60802 support"
 
 config USB_EHCI_HCD
 	tristate "EHCI HCD (USB 2.0) support"
@@ -58,6 +87,11 @@ config USB_EHCI_HCD
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ehci-hcd.
+
+config RT3XXX_EHCI
+	bool "Ralink EHCI HCD support"
+	depends on USB_EHCI_HCD && RALINK_SOC
+	default y
 
 config USB_EHCI_ROOT_HUB_TT
 	bool "Root Hub Transaction Translators"
@@ -209,6 +243,11 @@ config USB_OHCI_HCD
 
 	  To compile this driver as a module, choose M here: the
 	  module will be called ohci-hcd.
+
+config RT3XXX_OHCI
+	bool "Ralink OHCI HCD support"
+	depends on USB_OHCI_HCD && RALINK_SOC
+	default y
 
 config USB_OHCI_HCD_OMAP1
 	bool "OHCI support for OMAP1/2 chips"

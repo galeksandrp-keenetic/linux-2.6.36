@@ -208,6 +208,12 @@ config MTD_CFI_STAA
 config MTD_CFI_UTIL
 	tristate
 
+config MTD_SPIFLASH
+	tristate "Support for SPIFLASH on TC3162/TC3262"
+	depends on (MIPS_TC3162 || MIPS_TC3162U || MIPS_TC3262)
+	help
+	  This option enables basic support for SPIFLASH on TC3162 chip.
+
 config MTD_RAM
 	tristate "Support for RAM chips in bus mapping"
 	help

@@ -13,6 +13,7 @@ obj-$(CONFIG_MTD_CMDLINE_PARTS) += cmdlinepart.o
 obj-$(CONFIG_MTD_AFS_PARTS)	+= afs.o
 obj-$(CONFIG_MTD_AR7_PARTS)	+= ar7part.o
 obj-$(CONFIG_MTD_OF_PARTS)      += ofpart.o
+obj-$(CONFIG_MTD_NDM_PARTS)	+= ndmpart.o
 
 # 'Users' - code which presents functionality to userspace.
 obj-$(CONFIG_MTD_CHAR)		+= mtdchar.o
@@ -29,7 +30,7 @@ obj-$(CONFIG_MTD_OOPS)		+= mtdoops.o
 
 nftl-objs		:= nftlcore.o nftlmount.o
 inftl-objs		:= inftlcore.o inftlmount.o
-
-obj-y		+= chips/ lpddr/ maps/ devices/ nand/ onenand/ tests/
+# frankliao modify 20101216
+obj-y		+= chips/ mtk/ ralink/ lpddr/ maps/ devices/ nand/ onenand/ tests/
 
 obj-$(CONFIG_MTD_UBI)		+= ubi/

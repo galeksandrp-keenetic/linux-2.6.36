@@ -49,6 +49,12 @@ struct mtd_file_info {
 	enum mtd_file_modes mode;
 };
 
+#if defined(CONFIG_TCSUPPORT_VOIP)
+/*#11542: For voice afftected by Flash action issue*/
+atomic_t eraseAction;
+extern int mtd_spiflash_erase_sp(struct mtd_info *mtd, struct erase_info *instr);
+#endif
+
 static loff_t mtd_lseek (struct file *file, loff_t offset, int orig)
 {
 	struct mtd_file_info *mfi = file->private_data;
@@ -396,31 +402,51 @@ static int mtd_do_writeoob(struct file *file, struct mtd_info *mtd,
 	uint32_t retlen;
 	int ret = 0;
 
-	if (!(file->f_mode & FMODE_WRITE))
+	if (!(file->f_mode & FMODE_WRITE)){
+#if defined(CONFIG_TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 		return -EPERM;
+	}
 
-	if (length > 4096)
+	if (length > 4096){
+#if defined(CONFIG_TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 		return -EINVAL;
+	}
 
 	if (!mtd->write_oob)
 		ret = -EOPNOTSUPP;
 	else
 		ret = access_ok(VERIFY_READ, ptr, length) ? 0 : -EFAULT;
 
-	if (ret)
+	if (ret){
+#if defined(CONFIG_TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 		return ret;
+	}
 
 	ops.ooblen = length;
 	ops.ooboffs = start & (mtd->oobsize - 1);
 	ops.datbuf = NULL;
 	ops.mode = MTD_OOB_PLACE;
 
-	if (ops.ooboffs && ops.ooblen > (mtd->oobsize - ops.ooboffs))
+	if (ops.ooboffs && ops.ooblen > (mtd->oobsize - ops.ooboffs)){
+#if defined(CONFIG_TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 		return -EINVAL;
+	}
 
 	ops.oobbuf = memdup_user(ptr, length);
-	if (IS_ERR(ops.oobbuf))
+	if (IS_ERR(ops.oobbuf)){
+#if defined(CONFIG_TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 		return PTR_ERR(ops.oobbuf);
+	}
 
 	start &= ~((uint64_t)mtd->oobsize - 1);
 	ret = mtd->write_oob(mtd, start, &ops);
@@ -428,11 +454,12 @@ static int mtd_do_writeoob(struct file *file, struct mtd_info *mtd,
 	if (ops.oobretlen > 0xFFFFFFFFU)
 		ret = -EOVERFLOW;
 	retlen = ops.oobretlen;
-	if (copy_to_user(retp, &retlen, sizeof(length)))
+	if (copy_to_user(retp, &retlen, sizeof(length))){
 		ret = -EFAULT;
 
 	kfree(ops.oobbuf);
 	return ret;
+	}
 }
 
 static int mtd_do_readoob(struct mtd_info *mtd, uint64_t start,
@@ -541,9 +568,15 @@ static int mtd_ioctl(struct file *file, u_int cmd, u_long arg)
 	case MEMERASE64:
 	{
 		struct erase_info *erase;
-
-		if(!(file->f_mode & FMODE_WRITE))
+#if defined(CONFIG_TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 1);
+#endif
+		if(!(file->f_mode & FMODE_WRITE)){
+#if defined(CONFIG_TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 			return -EPERM;
+		}
 
 		erase=kzalloc(sizeof(struct erase_info),GFP_KERNEL);
 		if (!erase)
@@ -560,6 +593,9 @@ static int mtd_ioctl(struct file *file, u_int cmd, u_long arg)
 				if (copy_from_user(&einfo64, argp,
 					    sizeof(struct erase_info_user64))) {
 					kfree(erase);
+#if defined(CONFIG_TCSUPPORT_VOIP)
+				atomic_set(&eraseAction, 0);
+#endif
 					return -EFAULT;
 				}
 				erase->addr = einfo64.start;
@@ -570,6 +606,9 @@ static int mtd_ioctl(struct file *file, u_int cmd, u_long arg)
 				if (copy_from_user(&einfo32, argp,
 					    sizeof(struct erase_info_user))) {
 					kfree(erase);
+#if defined(CONFIG_TCSUPPORT_VOIP)
+				atomic_set(&eraseAction, 0);
+#endif
 					return -EFAULT;
 				}
 				erase->addr = einfo32.start;
@@ -602,6 +641,9 @@ static int mtd_ioctl(struct file *file, u_int cmd, u_long arg)
 			}
 			kfree(erase);
 		}
+#if defined(CONFIG_TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 0);
+#endif
 		break;
 	}
 
@@ -609,13 +651,22 @@ static int mtd_ioctl(struct file *file, u_int cmd, u_long arg)
 	{
 		struct mtd_oob_buf buf;
 		struct mtd_oob_buf __user *buf_user = argp;
-
+#if defined(CONFIG_TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 1);
+#endif
 		/* NOTE: writes return length to buf_user->length */
-		if (copy_from_user(&buf, argp, sizeof(buf)))
+		if (copy_from_user(&buf, argp, sizeof(buf))){
+#if defined(CONFIG_TCSUPPORT_VOIP)
+			atomic_set(&eraseAction, 0);
+#endif
 			ret = -EFAULT;
+		}
 		else
 			ret = mtd_do_writeoob(file, mtd, buf.start, buf.length,
 				buf.ptr, &buf_user->length);
+#if defined(CONFIG_TCSUPPORT_VOIP)
+		atomic_set(&eraseAction, 0);
+#endif
 		break;
 	}
 
@@ -1074,6 +1125,9 @@ static int __init init_mtdchar(void)
 				"Memory Technology Devices.\n", MTD_CHAR_MAJOR);
 		return ret;
 	}
+#if defined(CONFIG_TCSUPPORT_VOIP)
+	atomic_set(&eraseAction, 0);
+#endif
 
 	ret = register_filesystem(&mtd_inodefs_type);
 	if (ret) {
@@ -1108,6 +1162,10 @@ static void __exit cleanup_mtdchar(void)
 
 module_init(init_mtdchar);
 module_exit(cleanup_mtdchar);
+
+#if defined(CONFIG_TCSUPPORT_VOIP)
+EXPORT_SYMBOL(eraseAction);
+#endif
 
 MODULE_ALIAS_CHARDEV_MAJOR(MTD_CHAR_MAJOR);
 

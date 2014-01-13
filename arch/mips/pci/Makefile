@@ -19,14 +19,18 @@ obj-$(CONFIG_BCM47XX)		+= pci-bcm47xx.o
 obj-$(CONFIG_BCM63XX)		+= pci-bcm63xx.o fixup-bcm63xx.o \
 					ops-bcm63xx.o
 
+ifdef CONFIG_MIPS_RT63365
+obj-$(CONFIG_MIPS_RT63365)	+= pci-rt6xxxx.o
+else
 obj-$(CONFIG_MIPS_TC3162)	+= ops-tc3162.o pci-tc3162.o fixup-tc3162.o
-ifdef CONFIG_MIPS_TC3262 
+ifdef CONFIG_MIPS_TC3262
 EXTRA_CFLAGS += -DPCIE_PCI_COEXIT
 endif
 obj-$(CONFIG_MIPS_TC3262)	+= ops-tc3162u.o pci-tc3162u.o fixup-tc3162u.o pcie-phy.o
 obj-$(CONFIG_MIPS_TC3262)       += ops-tc3162.o pci-tc3162.o fixup-tc3162.o
 ifdef CONFIG_MIPS_TC3162U
 EXTRA_CFLAGS += -DPCIE_PCI_COEXIT
+endif
 endif
 obj-$(CONFIG_MIPS_TC3162U)	+= ops-tc3162u.o pci-tc3162u.o fixup-tc3162u.o pcie-phy.o
 obj-$(CONFIG_MIPS_TC3162U)	+= ops-tc3162.o pci-tc3162.o fixup-tc3162.o

@@ -44,6 +44,9 @@
 
 #include "usb.h"
 
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#include <asm/tc3162/tc3162.h>
+#endif
 
 const char *usbcore_name = "usbcore";
 
@@ -591,6 +594,76 @@ int usb_lock_device_for_reset(struct usb_device *udev,
 }
 EXPORT_SYMBOL_GPL(usb_lock_device_for_reset);
 
+
+static struct usb_device *match_device(struct usb_device *dev, u16 vendor_id, u16 product_id)
+{
+	struct usb_device *ret_dev = NULL;
+	int child;
+
+	dev_dbg(&dev->dev, "check for vendor %04x, product %04x ...\n",
+		le16_to_cpu(dev->descriptor.idVendor),
+		le16_to_cpu(dev->descriptor.idProduct));
+
+	/* see if this device matches */
+	if ((vendor_id == le16_to_cpu(dev->descriptor.idVendor)) &&
+		(product_id == le16_to_cpu(dev->descriptor.idProduct))) {
+		dev_dbg(&dev->dev, "matched this device!\n");
+		ret_dev = usb_get_dev(dev);
+		goto exit;
+	}
+
+	/* look through all of the children of this device */
+	for (child = 0; child < dev->maxchild; ++child) {
+		if (dev->children[child]) {
+			usb_lock_device(dev->children[child]);
+			ret_dev = match_device(dev->children[child], vendor_id, product_id);
+			usb_unlock_device(dev->children[child]);
+			if (ret_dev)
+				goto exit;
+		}
+	}
+exit:
+	return ret_dev;
+}
+
+/**
+ - * usb_find_device - find a specific usb device in the system
+ - * @vendor_id: the vendor id of the device to find
+ - * @product_id: the product id of the device to find
+ - *
+ - * Returns a pointer to a struct usb_device if such a specified usb
+ - * device is present in the system currently.  The usage count of the
+ - * device will be incremented if a device is found.  Make sure to call
+ - * usb_put_dev() when the caller is finished with the device.
+ - *
+ - * If a device with the specified vendor and product id is not found,
+ - * NULL is returned.
+ - */
+struct usb_device *usb_find_device(u16 vendor_id, u16 product_id)
+{
+	struct list_head *buslist;
+	struct usb_bus *bus;
+	struct usb_device *dev = NULL;
+
+	mutex_lock(&usb_bus_list_lock);
+	for (buslist = usb_bus_list.next;
+		buslist != &usb_bus_list;
+		buslist = buslist->next) {
+		bus = container_of(buslist, struct usb_bus, bus_list);
+		if (!bus->root_hub)
+			continue;
+		usb_lock_device(bus->root_hub);
+		dev = match_device(bus->root_hub, vendor_id, product_id);
+		usb_unlock_device(bus->root_hub);
+		if (dev)
+			goto exit;
+	}
+exit:
+	mutex_unlock(&usb_bus_list_lock);
+	return dev;
+}
+EXPORT_SYMBOL(usb_find_device);
+
 /**
  * usb_get_current_frame_number - return current bus frame number
  * @dev: the device whose bus is being queried
@@ -999,11 +1072,106 @@ static void usb_debugfs_cleanup(void)
  */
 static int __init usb_init(void)
 {
+	
 	int retval;
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+	unsigned long x;
+#endif
+#endif
 	if (nousb) {
 		pr_info("%s: USB support disabled\n", usbcore_name);
 		return 0;
 	}
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+	if (!isFPGA)
+		usb_phy_init();
+#if !defined(CONFIG_MIPS_RT63365)
+#ifdef CONFIG_MIPS_TC3162U
+	/*REXT pin for TC. 
+		Reset some part of usb phy. shnwind 20100406.*/
+	x=VPint(0xbfb000ac);
+	x &= ~((1<<6));
+	x |= ((1<<25));
+	VPint(0xbfb000ac) = x;
+	mdelay(1);
+	x |= ((1<<6));
+	VPint(0xbfb000ac) = x;
+	mdelay(1); 
+	//SiS bug fix. shnwind.
+	x = VPint(0xbfb000a8);
+	x &= ~((1<<23) | (1<<22) | (1<<21) | (1<<20));
+	x |= (1<<20);
+	VPint(0xbfb000a8) = x;
+
+	/*close otg part,
+         note: read bit 22,23 always 1 wheater it real value is 0 or 1.
+         1 means close otg part.
+		 change chirp level to 570mV. shnwind*/
+	 
+	x=VPint(0xbfb000ac);
+	x &= ~((1<<25) | (1<<23) | (1<<22) | (1<<14) | (1<<15) | (1<<13));
+	x |= ((1<<25) | (1<<23) | (1<<22) | (1<<15));
+	VPint(0xbfb000ac) = x;
+	
+	/*choose op mode host*/
+	x = VPint(CR_AHB_SSR);
+	x &= ~((1<<30) | (1<<29));
+	x |= ((1<<30) | (1<<29));
+	VPint(CR_AHB_SSR) = x;
+#endif
+#ifdef CONFIG_MIPS_TC3262
+	/*REXT pin for TC. 
+		Reset some part of usb phy. shnwind 20100406.*/
+	x=VPint(0xbfb000ac);
+	x &= ~((1<<6));
+	x |= ((1<<27));
+	VPint(0xbfb000ac) = x;
+	mdelay(1);
+	x |= ((1<<6));
+	VPint(0xbfb000ac) = x;
+	mdelay(1); 
+	x=VPint(0xbfb000e8);
+	x &= ~((1<<6));
+	x |= ((1<<27));
+	VPint(0xbfb000e8) = x;
+	mdelay(1);
+	x |= ((1<<6));
+	VPint(0xbfb000e8) = x;
+
+
+	//SiS bug fix.
+	//	change detext disconnect only rx. shnwind.
+	x = VPint(0xbfb000a8);
+	x &= ~((1<<23) | (1<<22) | (1<<21) | (1<<20) | (1<<19) | (1<<18) | (1<<17) | (1<<16) | (1<<4) | (1<<3) | (1<<2) | (1<<1));
+	x |= ((1<<20) | (1<<16) | (1<<4) | (1<<2));
+	VPint(0xbfb000a8) = x;
+
+	/*close otg part,
+         note: read bit 22,23 always 1 wheater it real value is 0 or 1.
+         1 means close otg part.
+		 change chirp level to 600mV, output level 420mV. resistor < 45 ohm shnwind*/
+	x=VPint(0xbfb000ac);
+	x &= ~((1<<27) | (1<<23) | (1<<22) | (1<<15) | (1<<14) | (1<<13) | (1<<11) | (1<<10) | (1<<8) | (1<<7));
+	x |= ((1<<27) | (1<<23) | (1<<22) | (1<<15) | (1<<14));
+	VPint(0xbfb000ac) = x;
+	x = VPint(0xbfb000e8);
+	x &= ~((1<<27) | (1<<23) | (1<<22) | (1<<15) | (1<<14) | (1<<13) | (1<<11) | (1<<10) | (1<<8) | (1<<7));
+	x |= ((1<<27) | (1<<23) | (1<<22) | (1<<15) | (1<<14));
+	VPint(0xbfb000e8) = x;
+
+/*
+ * To fix low-speed device bug:  USB can't detect low-speed device's un-plug which causes 
+ * the low-speed device can't connect to USB when it is plugged in.  This bug-fix is for 
+ * 3262 only, not for 3182.  --Trey
+ */
+	x = VPint(0xbfb000ec);
+	x |= (1<<5);
+	VPint(0xbfb000ec) = x;
+
+#endif
+#endif
+#endif
 
 	retval = usb_debugfs_init();
 	if (retval)

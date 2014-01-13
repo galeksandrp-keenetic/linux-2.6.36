@@ -142,6 +142,12 @@
 #define gadget_is_s3c_hsotg(g)    0
 #endif
 
+/* Ralin SoC USB device controller */
+#ifdef CONFIG_USB_GADGET_RT
+#define gadget_is_rt(g)         !strcmp("rt_udc", (g)->name)
+#else
+#define gadget_is_rt(g)         0
+#endif
 
 /**
  * usb_gadget_controller_number - support bcdDevice id convention
@@ -200,6 +206,10 @@ static inline int usb_gadget_controller_number(struct usb_gadget *gadget)
 		return 0x25;
 	else if (gadget_is_s3c_hsotg(gadget))
 		return 0x26;
+	//for RT USB device controller
+	else if (gadget_is_rt(gadget))
+		return 0x40;
+
 	return -ENOENT;
 }
 

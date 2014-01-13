@@ -44,6 +44,15 @@
 #include <asm/system.h>
 #include <asm/unaligned.h>
 
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+struct ehci_hcd  *save_ehci = NULL;
+void  special_ehci_reset(void);
+int reset_count=0;
+#define VPint           *(volatile unsigned long int *)
+#endif
+#endif
+
 /*-------------------------------------------------------------------------*/
 
 /*
@@ -485,6 +494,39 @@ static void ehci_work (struct ehci_hcd *ehci)
 			 ehci->periodic_sched != 0))
 		timer_action (ehci, TIMER_IO_WATCHDOG);
 }
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+int ehci_light_reset (struct ehci_hcd *ehci)
+{
+	u32	command, hcc_params;
+
+	printk("ehci light reset\n");
+	command = ehci_readl(ehci, &ehci->regs->command);
+	command |= CMD_LRESET;
+	ehci_writel(ehci, command, &ehci->regs->command);
+	mdelay(5);
+
+	ehci_writel(ehci, ehci->periodic_dma, &ehci->regs->frame_list);
+	ehci_writel(ehci, (u32)ehci->async->qh_dma, &ehci->regs->async_next);
+
+	hcc_params = ehci_readl(ehci, &ehci->caps->hcc_params);
+	if (HCC_64BIT_ADDR(hcc_params)) {
+		ehci_writel(ehci, 0, &ehci->regs->segment);
+	}
+
+	ehci->command &= ~(CMD_LRESET|CMD_IAAD|CMD_PSE|CMD_ASE|CMD_RESET);
+	ehci->command |= CMD_RUN;
+	ehci_writel(ehci, ehci->command, &ehci->regs->command);
+
+	ehci_writel(ehci, INTR_MASK,
+		&ehci->regs->intr_enable); /* Turn On Interrupts */
+
+	mdelay(5);
+	
+	return 0;
+}
+#endif	
+#endif
 
 /*
  * Called when the ehci_hcd module is removed.
@@ -492,7 +534,11 @@ static void ehci_work (struct ehci_hcd *ehci)
 static void ehci_stop (struct usb_hcd *hcd)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci (hcd);
-
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+    save_ehci = NULL;
+#endif
+#endif
 	ehci_dbg (ehci, "stop\n");
 
 	/* no more interrupts ... */
@@ -729,17 +775,22 @@ static int ehci_run (struct usb_hcd *hcd)
 		((ehci->sbrn & 0xf0)>>4), (ehci->sbrn & 0x0f),
 		temp >> 8, temp & 0xff,
 		ignore_oc ? ", overcurrent ignored" : "");
-
+#if !defined(CONFIG_MIPS_TC3162U)
 	ehci_writel(ehci, INTR_MASK,
 		    &ehci->regs->intr_enable); /* Turn On Interrupts */
-
+#endif
+	
 	/* GRR this is run-once init(), being done every time the HC starts.
 	 * So long as they're part of class devices, we can't do it init()
 	 * since the class device isn't created that early.
 	 */
 	create_debug_files(ehci);
 	create_companion_file(ehci);
-
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+    save_ehci = ehci;
+#endif
+#endif
 	return 0;
 }
 
@@ -1170,6 +1221,16 @@ MODULE_LICENSE ("GPL");
 #define	PLATFORM_DRIVER		ehci_hcd_au1xxx_driver
 #endif
 
+#if (defined (CONFIG_RT3XXX_OHCI) || defined (CONFIG_RT3XXX_OHCI_MODULE)) && !defined (CONFIG_MIPS_RT63365)
+#include "ehci-rt3xxx.c"
+#define PLATFORM_DRIVER     rt3xxx_ehci_driver
+#endif
+
+#if defined (CONFIG_MIPS_RT63365)
+#include "ehci-rt6xxx.c"
+#define PLATFORM_DRIVER     rt3xxx_ehci_driver
+#endif
+
 #ifdef CONFIG_ARCH_OMAP3
 #include "ehci-omap.c"
 #define        PLATFORM_DRIVER         ehci_hcd_omap_driver
@@ -1214,6 +1275,30 @@ MODULE_LICENSE ("GPL");
     !defined(PS3_SYSTEM_BUS_DRIVER) && !defined(OF_PLATFORM_DRIVER) && \
     !defined(XILINX_OF_PLATFORM_DRIVER)
 #error "missing bus glue for ehci-hcd"
+#endif
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+
+#if !defined(CONFIG_MIPS_RT63365)
+void  special_ehci_reset(void){
+	struct ehci_hcd     *ehci;
+	u32 flags;
+
+	ehci = save_ehci;
+
+	if(ehci == NULL){
+		printk("no ehci point\n");
+	    return;
+	}
+	reset_count++;
+	spin_lock_irqsave (&ehci->lock, flags);
+	ehci_light_reset(ehci);
+	spin_unlock_irqrestore (&ehci->lock, flags);
+
+	return;
+
+}
+
+#endif
 #endif
 
 static int __init ehci_hcd_init(void)

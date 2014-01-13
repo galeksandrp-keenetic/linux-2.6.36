@@ -27,6 +27,11 @@
  */
 
 /*-------------------------------------------------------------------------*/
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+extern int ehci_light_reset (struct ehci_hcd *ehci);
+#endif
+#endif
 
 #define	PORT_WAKE_BITS	(PORT_WKOC_E|PORT_WKDISC_E|PORT_WKCONN_E)
 
@@ -730,7 +735,12 @@ static int ehci_hub_control (
 	unsigned long	flags;
 	int		retval = 0;
 	unsigned	selector;
-
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+	char reset_flag = 0;
+	unsigned long cmd_tmp;
+#endif
+#endif
 	/*
 	 * FIXME:  support SetPortFeatures USB_PORT_FEAT_INDICATOR.
 	 * HCS_INDICATOR may say we can change LEDs to off/amber/green.
@@ -1067,6 +1077,15 @@ static int ehci_hub_control (
 				temp |= PORT_OWNER;
 			} else {
 				ehci_vdbg (ehci, "port %d reset\n", wIndex + 1);
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+				reset_flag = 1;
+				cmd_tmp = ehci_readl(ehci,&ehci->regs->command);
+				cmd_tmp &= ~CMD_RUN;
+				ehci_writel(ehci, cmd_tmp, &ehci->regs->command);
+				mdelay(2);
+#endif
+#endif
 				temp |= PORT_RESET;
 				temp &= ~PORT_PE;
 
@@ -1078,6 +1097,15 @@ static int ehci_hub_control (
 						+ msecs_to_jiffies (50);
 			}
 			ehci_writel(ehci, temp, status_reg);
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+			if( reset_flag == 1){
+				cmd_tmp = ehci_readl(ehci,&ehci->regs->command);
+				cmd_tmp |= CMD_RUN;
+				ehci_writel(ehci, cmd_tmp, &ehci->regs->command);
+			}
+#endif
+#endif
 			break;
 
 		/* For downstream facing ports (these):  one hub port is put
@@ -1094,7 +1122,14 @@ static int ehci_hub_control (
 			temp |= selector << 16;
 			ehci_writel(ehci, temp, status_reg);
 			break;
-
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+		case USB_HOST_LIGHT_RESET:
+			//printk("SET port feature, Light reset\n");
+			ehci_light_reset (ehci);
+			break;
+#endif
+#endif
 		default:
 			goto error;
 		}

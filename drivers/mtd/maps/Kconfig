@@ -251,6 +251,13 @@ config MTD_NETtel
 	help
 	  Support for flash chips on NETtel/SecureEdge/SnapGear boards.
 
+config MTD_TC3162
+	tristate "TrendChip TC3162/TC3262 MTD support"
+	#depends on MIPS_TC3162 && MTD_PARTITIONS && MTD_CFI
+	depends on (MIPS_TC3162 || MIPS_TC3162U || MIPS_TC3262) && MTD_PARTITIONS
+	help
+	  Flash memory access on TrendChip TC3162 Boards
+
 config MTD_DILNETPC
 	tristate "CFI Flash device mapped on DIL/Net PC"
 	depends on X86 && MTD_CONCAT && MTD_PARTITIONS && MTD_CFI_INTELEXT && BROKEN

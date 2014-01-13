@@ -1611,4 +1611,9 @@ config SERIAL_ALTERA_UART_CONSOLE
 	help
 	  Enable a Altera UART port to be the system console.
 
+config SERIAL_TC3162
+	bool "TC3162/TC3262 serial port support"
+	select SERIAL_CORE
+	depends on (MIPS_TC3162 || MIPS_TC3162U || MIPS_TC3262)
+
 endmenu

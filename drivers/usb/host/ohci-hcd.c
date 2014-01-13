@@ -47,6 +47,14 @@
 
 #define DRIVER_AUTHOR "Roman Weissgaerber, David Brownell"
 #define DRIVER_DESC "USB 1.1 'Open' Host Controller (OHCI) Driver"
+#if defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+#define PORT_CONNECT    (1<<0)      /* device connected */
+
+#define USB_PORT0_STAT_20_ADDR 0xbfba1064
+#define USB_PORT1_STAT_20_ADDR 0xbfba1068
+#endif
+#endif
 
 /*-------------------------------------------------------------------------*/
 
@@ -696,6 +704,21 @@ retry:
 
 	/* wake on ConnectStatusChange, matching external hubs */
 	ohci_writel (ohci, RH_HS_DRWE, &ohci->regs->roothub.status);
+#if defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+	/*
+		If no device connect to host, set USB host 11 to reset state.
+		This mechanism is used to support power saving.
+			Chih Hunag 20101011.
+	*/
+	if(((readl((void *)USB_PORT0_STAT_20_ADDR) & PORT_CONNECT) == 0)
+		&& ((readl((void *)USB_PORT1_STAT_20_ADDR) & PORT_CONNECT) == 0)){
+		val = ohci_readl (ohci, &ohci->regs->control);
+		val &= ~(OHCI_USB_RESET);
+		ohci_writel (ohci, val, &ohci->regs->control);
+	}
+#endif
+#endif
 
 	/* Choose the interrupts we care about now, others later on demand */
 	mask = OHCI_INTR_INIT;
@@ -1056,6 +1079,14 @@ MODULE_LICENSE ("GPL");
 #define PLATFORM_DRIVER		usb_hcd_pnx4008_driver
 #endif
 
+#if (defined (CONFIG_RT3XXX_OHCI) || defined (CONFIG_RT3XXX_OHCI_MODULE)) && !defined (CONFIG_MIPS_RT63365)
+#include "ohci-rt3xxx.c"
+#define PLATFORM_DRIVER     ohci_hcd_rt3xxx_driver
+#endif
+#if defined (CONFIG_MIPS_RT63365)
+#include "ohci-rt6xxx.c"
+#define PLATFORM_DRIVER     ohci_hcd_rt3xxx_driver
+#endif
 #ifdef CONFIG_ARCH_DAVINCI_DA8XX
 #include "ohci-da8xx.c"
 #define PLATFORM_DRIVER		ohci_hcd_da8xx_driver

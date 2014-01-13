@@ -34,6 +34,9 @@
 #define __LINUX_USB_CH9_H
 
 #include <linux/types.h>	/* __u8 etc */
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+#include <asm/byteorder.h>	/* le16_to_cpu */
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 /*-------------------------------------------------------------------------*/
 
@@ -87,6 +90,11 @@
 #define USB_REQ_GET_INTERFACE		0x0A
 #define USB_REQ_SET_INTERFACE		0x0B
 #define USB_REQ_SYNCH_FRAME		0x0C
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+#ifdef CONFIG_XHCI_PM
+#define USB_REQ_SET_SEL			0x30
+#endif
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 #define USB_REQ_SET_ENCRYPTION		0x0D	/* Wireless USB */
 #define USB_REQ_GET_ENCRYPTION		0x0E
@@ -123,8 +131,36 @@
 #define USB_DEVICE_A_ALT_HNP_SUPPORT	5	/* (otg) other RH port does */
 #define USB_DEVICE_DEBUG_MODE		6	/* (special devices only) */
 
-#define USB_ENDPOINT_HALT		0	/* IN/OUT will STALL */
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+/*
+ * Test Mode Selectors
+ * See USB 2.0 spec Table 9-7
+ */
+#define	TEST_J		1
+#define	TEST_K		2
+#define	TEST_SE0_NAK	3
+#define	TEST_PACKET	4
+#define	TEST_FORCE_EN	5
 
+/*
+ * New Feature Selectors as added by USB 3.0
+ * See USB 3.0 spec Table 9-6
+ */
+#define USB_DEVICE_U1_ENABLE	48	/* dev may initiate U1 transition */
+#define USB_DEVICE_U2_ENABLE	49	/* dev may initiate U2 transition */
+#define USB_DEVICE_LTM_ENABLE	50	/* dev may send LTM */
+#define USB_INTRF_FUNC_SUSPEND	0	/* function suspend */
+
+#define USB_INTR_FUNC_SUSPEND_OPT_MASK	0xFF00
+
+
+/* Bit array elements as returned by the USB_REQ_GET_STATUS request. */
+#define USB_DEV_STAT_U1_ENABLED		2	/* transition into U1 state */
+#define USB_DEV_STAT_U2_ENABLED		3	/* transition into U2 state */
+#define USB_DEV_STAT_LTM_ENABLED	4	/* Latency tolerance messages */
+#endif // CONFIG_USB_MT7621_XHCI_HCD
+
+#define USB_ENDPOINT_HALT		0	/* IN/OUT will STALL */
 
 /**
  * struct usb_ctrlrequest - SETUP data for a USB device control request
@@ -365,6 +401,25 @@ struct usb_endpoint_descriptor {
 #define USB_ENDPOINT_XFER_INT		3
 #define USB_ENDPOINT_MAX_ADJUSTABLE	0x80
 
+
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+/* The USB 3.0 spec redefines bits 5:4 of bmAttributes as interrupt ep type. */
+#define USB_ENDPOINT_INTRTYPE		0x30
+#define USB_ENDPOINT_INTR_PERIODIC	(0 << 4)
+#define USB_ENDPOINT_INTR_NOTIFICATION	(1 << 4)
+
+#define USB_ENDPOINT_SYNCTYPE		0x0c
+#define USB_ENDPOINT_SYNC_NONE		(0 << 2)
+#define USB_ENDPOINT_SYNC_ASYNC		(1 << 2)
+#define USB_ENDPOINT_SYNC_ADAPTIVE	(2 << 2)
+#define USB_ENDPOINT_SYNC_SYNC		(3 << 2)
+
+#define USB_ENDPOINT_USAGE_MASK		0x30
+#define USB_ENDPOINT_USAGE_DATA		0x00
+#define USB_ENDPOINT_USAGE_FEEDBACK	0x10
+#define USB_ENDPOINT_USAGE_IMPLICIT_FB	0x20	/* Implicit feedback Data endpoint */
+#endif // CONFIG_USB_MT7621_XHCI_HCD
+
 /*-------------------------------------------------------------------------*/
 
 /**
@@ -545,6 +600,25 @@ static inline int usb_endpoint_is_isoc_out(
 	return usb_endpoint_xfer_isoc(epd) && usb_endpoint_dir_out(epd);
 }
 
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+/**
+ * usb_endpoint_maxp - get endpoint's max packet size
+ * @epd: endpoint to be checked
+ *
+ * Returns @epd's max packet
+ */
+static inline int usb_endpoint_maxp(const struct usb_endpoint_descriptor *epd)
+{
+	return __le16_to_cpu(epd->wMaxPacketSize);
+}
+
+static inline int usb_endpoint_interrupt_type(
+		const struct usb_endpoint_descriptor *epd)
+{
+	return epd->bmAttributes & USB_ENDPOINT_INTRTYPE;
+}
+#endif // CONFIG_USB_MT7621_XHCI_HCD
+
 /*-------------------------------------------------------------------------*/
 
 /* USB_DT_SS_ENDPOINT_COMP: SuperSpeed Endpoint Companion descriptor */
@@ -554,12 +628,40 @@ struct usb_ss_ep_comp_descriptor {
 
 	__u8  bMaxBurst;
 	__u8  bmAttributes;
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+	__le16 wBytesPerInterval;
+#else
 	__u16 wBytesPerInterval;
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 } __attribute__ ((packed));
 
 #define USB_DT_SS_EP_COMP_SIZE		6
+
 /* Bits 4:0 of bmAttributes if this is a bulk endpoint */
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+static inline int
+usb_ss_max_streams(const struct usb_ss_ep_comp_descriptor *comp)
+{
+	int		max_streams;
+
+	if (!comp)
+		return 0;
+
+	max_streams = comp->bmAttributes & 0x1f;
+
+	if (!max_streams)
+		return 0;
+
+	max_streams = 1 << max_streams;
+
+	return max_streams;
+}
+
+/* Bits 1:0 of bmAttributes if this is an isoc endpoint */
+#define USB_SS_MULT(p)			(1 + ((p) & 0x3))
+#else
 #define USB_SS_MAX_STREAMS(p)		(1 << (p & 0x1f))
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 /*-------------------------------------------------------------------------*/
 
@@ -675,6 +777,9 @@ struct usb_bos_descriptor {
 	__u8  bNumDeviceCaps;
 } __attribute__((packed));
 
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+#define USB_DT_BOS_SIZE		5
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 /*-------------------------------------------------------------------------*/
 
 /* USB_DT_DEVICE_CAPABILITY:  grouped with BOS */
@@ -712,7 +817,65 @@ struct usb_wireless_cap_descriptor {	/* Ultra Wide Band */
 	__u8  bReserved;
 } __attribute__((packed));
 
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+/* USB 2.0 Extension descriptor */
 #define	USB_CAP_TYPE_EXT		2
+
+struct usb_ext_cap_descriptor {		/* Link Power Management */
+	__u8  bLength;
+	__u8  bDescriptorType;
+	__u8  bDevCapabilityType;
+	__le32 bmAttributes;
+#define USB_LPM_SUPPORT			(1 << 1)	/* supports LPM */
+#define USB_BESL_SUPPORT		(1 << 2)	/* supports BESL */
+#define USB_BESL_BASELINE_VALID		(1 << 3)	/* Baseline BESL valid*/
+#define USB_BESL_DEEP_VALID		(1 << 4)	/* Deep BESL valid */
+#define USB_GET_BESL_BASELINE(p)	(((p) & (0xf << 8)) >> 8)
+#define USB_GET_BESL_DEEP(p)		(((p) & (0xf << 12)) >> 12)	
+#define USB_LPM_SUPPORT			(1 << 1)	/* supports LPM */
+} __attribute__((packed));
+
+#define USB_DT_USB_EXT_CAP_SIZE	7
+
+/*
+ * SuperSpeed USB Capability descriptor: Defines the set of SuperSpeed USB
+ * specific device level capabilities
+ */
+#define		USB_SS_CAP_TYPE		3
+struct usb_ss_cap_descriptor {		/* Link Power Management */
+	__u8  bLength;
+	__u8  bDescriptorType;
+	__u8  bDevCapabilityType;
+	__u8  bmAttributes;
+#define USB_LTM_SUPPORT			(1 << 1) /* supports LTM */
+	__le16 wSpeedSupported;
+#define USB_LOW_SPEED_OPERATION		(1)	 /* Low speed operation */
+#define USB_FULL_SPEED_OPERATION	(1 << 1) /* Full speed operation */
+#define USB_HIGH_SPEED_OPERATION	(1 << 2) /* High speed operation */
+#define USB_5GBPS_OPERATION		(1 << 3) /* Operation at 5Gbps */
+	__u8  bFunctionalitySupport;
+	__u8  bU1devExitLat;
+	__le16 bU2DevExitLat;
+} __attribute__((packed));
+
+#define USB_DT_USB_SS_CAP_SIZE	10
+
+/*
+ * Container ID Capability descriptor: Defines the instance unique ID used to
+ * identify the instance across all operating modes
+ */
+#define	CONTAINER_ID_TYPE	4
+struct usb_ss_container_id_descriptor {
+	__u8  bLength;
+	__u8  bDescriptorType;
+	__u8  bDevCapabilityType;
+	__u8  bReserved;
+	__u8  ContainerID[16]; /* 128-bit number */
+} __attribute__((packed));
+
+#define USB_DT_USB_SS_CONTN_ID_SIZE	20
+
+#else
 
 struct usb_ext_cap_descriptor {		/* Link Power Management */
 	__u8  bLength;
@@ -721,6 +884,7 @@ struct usb_ext_cap_descriptor {		/* Link Power Management */
 	__u8  bmAttributes;
 #define USB_LPM_SUPPORT			(1 << 1)	/* supports LPM */
 } __attribute__((packed));
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 /*-------------------------------------------------------------------------*/
 
@@ -807,5 +971,63 @@ enum usb_device_state {
 	 * suspend states.  (L2 being original USB 1.1 suspend.)
 	 */
 };
+
+#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
+enum usb3_link_state {
+	USB3_LPM_U0 = 0,
+	USB3_LPM_U1,
+	USB3_LPM_U2,
+	USB3_LPM_U3
+};
+
+/*
+ * A U1 timeout of 0x0 means the parent hub will reject any transitions to U1.
+ * 0xff means the parent hub will accept transitions to U1, but will not
+ * initiate a transition.
+ *
+ * A U1 timeout of 0x1 to 0x7F also causes the hub to initiate a transition to
+ * U1 after that many microseconds.  Timeouts of 0x80 to 0xFE are reserved
+ * values.
+ *
+ * A U2 timeout of 0x0 means the parent hub will reject any transitions to U2.
+ * 0xff means the parent hub will accept transitions to U2, but will not
+ * initiate a transition.
+ *
+ * A U2 timeout of 0x1 to 0xFE also causes the hub to initiate a transition to
+ * U2 after N*256 microseconds.  Therefore a U2 timeout value of 0x1 means a U2
+ * idle timer of 256 microseconds, 0x2 means 512 microseconds, 0xFE means
+ * 65.024ms.
+ */
+#define USB3_LPM_DISABLED		0x0
+#define USB3_LPM_U1_MAX_TIMEOUT		0x7F
+#define USB3_LPM_U2_MAX_TIMEOUT		0xFE
+#define USB3_LPM_DEVICE_INITIATED	0xFF
+
+struct usb_set_sel_req {
+	__u8	u1_sel;
+	__u8	u1_pel;
+	__le16	u2_sel;
+	__le16	u2_pel;
+} __attribute__ ((packed));
+
+/*
+ * The Set System Exit Latency control transfer provides one byte each for
+ * U1 SEL and U1 PEL, so the max exit latency is 0xFF.  U2 SEL and U2 PEL each
+ * are two bytes long.
+ */
+#define USB3_LPM_MAX_U1_SEL_PEL		0xFF
+#define USB3_LPM_MAX_U2_SEL_PEL		0xFFFF
+
+
+/*-------------------------------------------------------------------------*/
+
+/*
+ * As per USB compliance update, a device that is actively drawing
+ * more than 100mA from USB must report itself as bus-powered in
+ * the GetStatus(DEVICE) call.
+ * http://compliance.usb.org/index.asp?UpdateFile=Electrical&Format=Standard#34
+ */
+#define USB_SELF_POWER_VBUS_MAX_DRAW		100
+#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 #endif /* __LINUX_USB_CH9_H */

@@ -2094,7 +2094,9 @@ static int finish_reply(struct fsg_dev *fsg)
 				start_transfer(fsg, fsg->bulk_in, bh->inreq,
 						&bh->inreq_busy, &bh->state);
 				fsg->next_buffhd_to_fill = bh->next;
-				rc = halt_bulk_in_endpoint(fsg);
+// Ralink/MTK: derive from Synopsys OTG driver.
+// Both Synopsys & Cast controller unable to support STALL very well.
+//				rc = halt_bulk_in_endpoint(fsg);
 			} else
 				rc = pad_with_zeros(fsg);
 		}

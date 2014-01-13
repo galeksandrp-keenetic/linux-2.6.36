@@ -30,7 +30,106 @@
 #include <asm/byteorder.h>
 
 #include "usb.h"
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+/******************
+usb 2.0 port status definition which is the same with ehci.h.
+	shnwind add 20101012.
+***************/
+#define PORT_RESET	(1<<8)		/* reset port */
+#define PORT_SUSPEND	(1<<7)		/* suspend port */
+#define PORT_RESUME	(1<<6)		/* resume it */
+#define PORT_OCC	(1<<5)		/* over current change */
+#define PORT_OC		(1<<4)		/* over current active */
+#define PORT_PEC	(1<<3)		/* port enable change */
+#define PORT_PE		(1<<2)		/* port enable */
+#define PORT_CSC	(1<<1)		/* connect status change */
+#define PORT_CONNECT	(1<<0)		/* device connected */
+/***********************************/
+#define USB_PORT0_STAT_20_ADDR 0xbfba1064
+#define USB_PORT1_STAT_20_ADDR 0xbfba1068
 
+#define USB_PORT0_STAT_11_ADDR 0xbfba0054
+#define USB_PORT1_STAT_11_ADDR 0xbfba0058
+#define OHCI_USB_CONTROL_ADDR 0xbfba0004
+#endif
+
+#ifdef TC_SUPPORT_3G
+//if option.c
+#define HUAWEI_MSG_0 0
+#define HUAWEI_MSG_1 1
+
+
+void check_3g(struct usb_device *udev, u16 VendorId, u16 DeviceId);
+
+struct 
+support_ID_3G{
+	u16 VendorId;
+	u16 DeviceId;
+	u8 SendMsgType;
+};
+
+
+struct support_ID_3G support_ID_3G_list[]={
+{0xd112,0x4614,HUAWEI_MSG_1},
+{0,0,0},	
+};
+
+char msg0[31]={
+	    0x55,0x53,0x42,0x43,0x00,0x00,0x00,0x02,0x24,0x00,
+		0x00,0x00,0x80,0x00,0x06,0x11,0x06,0x30,0x01,0x00,
+		0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+		0x00
+};
+
+void check_3g(struct usb_device *udev, u16 VendorId, u16 DeviceId){
+	int i = 0;
+	int err = 0;
+	int len;
+	char *tmp_buf;
+
+
+	if(udev == NULL)
+		return;
+	//printk("VendorId %x ProductID %x\n",VendorId,DeviceId);	
+	tmp_buf = (char *)kzalloc(31, GFP_KERNEL);
+
+	while(1){
+		if(support_ID_3G_list[i].VendorId == 0 ){
+			//printk("no support 3g dongle\n");
+			break;	
+		}	
+		if((support_ID_3G_list[i].VendorId == VendorId )
+			&& (support_ID_3G_list[i].DeviceId == DeviceId)){
+			switch(support_ID_3G_list[i].SendMsgType){
+				case HUAWEI_MSG_0 :
+					printk("HUAWEI send 0\n");
+					err = usb_control_msg(udev,
+							usb_sndctrlpipe(udev, 0),
+							USB_REQ_SET_FEATURE, 0, 1, 0, NULL, 0, 1000);											
+					break;
+				case HUAWEI_MSG_1 :
+					printk("HUAWEI send 1\n");
+					memcpy(tmp_buf,msg0,31);
+					err = usb_bulk_msg(udev,
+							usb_sndbulkpipe(udev, 1),
+							tmp_buf, 31, &len, 1000);
+				default:
+					break;
+			}
+			if(err < 0)
+				printk("Send Massage Error\n");	
+			break;	
+		}
+		i++;
+	}
+	kfree(tmp_buf);
+	return;
+		
+}
+//end if option.c
+#endif
+#endif
 /* if we are in debug mode, always announce new devices */
 #ifdef DEBUG
 #ifndef CONFIG_USB_ANNOUNCE_NEW_DEVICES
@@ -1849,6 +1948,11 @@ int usb_new_device(struct usb_device *udev)
 	}
 
 	(void) usb_create_ep_devs(&udev->dev, &udev->ep0, udev);
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#ifdef TC_SUPPORT_3G
+	check_3g(udev, udev->descriptor.idVendor, udev->descriptor.idProduct);
+#endif
+#endif	
 	return err;
 
 fail:
@@ -2041,6 +2145,23 @@ static int hub_port_reset(struct usb_hub *hub, int port1,
 
 	/* Reset the port */
 	for (i = 0; i < PORT_RESET_TRIES; i++) {
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+		/*Use readl/writel to replace VPint in order to match the register in usb spec.
+			shnwind add 20101012.*/	
+		if(((readl((void *)USB_PORT0_STAT_20_ADDR) & PORT_PE) == 0) && ((readl((void *)USB_PORT1_STAT_20_ADDR) & PORT_PE) == 0)){
+			set_port_feature(hub->hdev, 1, USB_HOST_LIGHT_RESET);
+			if((readl((void *)USB_PORT0_STAT_20_ADDR) & PORT_CONNECT) == PORT_CONNECT){
+				writel((PORT_CSC | PORT_PEC), (void *)USB_PORT0_STAT_20_ADDR);
+			}
+			if((readl((void *)USB_PORT1_STAT_20_ADDR) & PORT_CONNECT) == PORT_CONNECT){
+				writel((PORT_CSC | PORT_PEC), (void *)USB_PORT1_STAT_20_ADDR);
+			}
+			mdelay(1);
+		}	
+#endif
+#endif
+
 		status = set_port_feature(hub->hdev,
 				port1, USB_PORT_FEAT_RESET);
 		if (status)
@@ -3004,7 +3125,12 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 			le16_to_cpu(hub->descriptor->wHubCharacteristics);
 	struct usb_device *udev;
 	int status, i;
-
+#if defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+	unsigned long x;
+#endif
+#endif
+ 
 	dev_dbg (hub_dev,
 		"port %d, status %04x, change %04x, %s\n",
 		port1, portstatus, portchange, portspeed (portstatus));
@@ -3050,8 +3176,25 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 	}
 
 	/* Disconnect any existing devices under this port */
-	if (udev)
+	if (udev){
 		usb_disconnect(&hdev->children[port1-1]);
+#if defined(CONFIG_MIPS_TC3262)
+#if !defined(CONFIG_MIPS_RT63365)
+		/* clear bit7,6 of 0xc0000000 (after USB flash is unpluged) 
+		 * to reset rootHub and SIE of usb1.1, so that power saving
+		 * mode can work properly  --Trey */
+		 if(((readl((void *)USB_PORT0_STAT_20_ADDR) & PORT_CONNECT) == 0) 
+			 && ((readl((void *)USB_PORT1_STAT_20_ADDR) & PORT_CONNECT) == 0)
+			 && ((readl((void *)USB_PORT0_STAT_11_ADDR) & PORT_CONNECT) == 0)
+			 && ((readl((void *)USB_PORT1_STAT_11_ADDR) & PORT_CONNECT) == 0)){
+		//	 	printk("SET USB 11 RESET\n");
+				x = readl((void *)OHCI_USB_CONTROL_ADDR);
+				x &= ~((1<<7) | (1<<6));
+				writel(x, (void *)OHCI_USB_CONTROL_ADDR);
+		 }
+#endif
+#endif
+	}
 	clear_bit(port1, hub->change_bits);
 
 	/* We can forget about a "removed" device when there's a physical
@@ -3089,7 +3232,18 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
   			goto done;
 		return;
 	}
-
+#if defined(CONFIG_MIPS_TC3262) 
+#if !defined(CONFIG_MIPS_RT63365)
+	/* set bit7 and clear bit6 of 0xc0000000 (when USB flash is pluged) 
+	 * to set to normal mode for rootHub and SIE of usb1.1, so that power 
+	 * saving mode can work properly  --Trey */
+	x = readl((void *)OHCI_USB_CONTROL_ADDR);
+	x |= (1<<7);
+	x &= ~(1<<6);
+	writel(x, (void *)OHCI_USB_CONTROL_ADDR);
+	//printk("SET USB 11 OPERATION\n");	
+#endif
+#endif
 	for (i = 0; i < SET_CONFIG_TRIES; i++) {
 
 		/* reallocate for each attempt, since references
