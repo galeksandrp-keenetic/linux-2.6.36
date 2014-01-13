@@ -3,13 +3,13 @@ menu "Ralink Module"
 ###########
 # Debuging
 ###########
-source "drivers/net/rt_rdm/Kconfig"
+#source "drivers/net/rt_rdm/Kconfig"
 
 #############
 # Wire
 #############
 
-source "drivers/net/raeth/Kconfig"
+#source "drivers/net/raeth/Kconfig"
 
 config  RALINK_HWCRYPTO
 	depends on RALINK_MT7621
@@ -264,7 +264,7 @@ config RTDEV
 #######
 # USB
 #######
-source "drivers/usb/dwc_otg/Kconfig"
+# source "drivers/usb/dwc_otg/Kconfig"
 
 #######
 # NAT

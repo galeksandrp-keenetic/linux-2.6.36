@@ -218,12 +218,12 @@ config MTD_SPI_RALINK
        bool "SPI"
        depends on  !RALINK_RT2880
 
-config MTK_MTD_NAND
-		bool "MTK_NAND"	
-		depends on  RALINK_MT7621
-		select MTD_NAND
-		select MTD_NAND_IDS
-		select MTD_NAND_ECC
+#config MTK_MTD_NAND
+#		bool "MTK_NAND"	
+#		depends on  RALINK_MT7621
+#		select MTD_NAND
+#		select MTD_NAND_IDS
+#		select MTD_NAND_ECC
 
 config MTD_NAND_RALINK
        bool "NAND"
