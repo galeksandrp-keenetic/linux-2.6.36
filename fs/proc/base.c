@@ -434,8 +434,12 @@ static int proc_oom_score(struct task_struct *task, char *buffer)
 
 	read_lock(&tasklist_lock);
 	if (pid_alive(task))
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+		points = oom_badness(task, NULL, NULL);
+#else
 		points = oom_badness(task, NULL, NULL,
 					totalram_pages + total_swap_pages);
+#endif
 	read_unlock(&tasklist_lock);
 	return sprintf(buffer, "%lu\n", points);
 }
@@ -1056,6 +1060,7 @@ static ssize_t oom_adjust_write(struct file *file, const char __user *buf,
 			current->comm, task_pid_nr(current),
 			task_pid_nr(task), task_pid_nr(task));
 	task->signal->oom_adj = oom_adjust;
+#ifndef CONFIG_TCSUPPORT_OOM_RB_NEXT
 	/*
 	 * Scale /proc/pid/oom_score_adj appropriately ensuring that a maximum
 	 * value is always attainable.
@@ -1065,6 +1070,7 @@ static ssize_t oom_adjust_write(struct file *file, const char __user *buf,
 	else
 		task->signal->oom_score_adj = (oom_adjust * OOM_SCORE_ADJ_MAX) /
 								-OOM_DISABLE;
+#endif
 	unlock_task_sighand(task, &flags);
 	put_task_struct(task);
 
@@ -1081,8 +1087,13 @@ static ssize_t oom_score_adj_read(struct file *file, char __user *buf,
 					size_t count, loff_t *ppos)
 {
 	struct task_struct *task = get_proc_task(file->f_path.dentry->d_inode);
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	char buffer[21];
+	long oom_score_adj = 0;
+#else
 	char buffer[PROC_NUMBUF];
 	int oom_score_adj = OOM_SCORE_ADJ_MIN;
+#endif
 	unsigned long flags;
 	size_t len;
 
@@ -1093,7 +1104,11 @@ static ssize_t oom_score_adj_read(struct file *file, char __user *buf,
 		unlock_task_sighand(task, &flags);
 	}
 	put_task_struct(task);
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	len = snprintf(buffer, sizeof(buffer), "%ld\n", oom_score_adj);
+#else
 	len = snprintf(buffer, sizeof(buffer), "%d\n", oom_score_adj);
+#endif
 	return simple_read_from_buffer(buf, count, ppos, buffer, len);
 }
 
@@ -1101,7 +1116,11 @@ static ssize_t oom_score_adj_write(struct file *file, const char __user *buf,
 					size_t count, loff_t *ppos)
 {
 	struct task_struct *task;
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	char buffer[21];
+#else
 	char buffer[PROC_NUMBUF];
+#endif
 	unsigned long flags;
 	long oom_score_adj;
 	int err;
@@ -1115,9 +1134,11 @@ static ssize_t oom_score_adj_write(struct file *file, const char __user *buf,
 	err = strict_strtol(strstrip(buffer), 0, &oom_score_adj);
 	if (err)
 		return -EINVAL;
+#ifndef CONFIG_TCSUPPORT_OOM_RB_NEXT
 	if (oom_score_adj < OOM_SCORE_ADJ_MIN ||
 			oom_score_adj > OOM_SCORE_ADJ_MAX)
 		return -EINVAL;
+#endif
 
 	task = get_proc_task(file->f_path.dentry->d_inode);
 	if (!task)
@@ -1134,6 +1155,7 @@ static ssize_t oom_score_adj_write(struct file *file, const char __user *buf,
 	}
 
 	task->signal->oom_score_adj = oom_score_adj;
+#ifndef CONFIG_TCSUPPORT_OOM_RB_NEXT
 	/*
 	 * Scale /proc/pid/oom_adj appropriately ensuring that OOM_DISABLE is
 	 * always attainable.
@@ -1143,6 +1165,7 @@ static ssize_t oom_score_adj_write(struct file *file, const char __user *buf,
 	else
 		task->signal->oom_adj = (oom_score_adj * OOM_ADJUST_MAX) /
 							OOM_SCORE_ADJ_MAX;
+#endif
 	unlock_task_sighand(task, &flags);
 	put_task_struct(task);
 	return count;

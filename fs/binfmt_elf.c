@@ -37,7 +37,9 @@
 #include <asm/page.h>
 
 static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs);
+#ifdef CONFIG_BINFMT_ELF_AOUT
 static int load_elf_library(struct file *);
+#endif
 static unsigned long elf_map(struct file *, unsigned long, struct elf_phdr *,
 				int, int, unsigned long);
 
@@ -68,7 +70,11 @@ static int elf_core_dump(struct coredump_params *cprm);
 static struct linux_binfmt elf_format = {
 		.module		= THIS_MODULE,
 		.load_binary	= load_elf_binary,
+#ifdef CONFIG_BINFMT_ELF_AOUT
 		.load_shlib	= load_elf_library,
+#else
+		.load_shlib	= NULL,
+#endif
 		.core_dump	= elf_core_dump,
 		.min_coredump	= ELF_EXEC_PAGESIZE,
 		.hasvdso	= 1
@@ -575,7 +581,7 @@ static int load_elf_binary(struct linux_binprm *bprm, struct pt_regs *regs)
 	unsigned long elf_entry;
 	unsigned long interp_load_addr = 0;
 	unsigned long start_code, end_code, start_data, end_data;
-	unsigned long reloc_func_desc = 0;
+	unsigned long reloc_func_desc __maybe_unused = 0;
 	int executable_stack = EXSTACK_DEFAULT;
 	unsigned long def_flags = 0;
 	struct {
@@ -995,6 +1001,7 @@ out_free_ph:
 	goto out;
 }
 
+#ifdef CONFIG_BINFMT_ELF_AOUT
 /* This is really simpleminded and specialized - we are loading an
    a.out library that is given an ELF header. */
 static int load_elf_library(struct file *file)
@@ -1078,6 +1085,7 @@ out_free_ph:
 out:
 	return error;
 }
+#endif /* CONFIG_BINFMT_ELF_AOUT */
 
 #ifdef CONFIG_ELF_CORE
 /*

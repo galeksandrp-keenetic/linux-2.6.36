@@ -576,7 +576,7 @@ int radix_tree_tag_get(struct radix_tree_root *root,
 {
 	unsigned int height, shift;
 	struct radix_tree_node *node;
-	int saw_unset_tag = 0;
+	int saw_unset_tag __maybe_unused = 0;
 
 	/* check the root's tag bit */
 	if (!root_tag_get(root, tag))

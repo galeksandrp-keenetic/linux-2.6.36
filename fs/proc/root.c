@@ -21,6 +21,10 @@
 
 #include "internal.h"
 
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
+struct proc_dir_entry *proc_tc3162;
+#endif
+
 static int proc_test_super(struct super_block *sb, void *data)
 {
 	return sb->s_fs_info == data;
@@ -124,6 +128,9 @@ void __init proc_root_init(void)
 #endif
 	proc_mkdir("fs", NULL);
 	proc_mkdir("driver", NULL);
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
+	proc_tc3162 = proc_mkdir("tc3162", NULL);
+#endif
 	proc_mkdir("fs/nfsd", NULL); /* somewhere for the nfsd filesystem to be mounted */
 #if defined(CONFIG_SUN_OPENPROMFS) || defined(CONFIG_SUN_OPENPROMFS_MODULE)
 	/* just give it a mountpoint */
@@ -219,3 +226,7 @@ void pid_ns_release_proc(struct pid_namespace *ns)
 {
 	mntput(ns->proc_mnt);
 }
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
+EXPORT_SYMBOL(proc_tc3162);
+#endif
+

@@ -11,8 +11,11 @@
 
 /* A global variable is a bit ugly, but it keeps the code simple */
 int sysctl_drop_caches;
-
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
+void drop_pagecache_sb(struct super_block *sb, void *unused)
+#else
 static void drop_pagecache_sb(struct super_block *sb, void *unused)
+#endif
 {
 	struct inode *inode, *toput_inode = NULL;
 
@@ -32,6 +35,9 @@ static void drop_pagecache_sb(struct super_block *sb, void *unused)
 	spin_unlock(&inode_lock);
 	iput(toput_inode);
 }
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
+EXPORT_SYMBOL(drop_pagecache_sb);
+#endif
 
 static void drop_slab(void)
 {

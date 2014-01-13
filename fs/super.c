@@ -70,6 +70,11 @@ static struct super_block *alloc_super(struct file_system_type *type)
 #else
 		INIT_LIST_HEAD(&s->s_files);
 #endif
+		/*	Ralink , 
+			from http://git.kernel.org/?p=linux/kernel/git/stable/linux-2.6.38.y.git;a=blobdiff;f=fs/super.c;h=0d89e93f654e1310572dfd714912e48f918c724e;hp=7e9dd4cc2c01170d0d7a38035a430e554c90cc57;hb=857754c982ffd7af7683cb5d39288db65c990bad;hpb=305c88ab06302e186aba8376a2b5c579a5c92291
+		 */
+		s->s_bdi = &default_backing_dev_info;
+
 		INIT_LIST_HEAD(&s->s_instances);
 		INIT_HLIST_HEAD(&s->s_anon);
 		INIT_LIST_HEAD(&s->s_inodes);
@@ -946,6 +951,11 @@ vfs_kern_mount(struct file_system_type *type, int flags, const char *name, void 
 	if (error < 0)
 		goto out_free_secdata;
 	BUG_ON(!mnt->mnt_sb);
+	/*	Ralink , 
+		from http://git.kernel.org/?p=linux/kernel/git/stable/linux-2.6.38.y.git;a=blobdiff;f=fs/super.c;h=0d89e93f654e1310572dfd714912e48f918c724e;hp=7e9dd4cc2c01170d0d7a38035a430e554c90cc57;hb=857754c982ffd7af7683cb5d39288db65c990bad;hpb=305c88ab06302e186aba8376a2b5c579a5c92291
+	*/
+	WARN_ON(mnt->mnt_sb->s_bdi == &default_backing_dev_info);
+
 	WARN_ON(!mnt->mnt_sb->s_bdi);
 	mnt->mnt_sb->s_flags |= MS_BORN;
 

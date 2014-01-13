@@ -975,6 +975,14 @@ void __mark_inode_dirty(struct inode *inode, int flags)
 		if (!was_dirty) {
 			bdi = inode_to_bdi(inode);
 
+
+			#if defined(CONFIG_TCSUPPORT_CPU_MT7510) || defined(CONFIG_TCSUPPORT_CPU_MT7520)
+				if(!bdi){
+					printk("__mark_inode_dirty:bdi is NULL\n");
+					goto out;
+				}
+			#endif
+
 			if (bdi_cap_writeback_dirty(bdi)) {
 				WARN(!test_bit(BDI_registered, &bdi->state),
 				     "bdi-%s not registered\n", bdi->name);

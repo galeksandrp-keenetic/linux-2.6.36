@@ -1896,6 +1896,7 @@ out_nolock:
 shouldnt_be_hashed:
 	spin_unlock(&dcache_lock);
 	BUG();
+	return NULL;
 }
 EXPORT_SYMBOL_GPL(d_materialise_unique);
 
