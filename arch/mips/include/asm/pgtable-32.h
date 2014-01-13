@@ -159,7 +159,7 @@ pfn_pte(unsigned long pfn, pgprot_t prot)
 #define pte_unmap(pte) ((void)(pte))
 #define pte_unmap_nested(pte) ((void)(pte))
 
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX) || defined(CONFIG_CPU_TC3162)
 
 /* Swap entries must have VALID bit cleared. */
 #define __swp_type(x)		(((x).val >> 10) & 0x1f)

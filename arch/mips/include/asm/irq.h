@@ -113,7 +113,11 @@ do {									\
 
 #endif
 
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+extern void do_IRQ(int irq);
+#else
 extern void do_IRQ(unsigned int irq);
+#endif
 
 #ifdef CONFIG_MIPS_MT_SMTC_IRQAFF
 

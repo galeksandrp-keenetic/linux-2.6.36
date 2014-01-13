@@ -151,6 +151,10 @@ static void vsmp_send_ipi_mask(const struct cpumask *mask, unsigned int action)
 
 static void __cpuinit vsmp_init_secondary(void)
 {
+#ifdef CONFIG_MIPS_TC3262
+	write_c0_status((read_c0_status() & ~ST0_IM ) |
+					(STATUSF_IP0 | STATUSF_IP1));
+#else
 	extern int gic_present;
 
 	/* This is Malta specific: IPI,performance and timer inetrrupts */
@@ -160,6 +164,7 @@ static void __cpuinit vsmp_init_secondary(void)
 	else
 		change_c0_status(ST0_IM, STATUSF_IP0 | STATUSF_IP1 |
 					 STATUSF_IP6 | STATUSF_IP7);
+#endif
 }
 
 static void __cpuinit vsmp_smp_finish(void)

@@ -439,7 +439,7 @@ extern int set_irq_msi(unsigned int irq, struct msi_desc *entry);
 static inline bool alloc_desc_masks(struct irq_desc *desc, int node,
 							bool boot)
 {
-	gfp_t gfp = GFP_ATOMIC;
+	gfp_t gfp __maybe_unused = GFP_ATOMIC;
 
 	if (boot)
 		gfp = GFP_NOWAIT;

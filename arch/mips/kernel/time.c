@@ -27,7 +27,7 @@
 #include <asm/div64.h>
 #include <asm/smtc_ipi.h>
 #include <asm/time.h>
-
+#include <linux/profile.h>
 /*
  * forward reference
  */
@@ -116,9 +116,83 @@ static __init int cpu_has_mfc0_count_bug(void)
 
 	return 0;
 }
+#if 0 //def CONFIG_MIPS_TC3262
+int reset_time_value(int time_shift){
+	u64 temp;
+	u32 shift;
+	int i;
+	unsigned int cpu;
+
+#ifdef DBG
+	printk("cycles_per_jiffy %x\n",cycles_per_jiffy);
+	printk("true mips_hpt_frequency  %x shift %d\n",mips_hpt_frequency_true,time_shift);
+#endif
+	if(loops_per_jiffy_true == 0){
+		//save correct value
+		if(loops_per_jiffy == (1<<12)){
+			printk("init not over\n");
+			return -1;
+		}else{
+			loops_per_jiffy_true = loops_per_jiffy;
+			for(i=0;i<NR_CPUS;i++){
+				udelay_val_true[i] = cpu_data[i].udelay_val;
+			}
+		}
+	}
+#ifdef DBG
+	printk("true loops_per_jiffie  %x loops_per_jiffie %x\n", loops_per_jiffy_true, loops_per_jiffy);
+#endif
+	local_irq_disable();
+	mips_hpt_frequency = (mips_hpt_frequency_true>>(time_shift));
+#ifdef DBG
+	printk("After mips_hpt_frequency %x \n",mips_hpt_frequency);
+#endif
+	/* Calculate cache parameters.  */
+	cycles_per_jiffy = (mips_hpt_frequency + HZ / 2) / HZ;
+#ifdef DBG
+	printk("cycles_per_jiffy %x\n",cycles_per_jiffy);
+#endif
+	/* Calclate a somewhat reasonable rating value */
+	clocksource_mips.rating = 200 + mips_hpt_frequency / 10000000;
+	/* Find a shift value */
+	for (shift = 32; shift > 0; shift--) {
+		temp = (u64) NSEC_PER_SEC << shift;
+		do_div(temp, mips_hpt_frequency);
+		if ((temp >> 32) == 0)
+			break;
+	}
+	clocksource_mips.shift = shift;
+	clocksource_mips.mult = (u32)temp;
+	//about date
+	clocksource_calculate_interval(&clocksource_mips, NTP_INTERVAL_LENGTH);
+	clocksource_change_rating(&clocksource_mips, clocksource_mips.rating);
+#ifdef DBG
+	printk("clocksource_mips.rate %x shift %x mult %x cycle_interval %x\n",clocksource_mips.rating,clocksource_mips.shift,clocksource_mips.mult,clocksource_mips.cycle_interval);
+#endif
+	//about delay
+	for(i=0;i<NR_CPUS;i++){
+		cpu_data[i].udelay_val = (udelay_val_true[i] >> (time_shift));
+	}
+	loops_per_jiffy = loops_per_jiffy_true >> (time_shift) ;
+
+	local_irq_enable();
+
+	return 0;
+}
+EXPORT_SYMBOL(reset_time_value);
+#endif
+
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+void (*board_time_init)(void);
+#endif
 
 void __init time_init(void)
 {
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+	if(board_time_init)
+		board_time_init();
+#endif
+
 	plat_time_init();
 
 	if (!mips_clockevent_init() || !cpu_has_mfc0_count_bug())

@@ -46,6 +46,9 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 #include <asm/unistd.h>
+#if defined(CONFIG_MIPS_TC3262) && defined(CONFIG_TCSUPPORT_POWERSAVE_ENABLE)
+#include <asm/tc3162/tc3162.h>
+#endif
 
 #ifndef SET_UNALIGN_CTL
 # define SET_UNALIGN_CTL(a,b)	(-EINVAL)
@@ -307,6 +310,11 @@ void kernel_restart_prepare(char *cmd)
  */
 void kernel_restart(char *cmd)
 {
+
+#if defined(CONFIG_MIPS_TC3262) && defined(CONFIG_TCSUPPORT_POWERSAVE_ENABLE)
+	if(isRT63365)
+		VPint(CR_AHB_CLK) |= 0x57e1;//restore ahb clk to default value
+#endif
 	kernel_restart_prepare(cmd);
 	if (!cmd)
 		printk(KERN_EMERG "Restarting system.\n");

@@ -506,6 +506,10 @@ struct thread_group_cputimer {
 	spinlock_t lock;
 };
 
+#ifdef CONFIG_RALINK_SOC
+struct autogroup;
+#endif
+
 /*
  * NOTE! "signal_struct" does not have it's own
  * locking, because a shared signal_struct always
@@ -573,6 +577,9 @@ struct signal_struct {
 
 	struct tty_struct *tty; /* NULL if no tty */
 
+#if defined(CONFIG_SCHED_AUTOGROUP) && defined(CONFIG_RALINK_SOC)
+	struct autogroup *autogroup;
+#endif
 	/*
 	 * Cumulative resource counters for dead threads in the group,
 	 * and for reaped dead child processes forked by this group.
@@ -622,7 +629,11 @@ struct signal_struct {
 #endif
 
 	int oom_adj;		/* OOM kill score adjustment (bit shift) */
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	long oom_score_adj;	/* OOM kill score adjustment */
+#else
 	int oom_score_adj;	/* OOM kill score adjustment */
+#endif
 };
 
 /* Context switch must be unlocked if interrupts are to be enabled */
@@ -1512,7 +1523,11 @@ struct task_struct {
  * MAX_RT_PRIO must not be smaller than MAX_USER_RT_PRIO.
  */
 
+#ifdef CONFIG_RALINK_SOC
+#define MAX_USER_RT_PRIO	CONFIG_MAX_USER_RT_PRIO
+#else
 #define MAX_USER_RT_PRIO	100
+#endif
 #define MAX_RT_PRIO		MAX_USER_RT_PRIO
 
 #define MAX_PRIO		(MAX_RT_PRIO + 40)
@@ -1900,6 +1915,22 @@ int sched_rt_handler(struct ctl_table *table, int write,
 
 extern unsigned int sysctl_sched_compat_yield;
 
+#ifdef CONFIG_RALINK_SOC
+#ifdef CONFIG_SCHED_AUTOGROUP
+extern unsigned int sysctl_sched_autogroup_enabled;
+
+extern void sched_autogroup_create_attach(struct task_struct *p);
+extern void sched_autogroup_detach(struct task_struct *p);
+extern void sched_autogroup_fork(struct signal_struct *sig);
+extern void sched_autogroup_exit(struct signal_struct *sig);
+#else
+static inline void sched_autogroup_create_attach(struct task_struct *p) { }
+static inline void sched_autogroup_detach(struct task_struct *p) { }
+static inline void sched_autogroup_fork(struct signal_struct *sig) { }
+static inline void sched_autogroup_exit(struct signal_struct *sig) { }
+#endif
+#endif
+
 #ifdef CONFIG_RT_MUTEXES
 extern int rt_mutex_getprio(struct task_struct *p);
 extern void rt_mutex_setprio(struct task_struct *p, int prio);
@@ -2246,7 +2277,7 @@ static inline int object_is_on_stack(void *obj)
 
 extern void thread_info_cache_init(void);
 
-#ifdef CONFIG_DEBUG_STACK_USAGE
+#if defined(CONFIG_DEBUG_STACK_USAGE) || defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 static inline unsigned long stack_not_used(struct task_struct *p)
 {
 	unsigned long *n = end_of_stack(p);

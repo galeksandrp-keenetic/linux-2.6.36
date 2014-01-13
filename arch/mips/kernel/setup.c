@@ -487,6 +487,12 @@ static void __init arch_mem_init(char **cmdline_p)
 	}
 
 	bootmem_init();
+
+#if defined (CONFIG_RALINK_MT7621)
+#if defined (CONFIG_RT2880_DRAM_512M)
+	reserve_bootmem(0x1C000000, 64*1024*1024, BOOTMEM_DEFAULT);
+#endif
+#endif
 	sparse_init();
 	paging_init();
 }

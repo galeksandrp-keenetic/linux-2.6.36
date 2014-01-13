@@ -15,6 +15,9 @@
 #include <asm/smtc_ipi.h>
 #include <asm/time.h>
 #include <asm/cevt-r4k.h>
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+#include <asm/tc3162/tc3162.h>
+#endif
 
 /*
  * Variant clock event timer support for SMTC on MIPS 34K, 1004K
@@ -230,10 +233,23 @@ repeat:
 	}
 }
 
-
 irqreturn_t c0_compare_interrupt(int irq, void *dev_id)
 {
 	int cpu = smp_processor_id();
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+	unsigned int tmp;
+
+	if (isRT63165 || isRT63365 || isMT751020) {
+
+		if (cpu_data[cpu].vpe_id == 0) {
+			mips_timer_ack();
+		} else {
+			tmp = regRead32(CR_CPUTMR_CNT1) + (mips_hpt_frequency/HZ);
+			regWrite32(CR_CPUTMR_CMR1, tmp);
+		}
+
+	}
+#endif
 
 	/* If we're running SMTC, we've got MIPS MT and therefore MIPS32R2 */
 	handle_perf_irq(1);
@@ -243,9 +259,77 @@ irqreturn_t c0_compare_interrupt(int irq, void *dev_id)
 		write_c0_compare(read_c0_compare());
 		smtc_distribute_timer(cpu_data[cpu].vpe_id);
 	}
+ 
 	return IRQ_HANDLED;
 }
 
+#ifdef CONFIG_MIPS_TC3262
+unsigned int mips_hpt_frequency_true;
+unsigned long loops_per_jiffy_true = 0;
+extern unsigned long loops_per_jiffy;
+unsigned long udelay_val_true[NR_CPUS];
+static unsigned long cycles_per_jiffy __read_mostly;
+extern struct clocksource clocksource_mips;
+
+int reset_time_value(int time_shift){
+	u64 temp=0;
+	u32 shift=0;
+	int i=0;
+	unsigned int cpu = smp_processor_id();
+
+#ifdef DBG
+	printk("cycles_per_jiffy %x\n",cycles_per_jiffy);
+	printk("true mips_hpt_frequency  %x shift %d\n",mips_hpt_frequency_true,time_shift);
+#endif	
+	if(loops_per_jiffy_true == 0){
+		//save correct value
+		if(loops_per_jiffy == (1<<12)){
+			printk("init not over\n");
+			return -1;
+		}else{
+			loops_per_jiffy_true = loops_per_jiffy;
+			for(i=0;i<NR_CPUS;i++){
+				udelay_val_true[i] = cpu_data[i].udelay_val;
+			}
+		}
+	}
+#ifdef DBG
+	printk("true loops_per_jiffie  %x loops_per_jiffie %x\n", loops_per_jiffy_true, loops_per_jiffy);
+#endif
+	local_irq_disable();
+	mips_hpt_frequency = (mips_hpt_frequency_true>>(time_shift));
+#ifdef DBG
+	printk("After mips_hpt_frequency %x \n",mips_hpt_frequency);
+#endif
+	/* Calculate cache parameters.	*/
+	cycles_per_jiffy = (mips_hpt_frequency + HZ / 2) / HZ;
+#ifdef DBG
+	printk("cycles_per_jiffy %x\n",cycles_per_jiffy);
+#endif
+	/* Calclate a somewhat reasonable rating value */
+	clocksource_mips.rating = 200 + mips_hpt_frequency / 10000000;
+	clocksource_set_clock(&clocksource_mips, mips_hpt_frequency);
+
+	//about date
+	clocksource_change_rating(&clocksource_mips, clocksource_mips.rating);
+#ifdef DBG
+	printk("clocksource_mips.rate %x shift %x mult %x cycle_interval null\n",clocksource_mips.rating,clocksource_mips.shift,clocksource_mips.mult/*,clocksource_mips.cycle_interval*/);
+#endif
+	//about delay
+	for(i=0;i<NR_CPUS;i++){
+		cpu_data[i].udelay_val = (udelay_val_true[i] >> (time_shift));
+	}
+	loops_per_jiffy = loops_per_jiffy_true >> (time_shift) ;
+#ifdef DBG
+	printk("loops_per_jiffy %x\n",loops_per_jiffy);
+#endif
+
+	local_irq_enable();
+
+	return 0;
+}
+EXPORT_SYMBOL(reset_time_value);
+#endif
 
 int __cpuinit smtc_clockevent_init(void)
 {
@@ -258,6 +342,10 @@ int __cpuinit smtc_clockevent_init(void)
 
 	if (!cpu_has_counter || !mips_hpt_frequency)
 		return -ENXIO;
+#ifdef CONFIG_MIPS_TC3262 
+	cycles_per_jiffy =(mips_hpt_frequency + HZ / 2) / HZ;
+	mips_hpt_frequency_true = mips_hpt_frequency;
+#endif
 	if (cpu == 0) {
 		for (i = 0; i < num_possible_cpus(); i++) {
 			smtc_nextinvpe[i] = 0;

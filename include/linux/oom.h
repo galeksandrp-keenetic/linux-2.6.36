@@ -12,12 +12,14 @@
 #define OOM_ADJUST_MIN (-16)
 #define OOM_ADJUST_MAX 15
 
+#ifndef CONFIG_TCSUPPORT_OOM_RB_NEXT
 /*
  * /proc/<pid>/oom_score_adj set to OOM_SCORE_ADJ_MIN disables oom killing for
  * pid.
  */
 #define OOM_SCORE_ADJ_MIN	(-1000)
 #define OOM_SCORE_ADJ_MAX	1000
+#endif
 
 #ifdef __KERNEL__
 
@@ -40,8 +42,14 @@ enum oom_constraint {
 	CONSTRAINT_MEMCG,
 };
 
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+/* The badness from the OOM killer */
+extern unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *mem,
+				 const nodemask_t *nodemask);
+#else
 extern unsigned int oom_badness(struct task_struct *p, struct mem_cgroup *mem,
 			const nodemask_t *nodemask, unsigned long totalpages);
+#endif
 extern int try_set_zonelist_oom(struct zonelist *zonelist, gfp_t gfp_flags);
 extern void clear_zonelist_oom(struct zonelist *zonelist, gfp_t gfp_flags);
 
@@ -62,9 +70,11 @@ static inline void oom_killer_enable(void)
 	oom_killer_disabled = false;
 }
 
+#ifndef CONFIG_TCSUPPORT_OOM_RB_NEXT
 /* The badness from the OOM killer */
 extern unsigned long badness(struct task_struct *p, struct mem_cgroup *mem,
 		      const nodemask_t *nodemask, unsigned long uptime);
+#endif
 
 extern struct task_struct *find_lock_task_mm(struct task_struct *p);
 

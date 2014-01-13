@@ -15,6 +15,9 @@
 #include <linux/sched.h>
 #include <linux/syscalls.h>
 #include <linux/mm.h>
+#ifdef CONFIG_RALINK_SOC
+#include <linux/highmem.h>
+#endif
 
 #include <asm/cacheflush.h>
 #include <asm/processor.h>
@@ -51,6 +54,7 @@ void (*_dma_cache_wback_inv)(unsigned long start, unsigned long size);
 void (*_dma_cache_wback)(unsigned long start, unsigned long size);
 void (*_dma_cache_inv)(unsigned long start, unsigned long size);
 
+EXPORT_SYMBOL(_dma_cache_inv);
 EXPORT_SYMBOL(_dma_cache_wback_inv);
 
 #endif /* CONFIG_DMA_NONCOHERENT */
@@ -74,6 +78,14 @@ SYSCALL_DEFINE3(cacheflush, unsigned long, addr, unsigned long, bytes,
 
 void __flush_dcache_page(struct page *page)
 {
+#ifdef CONFIG_RALINK_SOC
+	void *addr;
+
+	if (page_mapping(page) && !page_mapped(page)) {
+		SetPageDcacheDirty(page);
+		return;
+	}
+#else
 	struct address_space *mapping = page_mapping(page);
 	unsigned long addr;
 
@@ -83,20 +95,70 @@ void __flush_dcache_page(struct page *page)
 		SetPageDcacheDirty(page);
 		return;
 	}
+#endif
 
 	/*
 	 * We could delay the flush for the !page_mapping case too.  But that
 	 * case is for exec env/arg pages and those are %99 certainly going to
 	 * get faulted into the tlb (and thus flushed) anyways.
 	 */
+#ifdef CONFIG_RALINK_SOC
+	if (PageHighMem(page)) {
+		addr = kmap_atomic(page, KM_PTE1);
+		flush_data_cache_page((unsigned long)addr);
+		kunmap_atomic(addr, KM_PTE1);
+	} else {
+		addr = (void *) page_address(page);
+		flush_data_cache_page((unsigned long)addr);
+	}
+	ClearPageDcacheDirty(page);
+#else
 	addr = (unsigned long) page_address(page);
 	flush_data_cache_page(addr);
+#endif
 }
 
 EXPORT_SYMBOL(__flush_dcache_page);
 
 void __flush_anon_page(struct page *page, unsigned long vmaddr)
 {
+#ifdef CONFIG_RALINK_SOC
+	if (!PageHighMem(page)) {
+		unsigned long addr = (unsigned long) page_address(page);
+
+		if (pages_do_alias(addr, vmaddr & PAGE_MASK)) {
+			if (page_mapped(page) && !Page_dcache_dirty(page)) {
+				void *kaddr;
+
+				kaddr = kmap_coherent(page, vmaddr);
+				flush_data_cache_page((unsigned long)kaddr);
+				kunmap_coherent();
+			} else {
+				flush_data_cache_page(addr);
+				ClearPageDcacheDirty(page);
+			}
+		}
+	} else {
+		void *laddr = lowmem_page_address(page);
+
+		if (pages_do_alias((unsigned long)laddr, vmaddr & PAGE_MASK)) {
+			if (page_mapped(page) && !Page_dcache_dirty(page)) {
+				void *kaddr;
+
+				kaddr = kmap_coherent(page, vmaddr);
+				flush_data_cache_page((unsigned long)kaddr);
+				kunmap_coherent();
+			} else {
+				void *kaddr;
+
+				kaddr = kmap_atomic(page, KM_PTE1);
+				flush_data_cache_page((unsigned long)kaddr);
+				kunmap_atomic(kaddr, KM_PTE1);
+				ClearPageDcacheDirty(page);
+			}
+		}
+	}
+#else
 	unsigned long addr = (unsigned long) page_address(page);
 
 	if (pages_do_alias(addr, vmaddr)) {
@@ -108,7 +170,7 @@ void __flush_anon_page(struct page *page, unsigned long vmaddr)
 			kunmap_coherent();
 		} else
 			flush_data_cache_page(addr);
-	}
+#endif
 }
 
 EXPORT_SYMBOL(__flush_anon_page);
@@ -121,15 +183,39 @@ void __update_cache(struct vm_area_struct *vma, unsigned long address,
 	int exec = (vma->vm_flags & VM_EXEC) && !cpu_has_ic_fills_f_dc;
 
 	pfn = pte_pfn(pte);
-	if (unlikely(!pfn_valid(pfn)))
+	if (unlikely(!pfn_valid(pfn))) {
+#ifdef CONFIG_RALINK_SOC
+		wmb();
+#endif
 		return;
+	}
 	page = pfn_to_page(pfn);
+#ifdef CONFIG_RALINK_SOC
+	if (page_mapped(page) && Page_dcache_dirty(page)) {
+		void *kaddr = NULL;
+		if (PageHighMem(page)) {
+			addr = (unsigned long)kmap_atomic(page, KM_PTE1);
+			kaddr = (void *)addr;
+		} else
+			addr = (unsigned long) page_address(page);
+		if (exec || (cpu_has_dc_aliases &&
+		    pages_do_alias(addr, address & PAGE_MASK))) {
+			flush_data_cache_page(addr);
+			ClearPageDcacheDirty(page);
+		}
+
+		if (kaddr)
+			kunmap_atomic((void *)kaddr, KM_PTE1);
+	}
+	wmb();  /* finish any outstanding arch cache flushes before ret to user */
+#else
 	if (page_mapping(page) && Page_dcache_dirty(page)) {
 		addr = (unsigned long) page_address(page);
 		if (exec || pages_do_alias(addr, address & PAGE_MASK))
 			flush_data_cache_page(addr);
 		ClearPageDcacheDirty(page);
 	}
+#endif
 }
 
 unsigned long _page_cachable_default;
@@ -220,3 +306,4 @@ int __weak __uncached_access(struct file *file, unsigned long addr)
 
 	return addr >= __pa(high_memory);
 }
+

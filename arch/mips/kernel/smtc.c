@@ -42,6 +42,9 @@
 #include <asm/addrspace.h>
 #include <asm/smtc.h>
 #include <asm/smtc_proc.h>
+#ifdef CONFIG_MIPS_TC3262
+#include <asm/tc3162/tc3162.h>
+#endif
 
 /*
  * SMTC Kernel needs to manipulate low-level CPU interrupt mask
@@ -99,8 +102,12 @@ void init_smtc_stats(void);
 unsigned int smtc_status;
 
 /* Boot command line configuration overrides */
-
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+static int vpe0limit = 3;
+#else
 static int vpe0limit;
+#endif
+
 static int ipibuffers;
 static int nostlb;
 static int asidmask;
@@ -469,6 +476,13 @@ void smtc_prepare_cpus(int cpus)
 	for (tc = 0, vpe = 0 ; (vpe < nvpe) && (tc < ntc) ; vpe++) {
 		if (tcpervpe[vpe] == 0)
 			continue;
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+		/*
+		 * Set the MVP bits.
+		 */
+		settc(tc);
+		write_vpe_c0_vpeconf0(read_vpe_c0_vpeconf0() | VPECONF0_MVP);
+#endif
 		if (vpe != 0)
 			printk(", ");
 		printk("VPE %d: TC", vpe);
@@ -501,10 +515,18 @@ void smtc_prepare_cpus(int cpus)
 			 * Clear ERL/EXL of VPEs other than 0
 			 * and set restricted interrupt enable/mask.
 			 */
+#ifdef CONFIG_MIPS_TC3262
+			write_vpe_c0_status((read_vpe_c0_status()
+				& ~(ST0_BEV | ST0_ERL | ST0_EXL | ST0_IM))
+				| (STATUSF_IP0 | STATUSF_IP1 | STATUSF_IP2 | STATUSF_IP3
+				| STATUSF_IP4 | STATUSF_IP5 | STATUSF_IP6 | STATUSF_IP7
+				| ST0_IE));
+#else
 			write_vpe_c0_status((read_vpe_c0_status()
 				& ~(ST0_BEV | ST0_ERL | ST0_EXL | ST0_IM))
 				| (STATUSF_IP0 | STATUSF_IP1 | STATUSF_IP7
 				| ST0_IE));
+#endif
 			/*
 			 * set config to be the same as vpe0,
 			 *  particularly kseg0 coherency alg
@@ -795,6 +817,9 @@ void smtc_send_ipi(int cpu, int type, unsigned int action)
 {
 	int tcstatus;
 	struct smtc_ipi *pipi;
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+	struct smtc_ipi *pipi2;
+#endif
 	unsigned long flags;
 	int mtflags;
 	unsigned long tcrestart;
@@ -828,6 +853,21 @@ void smtc_send_ipi(int cpu, int type, unsigned int action)
 		write_vpe_c0_cause(read_vpe_c0_cause() | C_SW1);
 		UNLOCK_CORE_PRA();
 	} else {
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+		if (type == IRQ_AFFINITY_IPI) {
+			/* Set up a descriptor, to be delivered either promptly or queued */
+			pipi2 = smtc_ipi_dq(&freeIPIq);
+			if (pipi2 == NULL) {
+				bust_spinlocks(1);
+				mips_mt_regdump(dvpe());
+				panic("IPI Msg. Buffers Depleted\n");
+			}
+			pipi2->type = type;
+			pipi2->arg = (void *)action;
+			pipi2->dest = cpu;
+			smtc_ipi_nq(&IPIQ[cpu], pipi2);
+		}
+#endif
 		/*
 		 * Not sufficient to do a LOCK_MT_PRA (dmt) here,
 		 * since ASID shootdown on the other VPE may
@@ -852,16 +892,23 @@ void smtc_send_ipi(int cpu, int type, unsigned int action)
 			 * loop, we need to force exit from the wait and
 			 * do a direct post of the IPI.
 			 */
-			if (cpu_wait == r4k_wait_irqoff) {
+#if !defined(CONFIG_MIPS_TC3262) && !defined(CONFIG_MIPS_TC3162)
+			if (cpu_wait == r4k_wait_irqoff) {/* marked for "When set IRQ to bind to specific CPU, the interrupt latency is long" ---xflu @20120823*/
+#endif
 				tcrestart = read_tc_c0_tcrestart();
 				if (tcrestart >= (unsigned long)r4k_wait_irqoff
 				    && tcrestart < (unsigned long)__pastwait) {
 					write_tc_c0_tcrestart(__pastwait);
 					tcstatus &= ~TCSTATUS_IXMT;
 					write_tc_c0_tcstatus(tcstatus);
+#if !defined(CONFIG_MIPS_TC3262) && !defined(CONFIG_MIPS_TC3162)
+					ehb();//add for sync register R/W, ensure write success bufore read---xflu@20120823
+#endif
 					goto postdirect;
 				}
-			}
+#if !defined(CONFIG_MIPS_TC3262) && !defined(CONFIG_MIPS_TC3162)
+			}//xflu
+#endif
 			/*
 			 * Otherwise we queue the message for the target TC
 			 * to pick up when he does a local_irq_restore()
@@ -945,7 +992,11 @@ static void __irq_entry smtc_clock_tick_interrupt(void)
 {
 	unsigned int cpu = smp_processor_id();
 	struct clock_event_device *cd;
+#ifdef CONFIG_MIPS_TC3262
+	int irq = SI_TIMER_INT;
+#else
 	int irq = MIPS_CPU_IRQ_BASE + 1;
+#endif
 
 	irq_enter();
 	kstat_incr_irqs_this_cpu(irq, irq_to_desc(irq));
@@ -1049,7 +1100,11 @@ void deferred_smtc_ipi(void)
  * interrupts.
  */
 
+#ifdef CONFIG_MIPS_TC3262
+static int cpu_ipi_irq = SI_SWINT_INT1;
+#else
 static int cpu_ipi_irq = MIPS_CPU_IRQ_BASE + MIPS_CPU_IPI_IRQ;
+#endif
 
 static irqreturn_t ipi_interrupt(int irq, void *dev_idm)
 {
@@ -1135,6 +1190,10 @@ static struct irqaction irq_ipi = {
 	.name		= "SMTC_IPI"
 };
 
+#ifdef CONFIG_MIPS_TC3262
+extern void tc3162_enable_irq(unsigned int irq);
+#endif
+
 static void setup_cross_vpe_interrupts(unsigned int nvpe)
 {
 	if (nvpe < 1)
@@ -1143,7 +1202,13 @@ static void setup_cross_vpe_interrupts(unsigned int nvpe)
 	if (!cpu_has_vint)
 		panic("SMTC Kernel requires Vectored Interrupt support");
 
+#ifdef CONFIG_MIPS_TC3262
+	set_vi_handler(SI_SWINT_INT1, ipi_irq_dispatch);
+
+	tc3162_enable_irq(SI_SWINT1_INT1);
+#else
 	set_vi_handler(MIPS_CPU_IPI_IRQ, ipi_irq_dispatch);
+#endif
 
 	setup_irq_smtc(cpu_ipi_irq, &irq_ipi, (0x100 << MIPS_CPU_IPI_IRQ));
 
@@ -1276,7 +1341,23 @@ void smtc_idle_loop_hook(void)
 			}
 		}
 	}
-
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+	/*
+	 * Now that we limit outstanding timer IPIs, check for hung TC
+	 */
+	for (tc = 0; tc < NR_CPUS; tc++) {
+		/* Don't check ourself - we'll dequeue IPIs just below */
+		if ((tc != smp_processor_id()) &&
+		    ipi_timer_latch[tc] > timerq_limit) {
+		    if (clock_hang_reported[tc] == 0) {
+			pdb_msg += sprintf(pdb_msg,
+				"TC %d looks hung with timer latch at %d\n",
+				tc, ipi_timer_latch[tc]);
+			clock_hang_reported[tc]++;
+		    }
+		}
+	}
+#endif
 	emt(mtflags);
 	local_irq_restore(flags);
 	if (pdb_msg != &id_ho_db_msg[0])

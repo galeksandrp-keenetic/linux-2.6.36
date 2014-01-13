@@ -64,7 +64,13 @@ static inline int plat_device_is_coherent(struct device *dev)
 	return 1;
 #endif
 #ifdef CONFIG_DMA_NONCOHERENT
+#ifdef CONFIG_RALINK_SOC
+	extern int coherentio;
+
+	return coherentio;
+#else
 	return 0;
+#endif
 #endif
 }
 

@@ -10,14 +10,13 @@
 	unsigned long name[BITS_TO_LONGS(bits)]
 #else
 #ifndef __EXPORTED_HEADERS__
-#warning "Attempt to use kernel headers from user space, see http://kernelnewbies.org/KernelHeaders"
+//#warning "Attempt to use kernel headers from user space, see http://kernelnewbies.org/KernelHeaders"
 #endif /* __EXPORTED_HEADERS__ */
 #endif
 
 #include <linux/posix_types.h>
 
 #ifdef __KERNEL__
-
 typedef __u32 __kernel_dev_t;
 
 typedef __kernel_fd_set		fd_set;
@@ -35,6 +34,9 @@ typedef __kernel_clockid_t	clockid_t;
 typedef __kernel_mqd_t		mqd_t;
 
 typedef _Bool			bool;
+#ifndef bool
+#define bool int
+#endif
 
 typedef __kernel_uid32_t	uid_t;
 typedef __kernel_gid32_t	gid_t;

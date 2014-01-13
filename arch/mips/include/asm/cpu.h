@@ -72,6 +72,8 @@
 #define PRID_IMP_R5500		0x5500
 #define PRID_IMP_LOONGSON2	0x6300
 
+#define PRID_IMP_TC3162	0xcd00
+
 #define PRID_IMP_UNKNOWN	0xff00
 
 /*

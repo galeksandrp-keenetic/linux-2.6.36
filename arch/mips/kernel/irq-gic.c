@@ -28,13 +28,32 @@ void gic_send_ipi(unsigned int intr)
 	GICWRITE(GIC_REG(SHARED, GIC_SH_WEDGE), 0x80000000 | intr);
 }
 
+#ifdef CONFIG_RALINK_SOC
+void gic_eic_tmr_irq_dispatch(void)
+{
+	do_IRQ(cp0_compare_irq);
+}
+#endif
+
 /* This is Malta specific and needs to be exported */
 static void __init vpe_local_setup(unsigned int numvpes)
 {
 	int i;
+#ifdef CONFIG_RALINK_SOC
+	unsigned long timer_interrupt = GIC_INT_TMR, perf_interrupt = GIC_INT_PERFCTR;
+#else
 	unsigned long timer_interrupt = 5, perf_interrupt = 5;
+#endif
 	unsigned int vpe_ctl;
 
+#ifdef CONFIG_RALINK_SOC
+	if (cpu_has_veic) {
+		/* GIC timer interrupt -> CPU HW Int X (vector X+2) -> map to pin X+2-1 (since GIC adds 1) */
+		timer_interrupt += (GIC_CPU_TO_VEC_OFFSET - GIC_PIN_TO_VEC_OFFSET);
+		/* GIC perfcnt interrupt -> CPU HW Int X (vector X+2) -> map to pin X+2-1 (since GIC adds 1) */
+		perf_interrupt += (GIC_CPU_TO_VEC_OFFSET - GIC_PIN_TO_VEC_OFFSET);
+	}
+#endif
 	/*
 	 * Setup the default performance counter timer interrupts
 	 * for all VPEs
@@ -47,10 +66,20 @@ static void __init vpe_local_setup(unsigned int numvpes)
 		if (vpe_ctl & GIC_VPE_CTL_TIMER_RTBL_MSK)
 			GICWRITE(GIC_REG(VPE_OTHER, GIC_VPE_TIMER_MAP),
 				 GIC_MAP_TO_PIN_MSK | timer_interrupt);
+#ifdef CONFIG_RALINK_SOC
+		if (cpu_has_veic) {
+			set_vi_handler(timer_interrupt+GIC_PIN_TO_VEC_OFFSET, gic_eic_tmr_irq_dispatch);
+		}
+#endif
 
 		if (vpe_ctl & GIC_VPE_CTL_PERFCNT_RTBL_MSK)
 			GICWRITE(GIC_REG(VPE_OTHER, GIC_VPE_PERFCTR_MAP),
 				 GIC_MAP_TO_PIN_MSK | perf_interrupt);
+#ifdef CONFIG_RALINK_SOC
+		if (cpu_has_veic) {
+			set_vi_handler(perf_interrupt+GIC_PIN_TO_VEC_OFFSET, gic_eic_tmr_irq_dispatch);
+		}
+#endif
 	}
 }
 
@@ -137,7 +166,9 @@ static int gic_set_affinity(unsigned int irq, const struct cpumask *cpumask)
 
 	/* Assumption : cpumask refers to a single CPU */
 	spin_lock_irqsave(&gic_lock, flags);
+#ifndef CONFIG_RALINK_SOC
 	for (;;) {
+#endif
 		/* Re-route this IRQ */
 		GIC_SH_MAP_TO_VPE_SMASK(irq, first_cpu(tmp));
 
@@ -145,8 +176,9 @@ static int gic_set_affinity(unsigned int irq, const struct cpumask *cpumask)
 		for (i = 0; i < NR_CPUS; i++)
 			clear_bit(irq, pcpu_masks[i].pcpu_mask);
 		set_bit(irq, pcpu_masks[first_cpu(tmp)].pcpu_mask);
-
+#ifndef CONFIG_RALINK_SOC
 	}
+#endif
 	cpumask_copy(irq_desc[irq].affinity, cpumask);
 	spin_unlock_irqrestore(&gic_lock, flags);
 
@@ -198,7 +230,11 @@ static void __init gic_setup_intr(unsigned int intr, unsigned int cpu,
 	/* Initialise per-cpu Interrupt software masks */
 	if (flags & GIC_FLAG_IPI)
 		set_bit(intr, pcpu_masks[cpu].pcpu_mask);
+#ifdef CONFIG_RALINK_SOC
+	if ((flags & GIC_FLAG_TRANSPARENT) && (cpu_has_veic == 0))
+#else
 	if (flags & GIC_FLAG_TRANSPARENT)
+#endif
 		GIC_SET_INTR_MASK(intr);
 	if (trigtype == GIC_TRIG_EDGE)
 		gic_irq_flags[intr] |= GIC_IRQ_FLAG_EDGE;
@@ -235,8 +271,17 @@ static void __init gic_basic_init(int numintrs, int numvpes,
 
 	vpe_local_setup(numvpes);
 
-	for (i = _irqbase; i < (_irqbase + numintrs); i++)
-		set_irq_chip(i, &gic_irq_controller);
+#ifdef CONFIG_RALINK_SOC
+	if(cpu_has_veic) {
+		for (i = _irqbase; i < (_irqbase + numintrs); i++)
+			set_irq_chip_and_handler(i, &gic_irq_controller, handle_percpu_irq);
+	} else {
+#endif
+		for (i = _irqbase; i < (_irqbase + numintrs); i++)
+			set_irq_chip(i, &gic_irq_controller);
+#ifdef CONFIG_RALINK_SOC
+	}
+#endif
 }
 
 void __init gic_init(unsigned long gic_base_addr,
@@ -258,6 +303,9 @@ void __init gic_init(unsigned long gic_base_addr,
 
 	numvpes = (gicconfig & GIC_SH_CONFIG_NUMVPES_MSK) >>
 		  GIC_SH_CONFIG_NUMVPES_SHF;
+#ifdef CONFIG_RALINK_SOC
+	numvpes = numvpes + 1;
+#endif
 
 	pr_debug("%s called\n", __func__);
 

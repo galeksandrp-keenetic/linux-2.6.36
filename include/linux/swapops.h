@@ -12,6 +12,8 @@
 #define SWP_TYPE_SHIFT(e)	(sizeof(e.val) * 8 - MAX_SWAPFILES_SHIFT)
 #define SWP_OFFSET_MASK(e)	((1UL << SWP_TYPE_SHIFT(e)) - 1)
 
+
+#if MAX_SWAPFILES_SHIFT > 0
 /*
  * Store a type+offset into a swp_entry_t in an arch-independent format
  */
@@ -41,6 +43,27 @@ static inline pgoff_t swp_offset(swp_entry_t entry)
 {
 	return entry.val & SWP_OFFSET_MASK(entry);
 }
+#else /* avoid undefined shift operations */
+
+static inline swp_entry_t swp_entry(unsigned type, pgoff_t offset)
+{
+	swp_entry_t ret;
+	ret.val = offset;
+	return ret;
+}
+
+static inline unsigned swp_type(swp_entry_t entry)
+{
+	return 0;
+}
+
+static inline pgoff_t swp_offset(swp_entry_t entry)
+{
+	return entry.val;
+}
+
+#endif
+
 
 #ifdef CONFIG_MMU
 /* check whether a pte points to a swap entry */

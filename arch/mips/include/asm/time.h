@@ -21,6 +21,16 @@
 
 extern spinlock_t rtc_lock;
 
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+/*
+ * Timer interrupt functions.
+ * mips_timer_state is needed for high precision timer calibration.
+ * mips_timer_ack may be NULL if the interrupt is self-recoverable.
+ */
+extern void (*board_time_init)(void);
+extern void (*mips_timer_ack)(void);
+#endif
+
 /*
  * RTC ops.  By default, they point to weak no-op RTC functions.
  *	rtc_mips_set_time - reverse the above translation and set time to RTC.

@@ -35,6 +35,12 @@
 int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
 int sysctl_oom_dump_tasks = 1;
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
+#ifdef CONFIG_PROC_FS
+extern int auto_kill_process_flag;
+#endif
+#endif
+
 static DEFINE_SPINLOCK(zone_scan_lock);
 
 #ifdef CONFIG_NUMA
@@ -143,15 +149,30 @@ static bool oom_unkillable_task(struct task_struct *p,
 /**
  * oom_badness - heuristic function to determine which candidate task to kill
  * @p: task struct of which task we should calculate
- * @totalpages: total present RAM allowed for page allocation
  *
  * The heuristic for determining which task to kill is made to be as simple and
  * predictable as possible.  The goal is to return the highest value for the
  * task consuming the most memory to avoid subsequent oom failures.
  */
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+unsigned long oom_badness(struct task_struct *p, struct mem_cgroup *mem,
+			  const nodemask_t *nodemask)
+#else
 unsigned int oom_badness(struct task_struct *p, struct mem_cgroup *mem,
 		      const nodemask_t *nodemask, unsigned long totalpages)
+#endif
 {
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	unsigned long points;
+	unsigned long points_orig;
+	int oom_adj = p->signal->oom_adj;
+	long oom_score_adj = p->signal->oom_score_adj;
+
+
+	if (oom_unkillable_task(p, mem, nodemask))
+		return 0;
+	if (oom_adj == OOM_DISABLE)
+#else
 	int points;
 
 	if (oom_unkillable_task(p, mem, nodemask))
@@ -159,8 +180,9 @@ unsigned int oom_badness(struct task_struct *p, struct mem_cgroup *mem,
 
 	p = find_lock_task_mm(p);
 	if (!p)
+#endif
 		return 0;
-
+#ifndef CONFIG_TCSUPPORT_OOM_RB_NEXT
 	/*
 	 * Shortcut check for OOM_SCORE_ADJ_MIN so the entire heuristic doesn't
 	 * need to be executed for something that cannot be killed.
@@ -169,11 +191,19 @@ unsigned int oom_badness(struct task_struct *p, struct mem_cgroup *mem,
 		task_unlock(p);
 		return 0;
 	}
-
+#endif
 	/*
 	 * When the PF_OOM_ORIGIN bit is set, it indicates the task should have
 	 * priority for oom killing.
 	 */
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	if (p->flags & PF_OOM_ORIGIN)
+		return ULONG_MAX;
+
+	p = find_lock_task_mm(p);
+	if (!p)
+		return 0;
+#else
 	if (p->flags & PF_OOM_ORIGIN) {
 		task_unlock(p);
 		return 1000;
@@ -185,13 +215,18 @@ unsigned int oom_badness(struct task_struct *p, struct mem_cgroup *mem,
 	 */
 	if (!totalpages)
 		totalpages = 1;
+#endif
 
 	/*
 	 * The baseline for the badness score is the proportion of RAM that each
 	 * task's rss and swap space use.
 	 */
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	points = (get_mm_rss(p->mm) + get_mm_counter(p->mm, MM_SWAPENTS));
+#else
 	points = (get_mm_rss(p->mm) + get_mm_counter(p->mm, MM_SWAPENTS)) * 1000 /
 			totalpages;
+#endif
 	task_unlock(p);
 
 	/*
@@ -199,23 +234,49 @@ unsigned int oom_badness(struct task_struct *p, struct mem_cgroup *mem,
 	 * implementation used by LSMs.
 	 */
 	if (has_capability_noaudit(p, CAP_SYS_ADMIN))
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+		points -= points / 32;
+#else
 		points -= 30;
+#endif
 
 	/*
 	 * /proc/pid/oom_score_adj ranges from -1000 to +1000 such that it may
 	 * either completely disable oom killing or always prefer a certain
 	 * task.
 	 */
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	points_orig = points;
+	points += oom_score_adj;
+	if ((oom_score_adj > 0) && (points < points_orig))
+		points = ULONG_MAX;	/* may be overflow */
+	if ((oom_score_adj < 0) && (points > points_orig))
+		points = 0;		/* may be underflow */
+
+	if (oom_adj) {
+		if (oom_adj > 0) {
+			if (!points)
+				points = 1;
+			points <<= oom_adj;
+		} else
+			points >>= -(oom_adj);
+	}
+#else
 	points += p->signal->oom_score_adj;
+#endif
 
 	/*
 	 * Never return 0 for an eligible task that may be killed since it's
 	 * possible that no single user task uses more than 0.1% of memory and
 	 * no single admin tasks uses more than 3.0%.
 	 */
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	return points;
+#else
 	if (points <= 0)
 		return 1;
 	return (points < 1000) ? points : 1000;
+#endif
 }
 
 /*
@@ -223,17 +284,23 @@ unsigned int oom_badness(struct task_struct *p, struct mem_cgroup *mem,
  */
 #ifdef CONFIG_NUMA
 static enum oom_constraint constrained_alloc(struct zonelist *zonelist,
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+			gfp_t gfp_mask, nodemask_t *nodemask)
+#else
 				gfp_t gfp_mask, nodemask_t *nodemask,
 				unsigned long *totalpages)
+#endif
 {
 	struct zone *zone;
 	struct zoneref *z;
 	enum zone_type high_zoneidx = gfp_zone(gfp_mask);
+#ifndef CONFIG_TCSUPPORT_OOM_RB_NEXT
 	bool cpuset_limited = false;
 	int nid;
 
 	/* Default to all available memory */
 	*totalpages = totalram_pages + total_swap_pages;
+#endif
 
 	if (!zonelist)
 		return CONSTRAINT_NONE;
@@ -250,17 +317,25 @@ static enum oom_constraint constrained_alloc(struct zonelist *zonelist,
 	 * the page allocator means a mempolicy is in effect.  Cpuset policy
 	 * is enforced in get_page_from_freelist().
 	 */
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	if (nodemask && !nodes_subset(node_states[N_HIGH_MEMORY], *nodemask))
+		return CONSTRAINT_MEMORY_POLICY;
+#else
 	if (nodemask && !nodes_subset(node_states[N_HIGH_MEMORY], *nodemask)) {
 		*totalpages = total_swap_pages;
 		for_each_node_mask(nid, *nodemask)
 			*totalpages += node_spanned_pages(nid);
 		return CONSTRAINT_MEMORY_POLICY;
 	}
+#endif
 
 	/* Check this allocation failure is caused by cpuset's wall function */
 	for_each_zone_zonelist_nodemask(zone, z, zonelist,
 			high_zoneidx, nodemask)
 		if (!cpuset_zone_allowed_softwall(zone, gfp_mask))
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+			return CONSTRAINT_CPUSET;
+#else
 			cpuset_limited = true;
 
 	if (cpuset_limited) {
@@ -269,14 +344,21 @@ static enum oom_constraint constrained_alloc(struct zonelist *zonelist,
 			*totalpages += node_spanned_pages(nid);
 		return CONSTRAINT_CPUSET;
 	}
+#endif
 	return CONSTRAINT_NONE;
 }
 #else
 static enum oom_constraint constrained_alloc(struct zonelist *zonelist,
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+					gfp_t gfp_mask, nodemask_t *nodemask)
+#else
 				gfp_t gfp_mask, nodemask_t *nodemask,
 				unsigned long *totalpages)
+#endif
 {
+#ifndef CONFIG_TCSUPPORT_OOM_RB_NEXT
 	*totalpages = totalram_pages + total_swap_pages;
+#endif
 	return CONSTRAINT_NONE;
 }
 #endif
@@ -287,16 +369,25 @@ static enum oom_constraint constrained_alloc(struct zonelist *zonelist,
  *
  * (not docbooked, we don't want this one cluttering up the manual)
  */
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+static struct task_struct *select_bad_process(unsigned long *ppoints,
+					      struct mem_cgroup *mem,
+#else
 static struct task_struct *select_bad_process(unsigned int *ppoints,
 		unsigned long totalpages, struct mem_cgroup *mem,
-		const nodemask_t *nodemask)
+#endif
+					      const nodemask_t *nodemask)
 {
 	struct task_struct *p;
 	struct task_struct *chosen = NULL;
 	*ppoints = 0;
 
 	for_each_process(p) {
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+		unsigned long points;
+#else
 		unsigned int points;
+#endif
 
 		if (oom_unkillable_task(p, mem, nodemask))
 			continue;
@@ -328,10 +419,18 @@ static struct task_struct *select_bad_process(unsigned int *ppoints,
 				return ERR_PTR(-1UL);
 
 			chosen = p;
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+			*ppoints = ULONG_MAX;
+#else
 			*ppoints = 1000;
+#endif
 		}
 
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+		points = oom_badness(p, mem, nodemask);
+#else
 		points = oom_badness(p, mem, nodemask, totalpages);
+#endif
 		if (points > *ppoints) {
 			chosen = p;
 			*ppoints = points;
@@ -374,7 +473,11 @@ static void dump_tasks(const struct mem_cgroup *mem, const nodemask_t *nodemask)
 			continue;
 		}
 
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+		pr_info("[%5d] %5d %5d %8lu %8lu %3u     %3d         %5ld %s\n",
+#else
 		pr_info("[%5d] %5d %5d %8lu %8lu %3u     %3d         %5d %s\n",
+#endif
 			task->pid, task_uid(task), task->tgid,
 			task->mm->total_vm, get_mm_rss(task->mm),
 			task_cpu(task), task->signal->oom_adj,
@@ -388,7 +491,11 @@ static void dump_header(struct task_struct *p, gfp_t gfp_mask, int order,
 {
 	task_lock(current);
 	pr_warning("%s invoked oom-killer: gfp_mask=0x%x, order=%d, "
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+		"oom_adj=%d, oom_score_adj=%ld\n",
+#else
 		"oom_adj=%d, oom_score_adj=%d\n",
+#endif
 		current->comm, gfp_mask, order, current->signal->oom_adj,
 		current->signal->oom_score_adj);
 	cpuset_print_task_mems_allowed(current);
@@ -428,15 +535,40 @@ static int oom_kill_task(struct task_struct *p, struct mem_cgroup *mem)
 }
 #undef K
 
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
+#ifdef CONFIG_PROC_FS	
+extern void drop_pagecache_sb(struct super_block *sb, void *unused);
+#endif
+#endif
 static int oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+			    unsigned long points, struct mem_cgroup *mem,
+			    nodemask_t *nodemask, const char *message)
+#else
 			    unsigned int points, unsigned long totalpages,
 			    struct mem_cgroup *mem, nodemask_t *nodemask,
 			    const char *message)
+#endif
 {
 	struct task_struct *victim = p;
 	struct task_struct *child;
 	struct task_struct *t = p;
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	unsigned long victim_points = 0;
+#else
 	unsigned int victim_points = 0;
+#endif
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
+#ifdef CONFIG_PROC_FS	
+	//when out of memory,no need to kill process
+		if(auto_kill_process_flag)
+		{
+			printk("\r\noom_kill_process:no need to kill process when out of memory and drop cache!");
+			iterate_supers(drop_pagecache_sb, NULL);
+			return 0;
+		}
+#endif
+#endif
 
 	if (printk_ratelimit())
 		dump_header(p, gfp_mask, order, mem, nodemask);
@@ -452,7 +584,11 @@ static int oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
 	}
 
 	task_lock(p);
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	pr_err("%s: Kill process %d (%s) score %lu or sacrifice child\n",
+#else
 	pr_err("%s: Kill process %d (%s) score %d or sacrifice child\n",
+#endif
 		message, task_pid_nr(p), p->comm, points);
 	task_unlock(p);
 
@@ -464,13 +600,21 @@ static int oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
 	 */
 	do {
 		list_for_each_entry(child, &t->children, sibling) {
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+			unsigned long child_points;
+#else
 			unsigned int child_points;
+#endif
 
 			/*
 			 * oom_badness() returns 0 if the thread is unkillable
 			 */
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+			child_points = oom_badness(child, mem, nodemask);
+#else
 			child_points = oom_badness(child, mem, nodemask,
 								totalpages);
+#endif
 			if (child_points > victim_points) {
 				victim = child;
 				victim_points = child_points;
@@ -509,18 +653,32 @@ static void check_panic_on_oom(enum oom_constraint constraint, gfp_t gfp_mask,
 void mem_cgroup_out_of_memory(struct mem_cgroup *mem, gfp_t gfp_mask)
 {
 	unsigned long limit;
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	unsigned long points = 0;
+#else
 	unsigned int points = 0;
+#endif
 	struct task_struct *p;
 
 	check_panic_on_oom(CONSTRAINT_MEMCG, gfp_mask, 0, NULL);
+#ifndef CONFIG_TCSUPPORT_OOM_RB_NEXT
 	limit = mem_cgroup_get_limit(mem) >> PAGE_SHIFT;
+#endif
 	read_lock(&tasklist_lock);
 retry:
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	p = select_bad_process(&points, mem, NULL);
+#else
 	p = select_bad_process(&points, limit, mem, NULL);
+#endif
 	if (!p || PTR_ERR(p) == -1UL)
 		goto out;
 
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	if (oom_kill_process(p, gfp_mask, 0, points, mem, NULL,
+#else
 	if (oom_kill_process(p, gfp_mask, 0, points, limit, mem, NULL,
+#endif
 				"Memory cgroup out of memory"))
 		goto retry;
 out:
@@ -646,9 +804,15 @@ void out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask,
 {
 	const nodemask_t *mpol_mask;
 	struct task_struct *p;
+#ifndef CONFIG_TCSUPPORT_OOM_RB_NEXT
 	unsigned long totalpages;
+#endif
 	unsigned long freed = 0;
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	unsigned long points;
+#else
 	unsigned int points;
+#endif
 	enum oom_constraint constraint = CONSTRAINT_NONE;
 	int killed = 0;
 
@@ -672,8 +836,12 @@ void out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask,
 	 * Check if there were limitations on the allocation (only relevant for
 	 * NUMA) that may require different handling.
 	 */
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	constraint = constrained_alloc(zonelist, gfp_mask, nodemask);
+#else
 	constraint = constrained_alloc(zonelist, gfp_mask, nodemask,
 						&totalpages);
+#endif
 	mpol_mask = (constraint == CONSTRAINT_MEMORY_POLICY) ? nodemask : NULL;
 	check_panic_on_oom(constraint, gfp_mask, order, mpol_mask);
 
@@ -686,14 +854,22 @@ void out_of_memory(struct zonelist *zonelist, gfp_t gfp_mask,
 		 * non-zero, current could not be killed so we must fallback to
 		 * the tasklist scan.
 		 */
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+		if (!oom_kill_process(current, gfp_mask, order, 0,
+#else
 		if (!oom_kill_process(current, gfp_mask, order, 0, totalpages,
+#endif
 				NULL, nodemask,
 				"Out of memory (oom_kill_allocating_task)"))
 			goto out;
 	}
 
 retry:
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	p = select_bad_process(&points, NULL, mpol_mask);
+#else
 	p = select_bad_process(&points, totalpages, NULL, mpol_mask);
+#endif
 	if (PTR_ERR(p) == -1UL)
 		goto out;
 
@@ -704,7 +880,11 @@ retry:
 		panic("Out of memory and no killable processes...\n");
 	}
 
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+	if (oom_kill_process(p, gfp_mask, order, points, NULL,
+#else
 	if (oom_kill_process(p, gfp_mask, order, points, totalpages, NULL,
+#endif
 				nodemask, "Out of memory"))
 		goto retry;
 	killed = 1;

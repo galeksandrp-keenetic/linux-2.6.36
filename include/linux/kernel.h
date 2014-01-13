@@ -37,6 +37,18 @@ extern const char linux_proc_banner[];
 #define LLONG_MIN	(-LLONG_MAX - 1)
 #define ULLONG_MAX	(~0ULL)
 
+#ifdef CONFIG_TC3162_IMEM
+#define __IMEM  __attribute__  ((__section__(".imem_text")))
+#else
+#define __IMEM
+#endif
+
+#if defined(CONFIG_TC3162_DMEM) && !defined(CONFIG_MIPS_TC3262)
+#define __DMEM  __attribute__  ((__section__(".dmem_data")))
+#else
+#define __DMEM
+#endif
+
 #define STACK_MAGIC	0xdeadbeef
 
 #define ALIGN(x, a)		__ALIGN_KERNEL((x), (a))
@@ -178,8 +190,13 @@ struct va_format {
 
 extern struct atomic_notifier_head panic_notifier_list;
 extern long (*panic_blink)(int state);
+#ifdef CONFIG_FULL_PANIC
 NORET_TYPE void panic(const char * fmt, ...)
 	__attribute__ ((NORET_AND format (printf, 1, 2))) __cold;
+#else
+#define panic(fmt, ...) tiny_panic(0, ## __VA_ARGS__)
+NORET_TYPE void tiny_panic(int a, ...) ATTRIB_NORET;
+#endif
 extern void oops_enter(void);
 extern void oops_exit(void);
 void print_oops_end_marker(void);
@@ -400,7 +417,40 @@ extern int hex_to_bin(char ch);
 #ifndef pr_fmt
 #define pr_fmt(fmt) fmt
 #endif
+/*
+ *      Display an IP address in readable format.
+ */
 
+#define NIPQUAD(addr) \
+	((unsigned char *)&addr)[0], \
+	((unsigned char *)&addr)[1], \
+	((unsigned char *)&addr)[2], \
+	((unsigned char *)&addr)[3]
+#define NIPQUAD_FMT "%u.%u.%u.%u"
+
+#define NIP6(addr) \
+	ntohs((addr).s6_addr16[0]), \
+	ntohs((addr).s6_addr16[1]), \
+	ntohs((addr).s6_addr16[2]), \
+	ntohs((addr).s6_addr16[3]), \
+	ntohs((addr).s6_addr16[4]), \
+	ntohs((addr).s6_addr16[5]), \
+	ntohs((addr).s6_addr16[6]), \
+	ntohs((addr).s6_addr16[7])
+#define NIP6_FMT "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x"
+#define NIP6_SEQFMT "%04x%04x%04x%04x%04x%04x%04x%04x"
+
+#if defined(__LITTLE_ENDIAN)
+#define HIPQUAD(addr) \
+	((unsigned char *)&addr)[3], \
+	((unsigned char *)&addr)[2], \
+	((unsigned char *)&addr)[1], \
+	((unsigned char *)&addr)[0]
+#elif defined(__BIG_ENDIAN)
+#define HIPQUAD	NIPQUAD
+#else
+#error "Please fix asm/byteorder.h"
+#endif /* __LITTLE_ENDIAN */
 #define pr_emerg(fmt, ...) \
         printk(KERN_EMERG pr_fmt(fmt), ##__VA_ARGS__)
 #define pr_alert(fmt, ...) \
@@ -622,7 +672,19 @@ ftrace_vprintk(const char *fmt, va_list ap)
 }
 static inline void ftrace_dump(enum ftrace_dump_mode oops_dump_mode) { }
 #endif /* CONFIG_TRACING */
-
+#ifdef CONFIG_TCSUPPORT_IPV6_ENHANCEMENT
+#define NIP6(addr) \
+	ntohs((addr).s6_addr16[0]), \
+	ntohs((addr).s6_addr16[1]), \
+	ntohs((addr).s6_addr16[2]), \
+	ntohs((addr).s6_addr16[3]), \
+	ntohs((addr).s6_addr16[4]), \
+	ntohs((addr).s6_addr16[5]), \
+	ntohs((addr).s6_addr16[6]), \
+	ntohs((addr).s6_addr16[7])
+#define NIP6_FMT "%04x:%04x:%04x:%04x:%04x:%04x:%04x:%04x"
+#define NIP6_SEQFMT "%04x%04x%04x%04x%04x%04x%04x%04x"
+#endif
 /*
  * min()/max()/clamp() macros that also do
  * strict type-checking.. See the

@@ -383,7 +383,7 @@ save_static_function(sys_sysmips);
 static int __used noinline
 _sys_sysmips(nabi_no_regargs struct pt_regs regs)
 {
-	long cmd, arg1, arg2, arg3;
+	long cmd, arg1, arg2, arg3 __maybe_unused;
 
 	cmd = regs.regs[4];
 	arg1 = regs.regs[5];

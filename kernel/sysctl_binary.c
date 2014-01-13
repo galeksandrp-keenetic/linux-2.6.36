@@ -699,7 +699,13 @@ static const struct bin_table bin_net_netfilter_table[] = {
 	{ CTL_INT,	NET_NF_CONNTRACK_FRAG6_LOW_THRESH,	"nf_conntrack_frag6_low_thresh" },
 	{ CTL_INT,	NET_NF_CONNTRACK_FRAG6_HIGH_THRESH,	"nf_conntrack_frag6_high_thresh" },
 	{ CTL_INT,	NET_NF_CONNTRACK_CHECKSUM,		"nf_conntrack_checksum" },
-
+	{ CTL_INT,	NET_NF_CONNTRACK_FTP_ENABLE,			"nf_conntrack_ftp_enable" },	
+	{ CTL_INT,	NET_NF_CONNTRACK_SIP_ENABLE,			"nf_conntrack_sip_enable" },	
+	{ CTL_INT,	NET_NF_CONNTRACK_H323_ENABLE,			"nf_conntrack_h323_enable" },	
+	{ CTL_INT,	NET_NF_CONNTRACK_RTSP_ENABLE,			"nf_conntrack_rtsp_enable" },	
+	{ CTL_INT,	NET_NF_CONNTRACK_L2TP_ENABLE,			"nf_conntrack_l2tp_enable" },
+	{ CTL_INT,	NET_NF_CONNTRACK_IPSEC_ENABLE,			"nf_conntrack_ipsec_enable" },
+	{ CTL_INT,	NET_NF_CONNTRACK_PPTP_ENABLE,			"nf_conntrack_pptp_enable" },
 	{}
 };
 

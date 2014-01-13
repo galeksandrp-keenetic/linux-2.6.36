@@ -15,19 +15,30 @@
 #include <linux/scatterlist.h>
 #include <linux/string.h>
 #include <linux/gfp.h>
+#ifdef CONFIG_RALINK_SOC
+#include <linux/highmem.h>
+#endif
 
 #include <asm/cache.h>
 #include <asm/io.h>
 
 #include <dma-coherence.h>
 
+#ifdef CONFIG_RALINK_SOC
+static inline struct page *dma_addr_to_page(struct device *dev,
+	dma_addr_t dma_addr)
+{
+	return pfn_to_page(
+		plat_dma_addr_to_phys(dev, dma_addr) >> PAGE_SHIFT);
+}
+#else
 static inline unsigned long dma_addr_to_virt(struct device *dev,
 	dma_addr_t dma_addr)
 {
 	unsigned long addr = plat_dma_addr_to_phys(dev, dma_addr);
-
 	return (unsigned long)phys_to_virt(addr);
 }
+#endif
 
 /*
  * Warning on the terminology - Linux calls an uncached area coherent;
@@ -101,6 +112,9 @@ EXPORT_SYMBOL(dma_alloc_noncoherent);
 void *dma_alloc_coherent(struct device *dev, size_t size,
 	dma_addr_t * dma_handle, gfp_t gfp)
 {
+#ifdef CONFIG_RALINK_SOC
+	extern int hw_coherentio;
+#endif
 	void *ret;
 
 	if (dma_alloc_from_coherent(dev, size, dma_handle, &ret))
@@ -116,7 +130,10 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 
 		if (!plat_device_is_coherent(dev)) {
 			dma_cache_wback_inv((unsigned long) ret, size);
-			ret = UNCAC_ADDR(ret);
+#ifdef CONFIG_RALINK_SOC
+			if (!hw_coherentio)
+#endif
+				ret = UNCAC_ADDR(ret);
 		}
 	}
 
@@ -137,6 +154,9 @@ EXPORT_SYMBOL(dma_free_noncoherent);
 void dma_free_coherent(struct device *dev, size_t size, void *vaddr,
 	dma_addr_t dma_handle)
 {
+#ifdef CONFIG_RALINK_SOC
+	extern int hw_coherentio;
+#endif
 	unsigned long addr = (unsigned long) vaddr;
 	int order = get_order(size);
 
@@ -146,13 +166,75 @@ void dma_free_coherent(struct device *dev, size_t size, void *vaddr,
 	plat_unmap_dma_mem(dev, dma_handle, size, DMA_BIDIRECTIONAL);
 
 	if (!plat_device_is_coherent(dev))
-		addr = CAC_ADDR(addr);
+#ifdef CONFIG_RALINK_SOC
+		if (!hw_coherentio)
+#endif
+			addr = CAC_ADDR(addr);
 
 	free_pages(addr, get_order(size));
 }
 
 EXPORT_SYMBOL(dma_free_coherent);
 
+#ifdef CONFIG_RALINK_SOC
+static inline void __dma_sync_virtual(void *addr, size_t size,
+	enum dma_data_direction direction)
+{
+	switch (direction) {
+	case DMA_TO_DEVICE:
+		dma_cache_wback((unsigned long)addr, size);
+		break;
+
+	case DMA_FROM_DEVICE:
+		dma_cache_inv((unsigned long)addr, size);
+		break;
+
+	case DMA_BIDIRECTIONAL:
+		dma_cache_wback_inv((unsigned long)addr, size);
+		break;
+
+	default:
+		BUG();
+	}
+}
+
+/*
+ * A single sg entry may refer to multiple physically contiguous
+ * pages. But we still need to process highmem pages individually.
+ * If highmem is not configured then the bulk of this loop gets
+ * optimized out.
+ */
+static inline void __dma_sync(struct page *page,
+	unsigned long offset, size_t size, enum dma_data_direction direction)
+{
+	size_t left = size;
+
+	do {
+		size_t len = left;
+
+		if (PageHighMem(page)) {
+			void *addr;
+
+			if (offset + len > PAGE_SIZE) {
+				if (offset >= PAGE_SIZE) {
+					page += offset >> PAGE_SHIFT;
+					offset &= ~PAGE_MASK;
+				}
+				len = PAGE_SIZE - offset;
+			}
+
+			addr = kmap_atomic(page, KM_PTE0);
+			__dma_sync_virtual(addr + offset, len, direction);
+			kunmap_atomic(addr, KM_PTE0);
+		} else
+			__dma_sync_virtual(page_address(page) + offset,
+					   size, direction);
+		offset = 0;
+		page++;
+		left -= len;
+	} while (left);
+}
+#else
 static inline void __dma_sync(unsigned long addr, size_t size,
 	enum dma_data_direction direction)
 {
@@ -173,15 +255,21 @@ static inline void __dma_sync(unsigned long addr, size_t size,
 		BUG();
 	}
 }
+#endif
 
 dma_addr_t dma_map_single(struct device *dev, void *ptr, size_t size,
 	enum dma_data_direction direction)
 {
+#ifndef CONFIG_RALINK_SOC
 	unsigned long addr = (unsigned long) ptr;
-
+#endif
 	if (!plat_device_is_coherent(dev))
+#ifdef CONFIG_RALINK_SOC
+		__dma_sync(virt_to_page(ptr),
+			   (unsigned long)ptr & ~PAGE_MASK, size, direction);
+#else
 		__dma_sync(addr, size, direction);
-
+#endif
 	return plat_map_dma_mem(dev, ptr, size);
 }
 
@@ -191,9 +279,12 @@ void dma_unmap_single(struct device *dev, dma_addr_t dma_addr, size_t size,
 	enum dma_data_direction direction)
 {
 	if (cpu_is_noncoherent_r10000(dev))
-		__dma_sync(dma_addr_to_virt(dev, dma_addr), size,
-		           direction);
-
+#ifdef CONFIG_RALINK_SOC
+		__dma_sync(dma_addr_to_page(dev, dma_addr),
+			   dma_addr & ~PAGE_MASK, size, direction);
+#else
+		__dma_sync(dma_addr_to_virt(dev, dma_addr), size, direction);
+#endif
 	plat_unmap_dma_mem(dev, dma_addr, size, direction);
 }
 
@@ -207,13 +298,20 @@ int dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 	BUG_ON(direction == DMA_NONE);
 
 	for (i = 0; i < nents; i++, sg++) {
+#ifdef CONFIG_RALINK_SOC
+		if (!plat_device_is_coherent(dev))
+			__dma_sync(sg_page(sg), sg->offset, sg->length,
+				   direction);
+		sg->dma_address = plat_map_dma_mem_page(dev, sg_page(sg)) +
+				  sg->offset;
+#else
 		unsigned long addr;
 
 		addr = (unsigned long) sg_virt(sg);
 		if (!plat_device_is_coherent(dev) && addr)
 			__dma_sync(addr, sg->length, direction);
-		sg->dma_address = plat_map_dma_mem(dev,
-				                   (void *)addr, sg->length);
+		sg->dma_address = plat_map_dma_mem(dev, (void *)addr, sg->length);
+#endif
 	}
 
 	return nents;
@@ -224,6 +322,10 @@ EXPORT_SYMBOL(dma_map_sg);
 dma_addr_t dma_map_page(struct device *dev, struct page *page,
 	unsigned long offset, size_t size, enum dma_data_direction direction)
 {
+#ifdef CONFIG_RALINK_SOC
+	if (!plat_device_is_coherent(dev))
+		__dma_sync(page, offset, size, direction);
+#else
 	BUG_ON(direction == DMA_NONE);
 
 	if (!plat_device_is_coherent(dev)) {
@@ -232,6 +334,7 @@ dma_addr_t dma_map_page(struct device *dev, struct page *page,
 		addr = (unsigned long) page_address(page) + offset;
 		__dma_sync(addr, size, direction);
 	}
+#endif
 
 	return plat_map_dma_mem_page(dev, page) + offset;
 }
@@ -241,7 +344,9 @@ EXPORT_SYMBOL(dma_map_page);
 void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
 	enum dma_data_direction direction)
 {
+#ifndef CONFIG_RALINK_SOC
 	unsigned long addr;
+#endif
 	int i;
 
 	BUG_ON(direction == DMA_NONE);
@@ -249,9 +354,14 @@ void dma_unmap_sg(struct device *dev, struct scatterlist *sg, int nhwentries,
 	for (i = 0; i < nhwentries; i++, sg++) {
 		if (!plat_device_is_coherent(dev) &&
 		    direction != DMA_TO_DEVICE) {
+#ifdef CONFIG_RALINK_SOC
+			__dma_sync(sg_page(sg), sg->offset, sg->length,
+				   direction);
+#else
 			addr = (unsigned long) sg_virt(sg);
 			if (addr)
 				__dma_sync(addr, sg->length, direction);
+#endif
 		}
 		plat_unmap_dma_mem(dev, sg->dma_address, sg->length, direction);
 	}
@@ -262,6 +372,11 @@ EXPORT_SYMBOL(dma_unmap_sg);
 void dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle,
 	size_t size, enum dma_data_direction direction)
 {
+#ifdef CONFIG_RALINK_SOC
+	if (cpu_is_noncoherent_r10000(dev))
+		__dma_sync(dma_addr_to_page(dev, dma_handle),
+			   dma_handle & ~PAGE_MASK, size, direction);
+#else
 	BUG_ON(direction == DMA_NONE);
 
 	if (cpu_is_noncoherent_r10000(dev)) {
@@ -270,6 +385,7 @@ void dma_sync_single_for_cpu(struct device *dev, dma_addr_t dma_handle,
 		addr = dma_addr_to_virt(dev, dma_handle);
 		__dma_sync(addr, size, direction);
 	}
+#endif
 }
 
 EXPORT_SYMBOL(dma_sync_single_for_cpu);
@@ -280,16 +396,23 @@ void dma_sync_single_for_device(struct device *dev, dma_addr_t dma_handle,
 	BUG_ON(direction == DMA_NONE);
 
 	plat_extra_sync_for_device(dev);
+#ifdef CONFIG_RALINK_SOC
+	if (!plat_device_is_coherent(dev))
+		__dma_sync(dma_addr_to_page(dev, dma_handle),
+			   dma_handle & ~PAGE_MASK, size, direction);
+#else
 	if (!plat_device_is_coherent(dev)) {
 		unsigned long addr;
 
 		addr = dma_addr_to_virt(dev, dma_handle);
 		__dma_sync(addr, size, direction);
 	}
+#endif
 }
 
 EXPORT_SYMBOL(dma_sync_single_for_device);
 
+#ifndef CONFIG_RALINK_SOC
 void dma_sync_single_range_for_cpu(struct device *dev, dma_addr_t dma_handle,
 	unsigned long offset, size_t size, enum dma_data_direction direction)
 {
@@ -320,6 +443,7 @@ void dma_sync_single_range_for_device(struct device *dev, dma_addr_t dma_handle,
 }
 
 EXPORT_SYMBOL(dma_sync_single_range_for_device);
+#endif
 
 void dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
 	enum dma_data_direction direction)
@@ -331,8 +455,13 @@ void dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nelems,
 	/* Make sure that gcc doesn't leave the empty loop body.  */
 	for (i = 0; i < nelems; i++, sg++) {
 		if (cpu_is_noncoherent_r10000(dev))
+#ifdef CONFIG_RALINK_SOC
+			__dma_sync(sg_page(sg), sg->offset, sg->length,
+				   direction);
+#else
 			__dma_sync((unsigned long)page_address(sg_page(sg)),
-			           sg->length, direction);
+				   sg->length, direction);
+#endif
 	}
 }
 
@@ -348,8 +477,13 @@ void dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nele
 	/* Make sure that gcc doesn't leave the empty loop body.  */
 	for (i = 0; i < nelems; i++, sg++) {
 		if (!plat_device_is_coherent(dev))
+#ifdef CONFIG_RALINK_SOC
+			__dma_sync(sg_page(sg), sg->offset, sg->length,
+				   direction);
+#else
 			__dma_sync((unsigned long)page_address(sg_page(sg)),
-			           sg->length, direction);
+				   sg->length, direction);
+#endif
 	}
 }
 
@@ -376,7 +510,11 @@ void dma_cache_sync(struct device *dev, void *vaddr, size_t size,
 
 	plat_extra_sync_for_device(dev);
 	if (!plat_device_is_coherent(dev))
+#ifdef CONFIG_RALINK_SOC
+		__dma_sync_virtual(vaddr, size, direction);
+#else
 		__dma_sync((unsigned long)vaddr, size, direction);
+#endif
 }
 
 EXPORT_SYMBOL(dma_cache_sync);

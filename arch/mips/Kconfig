@@ -21,10 +21,170 @@ menu "Machine selection"
 
 config ZONE_DMA
 	bool
+config RALINK_SOC
+	bool
+config RALINK_RT2880_MP
+	bool
+config RALINK_RT2880_SHUTTLE
+	bool
+config RALINK_RT3052_MP2
+	bool
+config RALINK_RT3352_MP
+	bool
+config RALINK_RT5350_MP
+	bool
+config RALINK_RT3883_MP
+	bool
 
 choice
 	prompt "System type"
 	default SGI_IP22
+
+config RALINK_RT2880
+	bool "Ralink RT2880 board"
+	select DMA_NONCOHERENT
+	select IRQ_CPU
+	select HW_HAS_PCI
+	select SWAP_IO_SPACE
+	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select BOOT_ELF32
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select RALINK_SOC
+	select RALINK_RT2880_MP
+	select CSRC_R4K
+	select CEVT_R4K
+	help
+	  Ralink evaluation board based on RT2880
+
+config RALINK_RT3052
+	bool "Ralink RT305x/RT3350 board"
+	select DMA_NONCOHERENT
+	select IRQ_CPU
+	select SWAP_IO_SPACE
+	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_HAS_CPU_MIPS32_R2
+	select SYS_HAS_EARLY_PRINTK
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select BOOT_ELF32
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select DEBUG_INFO
+	select CSRC_R4K
+	select CEVT_R4K
+	select RALINK_SOC
+	select RALINK_RT3052_MP2 if !RALINK_RT3350
+	help
+	  Ralink evaluation board based on RT3052
+
+config RALINK_RT3352
+	bool "Ralink RT3352 board"
+	select DMA_NONCOHERENT
+	select IRQ_CPU
+	select SWAP_IO_SPACE
+	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_HAS_CPU_MIPS32_R2
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select BOOT_ELF32
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select RALINK_SOC
+	select RALINK_RT3352_MP
+	select CSRC_R4K
+	select CEVT_R4K
+	help
+	  Ralink evaluation board based on RT3352
+
+config RALINK_RT5350
+	bool "Ralink RT5350 board"
+	select DMA_NONCOHERENT
+	select IRQ_CPU
+	select SWAP_IO_SPACE
+	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_HAS_CPU_MIPS32_R2
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select BOOT_ELF32
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select RALINK_SOC
+	select RALINK_RT5350_MP
+	select CSRC_R4K
+	select CEVT_R4K
+	help
+	  Ralink evaluation board based on RT5350
+
+config RALINK_RT3883
+	bool "Ralink RT3883 board"
+	select DMA_NONCOHERENT
+	select IRQ_CPU
+	select HW_HAS_PCI
+	select SWAP_IO_SPACE
+	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_HAS_CPU_MIPS32_R2
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select BOOT_ELF32
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select RALINK_SOC
+	select RALINK_RT3883_MP
+	select CSRC_R4K
+	select CEVT_R4K
+	help
+	  Ralink evaluation board based on RT3883
+
+config RALINK_MT7620
+	bool "Ralink MT7620 board"
+	select DMA_NONCOHERENT
+	select IRQ_CPU
+	select HW_HAS_PCI
+	select SWAP_IO_SPACE
+	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_HAS_CPU_MIPS32_R2
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select BOOT_ELF32
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select RALINK_SOC
+	select CSRC_R4K
+	select CEVT_R4K
+	help
+	  Ralink evaluation board based on MT7620
+
+config RALINK_MT7621
+	bool "Ralink MT7621 board"
+	select DMA_NONCOHERENT
+	select IRQ_CPU
+	select HW_HAS_PCI
+	select SWAP_IO_SPACE
+	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_HAS_CPU_MIPS32_R2
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select BOOT_ELF32
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select RALINK_SOC
+	select CPU_SUPPORTS_HIGHMEM
+	select SYS_SUPPORTS_HIGHMEM
+	select CSRC_R4K
+	select CEVT_R4K
+	select MIPS_CPU_SCACHE
+	select SYS_SUPPORTS_MULTITHREADING
+	select SYS_SUPPORTS_SMP
+	select SYS_SUPPORTS_MIPS_CMP
+	select IRQ_GIC
+	help
+	  Ralink evaluation board based on MT7621
+
+config RALINK_MT7628
+	bool "Ralink MT7628 board"
+	select DMA_NONCOHERENT
+	select IRQ_CPU
+	select HW_HAS_PCI
+	select SWAP_IO_SPACE
+	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_HAS_CPU_MIPS32_R2
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select BOOT_ELF32
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select RALINK_SOC
+	select CSRC_R4K
+	select CEVT_R4K
+	help
+	  Ralink evaluation board based on MT7628
 
 config MIPS_ALCHEMY
 	bool "Alchemy processor based machines"
@@ -252,6 +412,66 @@ config MIPS_MALTA
 	  This enables support for the MIPS Technologies Malta evaluation
 	  board.
 
+config MIPS_TC3262
+	bool "TrendChip's TC3262 Board"
+	select CPU_MIPSR2_IRQ_VI
+	select CPU_MIPSR2_IRQ_EI
+	select NO_EXCEPT_FILL
+	select BOOT_RAW
+	select CEVT_R4K
+	select CSRC_R4K
+	select DMA_NONCOHERENT
+	select IRQ_CPU
+	select HW_HAS_PCI
+	select SWAP_IO_SPACE
+	select SYS_HAS_CPU_MIPS32_R1
+	select SYS_HAS_CPU_MIPS32_R2
+	select SYS_HAS_CPU_MIPS64_R1
+	select SYS_HAS_EARLY_PRINTK
+	select SYS_SUPPORTS_32BIT_KERNEL
+	select SYS_SUPPORTS_BIG_ENDIAN
+	select SYS_SUPPORTS_LITTLE_ENDIAN
+	select SYS_SUPPORTS_MULTITHREADING
+	select TC3162_ADSL
+	select TC3162_IMEM
+	select TC3162_DMEM
+	help
+	  This enables support for TrendChip's TC3262 based board.  
+	  board.
+
+config MIPS_TC3182
+	bool "TrendChip's TC3182 Board"
+	depends on MIPS_TC3262
+	help
+	  This enables support for TrendChip's TC3182 based board.  
+	  board.
+
+config MIPS_RT63165
+	bool "Ralink's RT63165 Board"
+	depends on MIPS_TC3262
+	help
+	  This enables support for Ralink's RT63165 based board.  
+
+config MIPS_RT65168
+	bool "Ralink's RT65168 Board"
+	depends on MIPS_TC3262
+	select RALINK_VDSL
+	help
+	  This enables support for Ralink's RT65168 based board.  
+
+config MIPS_RT63365
+	bool "Ralink's RT63365 Board"
+	depends on MIPS_TC3262
+	help
+	  This enables support for Ralink's RT63365 based board.  
+
+config MIPS_MT7510
+	bool "MediaTek's MT7510 Board"
+	depends on MIPS_TC3262
+	select RALINK_VDSL
+	help
+	  This enables support for MediaTek's MT7510 based board.  
+	  
 config MIPS_SIM
 	bool 'MIPS simulator (MIPSsim)'
 	select CEVT_R4K
@@ -721,6 +941,8 @@ source "arch/mips/txx9/Kconfig"
 source "arch/mips/vr41xx/Kconfig"
 source "arch/mips/cavium-octeon/Kconfig"
 source "arch/mips/loongson/Kconfig"
+source "arch/mips/ralink/Kconfig"
+source "arch/mips/kprofile/Kconfig"
 
 endmenu
 
@@ -862,6 +1084,17 @@ config I8259
 
 config MIPS_BONITO64
 	bool
+
+config MIPS_FPU_EMU
+	bool "Enable FPU emulation"
+	default y
+	help
+	  This option allows building a kernel with or without the Algorithmics
+	  FPU emulator enabled. Turning off this option results in a kernel which
+	  does not catch floating operations exceptions. Make sure that your toolchain
+	  is configured to enable software floating point emulation in that case.
+	
+	  If unsure say Y here.
 
 config MIPS_MSC
 	bool
@@ -1052,6 +1285,32 @@ config SNIPROM
 
 config BOOT_ELF32
 	bool
+
+config MIPS_PATENTFREE
+	bool
+	depends on SYS_HAS_CPU_TC3162
+
+config TC3162_ADSL
+	bool 
+	depends on SYS_HAS_CPU_TC3162
+
+config RALINK_VDSL
+	bool 
+	depends on SYS_HAS_CPU_TC3162
+
+config TC3162_IMEM
+	bool 
+	depends on SYS_HAS_CPU_TC3162
+
+config TC3162_DMEM
+	bool 
+	depends on SYS_HAS_CPU_TC3162
+
+config IMEM_SIZE
+	int
+	default "32768" if MIPS_TC3162U || MIPS_TC3182 || MIPS_TC3262
+	default "16384" if MIPS_TC3162
+	depends on TC3162_IMEM
 
 config MIPS_L1_CACHE_SHIFT
 	int
@@ -1642,8 +1901,8 @@ config MIPS_MT_DISABLED
 config MIPS_MT_SMP
 	bool "Use 1 TC on each available VPE for SMP"
 	depends on SYS_SUPPORTS_MULTITHREADING
-	select CPU_MIPSR2_IRQ_VI
-	select CPU_MIPSR2_IRQ_EI
+	select CPU_MIPSR2_IRQ_VI if !RALINK_SOC
+	select CPU_MIPSR2_IRQ_EI if !RALINK_SOC
 	select MIPS_MT
 	select NR_CPUS_DEFAULT_2
 	select SMP
@@ -2159,10 +2418,26 @@ config PCI
 	  your box. Other bus systems are ISA, EISA, or VESA. If you have PCI,
 	  say Y, otherwise N.
 
+config PCIE_PORT0
+	bool "PCIe Port0 support"
+	depends on PCI && RALINK_MT7621
+	default n
+
+config PCIE_PORT1
+	bool "PCIe Port1 support"
+	depends on PCI && RALINK_MT7621
+	default n
+
+config PCIE_PORT2
+	bool "PCIe Port2 support"
+	depends on PCI && RALINK_MT7621
+	default n
+
 config PCI_DOMAINS
 	bool
 
 source "drivers/pci/Kconfig"
+source "drivers/pci/pcie/Kconfig"
 
 #
 # ISA support is now enabled via select.  Too many systems still have the one
@@ -2303,3 +2578,5 @@ source "security/Kconfig"
 source "crypto/Kconfig"
 
 source "lib/Kconfig"
+
+source "vendors/Kconfig"

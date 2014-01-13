@@ -26,6 +26,7 @@
 #include <asm/ptrace.h>
 #include <asm/highmem.h>		/* For VMALLOC_END */
 #include <linux/kdebug.h>
+#include <asm/tlbdebug.h>
 
 /*
  * This routine handles page faults.  It determines the address,
@@ -205,6 +206,7 @@ no_context:
 	       "virtual address %0*lx, epc == %0*lx, ra == %0*lx\n",
 	       raw_smp_processor_id(), field, address, field, regs->cp0_epc,
 	       field,  regs->regs[31]);
+	dump_tlb_all();
 	die("Oops", regs);
 
 out_of_memory:

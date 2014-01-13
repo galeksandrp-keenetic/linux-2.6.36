@@ -629,8 +629,15 @@ static DEFINE_PER_CPU(unsigned long, bdp_ratelimits) = 0;
 void balance_dirty_pages_ratelimited_nr(struct address_space *mapping,
 					unsigned long nr_pages_dirtied)
 {
+	struct backing_dev_info *bdi = mapping->backing_dev_info;
 	unsigned long ratelimit;
 	unsigned long *p;
+
+	/* MTK/Ralink, from linux-3.1 (http://lkml.org/lkml/2011/6/11/44 && 
+	 * http://lkml.org/lkml/2011/5/4/92 ) patch for ramfs write() livelock issue.
+	 */
+	if (!bdi_cap_account_dirty(bdi))
+		return;
 
 	ratelimit = ratelimit_pages;
 	if (mapping->backing_dev_info->dirty_exceeded)

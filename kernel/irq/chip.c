@@ -469,7 +469,7 @@ out_unlock:
  *	it after the associated handler has acknowledged the device, so the
  *	interrupt line is back to inactive.
  */
-void
+__IMEM void
 handle_level_irq(unsigned int irq, struct irq_desc *desc)
 {
 	struct irqaction *action;

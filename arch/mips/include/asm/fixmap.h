@@ -45,7 +45,11 @@
  * fix-mapped?
  */
 enum fixed_addresses {
+
+/* Ralink SoC: must be <= 8, last_pkmap_nr_arr[] is initialized to 8 elements,
+   keep the total L1 size <= 512KB with 4 ways */
 #define FIX_N_COLOURS 8
+
 	FIX_CMAP_BEGIN,
 #ifdef CONFIG_MIPS_MT_SMTC
 	FIX_CMAP_END = FIX_CMAP_BEGIN + (FIX_N_COLOURS * NR_CPUS * 2),
@@ -55,7 +59,11 @@ enum fixed_addresses {
 #ifdef CONFIG_HIGHMEM
 	/* reserved pte's for temporary kernel mappings */
 	FIX_KMAP_BEGIN = FIX_CMAP_END + 1,
+#ifdef CONFIG_RALINK_SOC
+	FIX_KMAP_END = FIX_KMAP_BEGIN+(8*NR_CPUS*FIX_N_COLOURS)-1,
+#else
 	FIX_KMAP_END = FIX_KMAP_BEGIN+(KM_TYPE_NR*NR_CPUS)-1,
+#endif
 #endif
 	__end_of_fixed_addresses
 };

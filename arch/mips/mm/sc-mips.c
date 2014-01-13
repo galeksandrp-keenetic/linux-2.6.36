@@ -24,6 +24,9 @@
  */
 static void mips_sc_wback_inv(unsigned long addr, unsigned long size)
 {
+#ifdef CONFIG_RALINK_SOC
+	__sync();
+#endif
 	blast_scache_range(addr, addr + size);
 }
 

@@ -62,6 +62,15 @@ DEFINE_PER_CPU(int, numa_node);
 EXPORT_PER_CPU_SYMBOL(numa_node);
 #endif
 
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
+#ifdef CONFIG_PROC_FS
+extern int auto_clear_cache_flag;
+extern void tc3162wdog_kick(void);
+extern void drop_pagecache_sb(struct super_block *sb, void *unused);
+#endif
+#endif
+
+
 #ifdef CONFIG_HAVE_MEMORYLESS_NODES
 /*
  * N.B., Do NOT reference the '_numa_mem_' per cpu variable directly.
@@ -2045,6 +2054,11 @@ rebalance:
 				preferred_zone, migratetype);
 		if (page)
 			goto got_pg;
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
+			if (gfp_mask & __GFP_NOFAIL) {
+				tc3162wdog_kick();
+			}
+#endif
 	}
 
 	/* Atomic allocations - we can't balance anything */
@@ -2091,7 +2105,9 @@ rebalance:
 					migratetype);
 			if (page)
 				goto got_pg;
-
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
+		tc3162wdog_kick();
+#endif
 			if (!(gfp_mask & __GFP_NOFAIL)) {
 				/*
 				 * The oom killer is not called for high-order
@@ -2118,6 +2134,9 @@ rebalance:
 	pages_reclaimed += did_some_progress;
 	if (should_alloc_retry(gfp_mask, order, pages_reclaimed)) {
 		/* Wait for some write requests to complete then retry */
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
+		tc3162wdog_kick();
+#endif
 		congestion_wait(BLK_RW_ASYNC, HZ/50);
 		goto rebalance;
 	}
@@ -2127,6 +2146,17 @@ nopage:
 		printk(KERN_WARNING "%s: page allocation failure."
 			" order:%d, mode:0x%x\n",
 			p->comm, order, gfp_mask);
+#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
+		#ifdef CONFIG_PROC_FS
+		if(auto_clear_cache_flag)
+		{
+			printk("\r\n__alloc_pages : clear cache when alloc page fail!");
+			iterate_supers(drop_pagecache_sb, NULL);
+		}
+		tc3162wdog_kick();
+		#endif
+#endif
+		
 		dump_stack();
 		show_mem();
 	}

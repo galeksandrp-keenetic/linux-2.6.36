@@ -139,7 +139,7 @@ int walk_page_range(unsigned long addr, unsigned long end,
 	pgd_t *pgd;
 	unsigned long next;
 	int err = 0;
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma __maybe_unused;
 
 	if (addr >= end)
 		return err;

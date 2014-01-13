@@ -42,6 +42,18 @@ extern pte_t *pkmap_page_table;
 #define PKMAP_NR(virt)  ((virt-PKMAP_BASE) >> PAGE_SHIFT)
 #define PKMAP_ADDR(nr)  (PKMAP_BASE + ((nr) << PAGE_SHIFT))
 
+#ifdef CONFIG_RALINK_SOC
+#define ARCH_PKMAP_COLORING             1
+#define     set_pkmap_color(pg,cl)      { cl = ((unsigned long)lowmem_page_address(pg) >> \
+					    PAGE_SHIFT) & (FIX_N_COLOURS - 1); }
+#define     get_last_pkmap_nr(p,cl)     (last_pkmap_nr_arr[cl])
+#define     get_next_pkmap_nr(p,cl)     (last_pkmap_nr_arr[cl] = \
+					    ((p + FIX_N_COLOURS) & LAST_PKMAP_MASK))
+#define     is_no_more_pkmaps(p,cl)     (p < FIX_N_COLOURS)
+#define     get_next_pkmap_counter(c,cl)    (c - FIX_N_COLOURS)
+extern unsigned int     last_pkmap_nr_arr[];
+#endif
+
 extern void * kmap_high(struct page *page);
 extern void kunmap_high(struct page *page);
 

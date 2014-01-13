@@ -84,6 +84,9 @@ DEFINE_PER_CPU(struct rcu_data, rcu_bh_data);
 
 int rcu_scheduler_active __read_mostly;
 EXPORT_SYMBOL_GPL(rcu_scheduler_active);
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+extern void show_mem();
+#endif
 
 /*
  * Return true if an RCU grace period is in progress.  The ACCESS_ONCE()s
@@ -483,7 +486,10 @@ static void print_other_cpu_stall(struct rcu_state *rsp)
 	raw_spin_unlock_irqrestore(&rnp->lock, flags);
 
 	/* OK, time to rat on our buddy... */
-
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+	dump_stack();
+	show_mem();
+#endif
 	printk(KERN_ERR "INFO: %s detected stalls on CPUs/tasks: {",
 	       rsp->name);
 	rcu_for_each_leaf_node(rsp, rnp) {
@@ -507,11 +513,15 @@ static void print_other_cpu_stall(struct rcu_state *rsp)
 	force_quiescent_state(rsp, 0);  /* Kick them all. */
 }
 
+
 static void print_cpu_stall(struct rcu_state *rsp)
 {
 	unsigned long flags;
 	struct rcu_node *rnp = rcu_get_root(rsp);
-
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+	dump_stack();
+	show_mem();
+#endif
 	printk(KERN_ERR "INFO: %s detected stall on CPU %d (t=%lu jiffies)\n",
 	       rsp->name, smp_processor_id(), jiffies - rsp->gp_start);
 	trigger_all_cpu_backtrace();

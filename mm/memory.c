@@ -2767,6 +2767,7 @@ static int do_swap_page(struct mm_struct *mm, struct vm_area_struct *vma,
 		ret |= do_wp_page(mm, vma, address, page_table, pmd, ptl, pte);
 		if (ret & VM_FAULT_ERROR)
 			ret &= VM_FAULT_ERROR;
+		update_mmu_cache(vma, address, page_table);
 		goto out;
 	}
 

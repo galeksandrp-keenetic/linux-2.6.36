@@ -383,11 +383,18 @@ retry:
 			if (addr + size - 1 < addr)
 				goto overflow;
 
+#ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
+			if (list_is_last(&first->list, &vmap_area_list))
+				goto found;
+			 first = list_entry(first->list.next,
+					struct vmap_area, list);
+#else
 			n = rb_next(&first->rb_node);
 			if (n)
 				first = rb_entry(n, struct vmap_area, rb_node);
 			else
 				goto found;
+#endif
 		}
 	}
 found:

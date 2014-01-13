@@ -24,7 +24,7 @@
  */
 #ifdef CONFIG_MIPS_MT_SMTC
 #define STATMASK 0x1e
-#elif defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
+#elif defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX) || defined(CONFIG_CPU_TC3162)
 #define STATMASK 0x3f
 #else
 #define STATMASK 0x1f
@@ -187,8 +187,6 @@
 		 * need it to operate correctly
 		 */
 		LONG_S	$0, PT_R0(sp)
-		mfc0	v1, CP0_STATUS
-		LONG_S	$2, PT_R2(sp)
 #ifdef CONFIG_MIPS_MT_SMTC
 		/*
 		 * Ideally, these instructions would be shuffled in
@@ -199,6 +197,8 @@
 		.set	mips0
 		LONG_S	v1, PT_TCSTATUS(sp)
 #endif /* CONFIG_MIPS_MT_SMTC */
+		mfc0	v1, CP0_STATUS
+		LONG_S	$2, PT_R2(sp)
 		LONG_S	$4, PT_R4(sp)
 		LONG_S	$5, PT_R5(sp)
 		LONG_S	v1, PT_STATUS(sp)
@@ -286,7 +286,7 @@
 		LONG_L	$30, PT_R30(sp)
 		.endm
 
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX) || defined(CONFIG_CPU_TC3162)
 
 		.macro	RESTORE_SOME
 		.set	push
@@ -581,7 +581,7 @@
 #endif /* CONFIG_MIPS_MT_SMTC */
 		mfc0	t0, CP0_STATUS
 		li	t1, ST0_CU0 | (STATMASK & ~1)
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX) || defined(CONFIG_CPU_TC3162)
 		andi	t2, t0, ST0_IEP
 		srl	t2, 2
 		or	t0, t2

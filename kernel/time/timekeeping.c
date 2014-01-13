@@ -154,6 +154,7 @@ __cacheline_aligned_in_smp DEFINE_SEQLOCK(xtime_lock);
  * used instead.
  */
 static struct timespec xtime __attribute__ ((aligned (16)));
+
 static struct timespec wall_to_monotonic __attribute__ ((aligned (16)));
 static struct timespec total_sleep_time;
 
@@ -370,8 +371,10 @@ static int change_clocksource(void *data)
  */
 void timekeeping_notify(struct clocksource *clock)
 {
+#if !defined(CONFIG_MIPS_TC3262) && !defined(CONFIG_MIPS_TC3162)
 	if (timekeeper.clock == clock)
 		return;
+#endif
 	stop_machine(change_clocksource, clock, NULL);
 	tick_clock_notify();
 }

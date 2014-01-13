@@ -22,6 +22,7 @@
 #include <asm/page.h>
 #include <asm/thread_info.h>
 
+#ifdef CONFIG_FULL_PANIC
 #define PANIC_PIC(msg)					\
 		.set push;				\
 		.set	reorder;			\
@@ -32,6 +33,18 @@
 9:		b	9b;				\
 		.set	pop;				\
 		TEXT(msg)
+#else
+#define PANIC_PIC(msg)					\
+		.set push;				\
+		.set	reorder;			\
+		PTR_LA	a0,8f;				\
+		.set	noat;				\
+		PTR_LA	AT, tiny_panic;			\
+		jr	AT;				\
+9:		b	9b;				\
+		.set	pop;				\
+		TEXT(msg)
+#endif
 
 	__INIT
 
@@ -178,7 +191,7 @@ NESTED(handle_int, PT_SIZE, sp)
 	.set	push
 	.set	noat
 	mfc0	k0, CP0_STATUS
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX) || defined(CONFIG_CPU_TC3162)
 	and	k0, ST0_IEP
 	bnez	k0, 1f
 
@@ -278,6 +291,7 @@ NESTED(except_vec_vi_handler, 0, sp)
 	 * service routine will have cleared the state, and any active
 	 * level represents a new or otherwised unserviced event...
 	 */
+#ifndef CONFIG_MIPS_TC3262
 	mfc0	t1, CP0_STATUS
 	and	t0, a0, t1
 #ifdef CONFIG_MIPS_MT_SMTC_IM_BACKSTOP
@@ -288,6 +302,7 @@ NESTED(except_vec_vi_handler, 0, sp)
 	xor	t1, t1, t0
 	mtc0	t1, CP0_STATUS
 	_ehb
+#endif
 #endif /* CONFIG_MIPS_MT_SMTC */
 	CLI
 #ifdef CONFIG_TRACE_IRQFLAGS
@@ -512,7 +527,7 @@ NESTED(nmi_handler, PT_SIZE, sp)
 	get_saved_sp	/* k1 := current_thread_info */
 	.set	noreorder
 	MFC0	k0, CP0_EPC
-#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX)
+#if defined(CONFIG_CPU_R3000) || defined(CONFIG_CPU_TX39XX) || defined(CONFIG_CPU_TC3162)
 	ori	k1, _THREAD_MASK
 	xori	k1, _THREAD_MASK
 	LONG_L	v1, TI_TP_VALUE(k1)

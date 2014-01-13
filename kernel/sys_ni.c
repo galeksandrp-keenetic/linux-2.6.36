@@ -1,6 +1,7 @@
 
 #include <linux/linkage.h>
 #include <linux/errno.h>
+#include <linux/autoconf.h>
 
 #include <asm/unistd.h>
 
@@ -185,3 +186,19 @@ cond_syscall(sys_perf_event_open);
 /* fanotify! */
 cond_syscall(sys_fanotify_init);
 cond_syscall(sys_fanotify_mark);
+
+#ifdef CONFIG_XATTR
+/* fs xattr support */
+cond_syscall(sys_setxattr);
+cond_syscall(sys_lsetxattr);
+cond_syscall(sys_fsetxattr);
+cond_syscall(sys_getxattr);
+cond_syscall(sys_lgetxattr);
+cond_syscall(sys_fgetxattr);
+cond_syscall(sys_listxattr);
+cond_syscall(sys_llistxattr);
+cond_syscall(sys_flistxattr);
+cond_syscall(sys_removexattr);
+cond_syscall(sys_lremovexattr);
+cond_syscall(sys_fremovexattr);
+#endif

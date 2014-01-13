@@ -356,6 +356,13 @@ static inline void cpu_probe_legacy(struct cpuinfo_mips *c, unsigned int cpu)
 			c->options |= MIPS_CPU_FPU;
 		c->tlbsize = 64;
 		break;
+	case PRID_IMP_TC3162:
+		c->cputype = CPU_R3000;
+		c->isa_level = MIPS_CPU_ISA_I;
+		c->options = MIPS_CPU_TLB | MIPS_CPU_3K_CACHE |
+		             MIPS_CPU_NOFPUEX;
+		c->tlbsize = 32;
+		break;
 	case PRID_IMP_R4000:
 		if (read_c0_config() & CONF_SC) {
 			if ((c->processor_id & 0xff) >= PRID_REV_R4400) {

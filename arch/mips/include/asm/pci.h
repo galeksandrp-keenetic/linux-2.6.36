@@ -56,8 +56,11 @@ extern void register_pci_controller(struct pci_controller *hose);
 /*
  * board supplied pci irq fixup routine
  */
+#ifdef CONFIG_RALINK_SOC
+extern int pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin);
+#else
 extern int pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin);
-
+#endif
 
 /* Can be used to override the logic in pci_scan_bus for skipping
    already-configured bus numbers - to be used for buggy BIOSes

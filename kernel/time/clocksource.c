@@ -570,11 +570,15 @@ static void clocksource_select(void)
 			best = cs;
 		break;
 	}
+#if !defined(CONFIG_MIPS_TC3262) && !defined(CONFIG_MIPS_TC3162)
 	if (curr_clocksource != best) {
+#endif
 		printk(KERN_INFO "Switching to clocksource %s\n", best->name);
 		curr_clocksource = best;
 		timekeeping_notify(curr_clocksource);
+#if !defined(CONFIG_MIPS_TC3262) && !defined(CONFIG_MIPS_TC3162)
 	}
+#endif
 }
 
 #else /* !CONFIG_ARCH_USES_GETTIMEOFFSET */

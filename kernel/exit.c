@@ -872,7 +872,7 @@ static void exit_notify(struct task_struct *tsk, int group_dead)
 		release_task(tsk);
 }
 
-#ifdef CONFIG_DEBUG_STACK_USAGE
+#if defined(CONFIG_DEBUG_STACK_USAGE) || defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 static void check_stack_usage(void)
 {
 	static DEFINE_SPINLOCK(low_water_lock);

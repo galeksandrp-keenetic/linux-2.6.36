@@ -19,7 +19,11 @@
 #define GIC_TRIG_EDGE			1
 #define GIC_TRIG_LEVEL			0
 
+#ifdef CONFIG_RALINK_SOC
+#define GIC_NUM_INTRS			(56 + NR_CPUS * 2)
+#else
 #define GIC_NUM_INTRS			(24 + NR_CPUS * 2)
+#endif
 
 #define MSK(n) ((1 << (n)) - 1)
 #define REG32(addr)		(*(volatile unsigned int *) (addr))
@@ -205,9 +209,13 @@
 #define GIC_VPE_COMPARE_HI		0x00a4
 
 #define GIC_VPE_EIC_SHADOW_SET_BASE	0x0100
+#ifdef CONFIG_RALINK_SOC
+#define GIC_VPE_EIC_SS(intr) \
+	(GIC_VPE_EIC_SHADOW_SET_BASE + (4 * intr))
+#else
 #define GIC_VPE_EIC_SS(intr) \
 	(GIC_EIC_SHADOW_SET_BASE + (4 * intr))
-
+#endif
 #define GIC_VPE_EIC_VEC_BASE		0x0800
 #define GIC_VPE_EIC_VEC(intr) \
 	(GIC_VPE_EIC_VEC_BASE + (4 * intr))
@@ -329,6 +337,33 @@ struct gic_intr_map {
 #define GIC_FLAG_IPI           0x01
 #define GIC_FLAG_TRANSPARENT   0x02
 };
+
+#ifdef CONFIG_RALINK_SOC
+/* GIC nomenclature for Core Interrupt Pins. */
+#define GIC_CPU_INT0		0 /* Core Interrupt 2 */
+#define GIC_CPU_INT1		1 /* .                */
+#define GIC_CPU_INT2		2 /* .                */
+#define GIC_CPU_INT3		3 /* .                */
+#define GIC_CPU_INT4		4 /* .                */
+#define GIC_CPU_INT5		5 /* Core Interrupt 5 */
+
+#define GIC_MAX_SHARED_INTR  0x5
+struct gic_shared_intr_map {
+	unsigned int num_shared_intr;
+	unsigned int intr_list[GIC_MAX_SHARED_INTR];
+	unsigned int local_intr_mask;
+};
+
+/* Local GIC interrupts. */
+#define GIC_INT_TMR		(GIC_CPU_INT5)
+#define GIC_INT_PERFCTR		(GIC_CPU_INT5)
+
+/* Add 2 to convert non-EIC hardware interrupt to EIC vector number. */
+#define GIC_CPU_TO_VEC_OFFSET	(2)
+
+/* Mapped interrupt to pin X, then GIC will generate the vector (X+1). */
+#define GIC_PIN_TO_VEC_OFFSET	(1)
+#endif
 
 extern void gic_init(unsigned long gic_base_addr,
 	unsigned long gic_addrspace_size, struct gic_intr_map *intrmap,

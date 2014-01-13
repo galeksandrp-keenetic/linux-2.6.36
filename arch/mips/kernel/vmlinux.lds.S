@@ -42,6 +42,9 @@ SECTIONS
 	/* read-only */
 	_text = .;	/* Text and read-only data */
 	.text : {
+#ifdef CONFIG_RALINK_SOC
+		. = . + 0x8000;
+#endif
 		TEXT_TEXT
 		SCHED_TEXT
 		LOCK_TEXT
@@ -51,7 +54,21 @@ SECTIONS
 		*(.fixup)
 		*(.gnu.warning)
 	} :text = 0
+
+#ifdef CONFIG_TC3162_IMEM
+#ifdef CONFIG_CPU_TC3162
+  	. = ALIGN(16384);
+#else
+  	. = ALIGN(32768);
+#endif
+  	__imem = . ;
+  	.imem_text : { *(.imem_text) }
+  	_imem_end = .;
+  	_etext = (__imem + CONFIG_IMEM_SIZE) > . ? (__imem + CONFIG_IMEM_SIZE) : .;
+  	. = _etext;
+#else
 	_etext = .;	/* End of text section */
+#endif  
 
 	EXCEPTION_TABLE(16)
 

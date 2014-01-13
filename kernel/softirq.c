@@ -188,7 +188,7 @@ EXPORT_SYMBOL(local_bh_enable_ip);
  */
 #define MAX_SOFTIRQ_RESTART 10
 
-asmlinkage void __do_softirq(void)
+__IMEM asmlinkage void __do_softirq(void)
 {
 	struct softirq_action *h;
 	__u32 pending;
@@ -250,7 +250,7 @@ restart:
 
 #ifndef __ARCH_HAS_DO_SOFTIRQ
 
-asmlinkage void do_softirq(void)
+__IMEM asmlinkage void do_softirq(void)
 {
 	__u32 pending;
 	unsigned long flags;
@@ -273,7 +273,7 @@ asmlinkage void do_softirq(void)
 /*
  * Enter an interrupt context.
  */
-void irq_enter(void)
+__IMEM void irq_enter(void)
 {
 	int cpu = smp_processor_id();
 
@@ -294,7 +294,7 @@ void irq_enter(void)
 /*
  * Exit an interrupt context. Process softirqs if needed and possible:
  */
-void irq_exit(void)
+__IMEM void irq_exit(void)
 {
 	account_system_vtime(current);
 	trace_hardirq_exit();
@@ -314,7 +314,7 @@ void irq_exit(void)
 /*
  * This function must run with irqs disabled!
  */
-inline void raise_softirq_irqoff(unsigned int nr)
+__IMEM inline void raise_softirq_irqoff(unsigned int nr)
 {
 	__raise_softirq_irqoff(nr);
 
@@ -331,7 +331,7 @@ inline void raise_softirq_irqoff(unsigned int nr)
 		wakeup_softirqd();
 }
 
-void raise_softirq(unsigned int nr)
+__IMEM void raise_softirq(unsigned int nr)
 {
 	unsigned long flags;
 

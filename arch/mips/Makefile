@@ -97,7 +97,6 @@ KBUILD_AFLAGS_MODULE		+= -mlong-calls
 KBUILD_CFLAGS_MODULE		+= -mlong-calls
 
 cflags-y += -ffreestanding
-
 #
 # We explicitly add the endianness specifier if needed, this allows
 # to compile kernels with a toolchain for the other endianness. We
@@ -244,6 +243,7 @@ libs-y			+= arch/mips/lib/
 core-y += arch/mips/
 
 drivers-$(CONFIG_OPROFILE)	+= arch/mips/oprofile/
+drivers-$(CONFIG_KPROFILE)	+= arch/mips/kprofile/
 
 # suspend and hibernation support
 drivers-$(CONFIG_PM)	+= arch/mips/power/

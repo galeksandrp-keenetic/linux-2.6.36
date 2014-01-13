@@ -34,8 +34,11 @@ static inline int current_is_kswapd(void)
  * on 32-bit-pgoff_t architectures.  And that assumes that the architecture packs
  * the type/offset into the pte as 5/27 as well.
  */
+#ifdef CONFIG_RALINK_SOC
+#define MAX_SWAPFILES_SHIFT	CONFIG_MAX_SWAPFILES_SHIFT
+#else
 #define MAX_SWAPFILES_SHIFT	5
-
+#endif
 /*
  * Use some of the swap files numbers for other purposes. This
  * is a convenient way to hook into the VM to trigger special

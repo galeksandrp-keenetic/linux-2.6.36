@@ -148,9 +148,14 @@ struct {
 	spinlock_t tc_list_lock;
 	struct list_head tc_list;	/* Thread contexts */
 } vpecontrol = {
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+	.vpe_list_lock	= __SPIN_LOCK_UNLOCKED(vpecontrol.vpe_list_lock),
+	.tc_list_lock	= __SPIN_LOCK_UNLOCKED(vpecontrol.tc_list_lock),
+#else
 	.vpe_list_lock	= SPIN_LOCK_UNLOCKED,
-	.vpe_list	= LIST_HEAD_INIT(vpecontrol.vpe_list),
 	.tc_list_lock	= SPIN_LOCK_UNLOCKED,
+#endif
+	.vpe_list	= LIST_HEAD_INIT(vpecontrol.vpe_list),
 	.tc_list	= LIST_HEAD_INIT(vpecontrol.tc_list)
 };
 
@@ -192,7 +197,7 @@ static struct tc *get_tc(int index)
 	}
 	spin_unlock(&vpecontrol.tc_list_lock);
 
-	return NULL;
+	return res;//modify by xfu seams like a bug
 }
 
 /* allocate a vpe and associate it with this minor (or index) */

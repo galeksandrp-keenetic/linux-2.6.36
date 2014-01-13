@@ -113,6 +113,78 @@ static void show_raw_backtrace(unsigned long reg29)
 	printk("\n");
 }
 
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+
+#define NMI_STACK_LEN	80
+#define NMI_STACK_MAGIC_NUM	0x5abc2312
+
+
+void show_raw_backtrace_nmi(unsigned long sp_start, unsigned long stack_len)
+{
+	unsigned long *sp = (unsigned long *)(sp_start & ~3);
+	unsigned long addr, i = 0;
+
+	printk("Call Trace NMI:");
+#ifdef CONFIG_KALLSYMS
+	printk("\n");
+#endif
+	while (i < stack_len) {
+		unsigned long __user *p =
+			(unsigned long __user *)(unsigned long)sp++;
+		if (__get_user(addr, p)) {
+			printk(" (Bad stack address)");
+			break;
+		}
+		if (__kernel_text_address(addr))
+			print_ip_sym(addr);
+
+		i++;
+	}
+	printk("\n");
+}
+
+void show_stack_nmi()
+{
+	unsigned int dspram_addr = dspram_base_addr();
+	int i, dspram_data_len=NMI_STACK_LEN;
+	unsigned int *p = (unsigned int *)dspram_addr;
+
+	printk("dspram_addr=0x%x\n", dspram_addr);
+
+	if(*p != NMI_STACK_MAGIC_NUM){
+		printk("No NMI Happen!\n");
+		return;
+	}
+	
+	p++;
+	printk("epc   : %08lx %pS\n", *p,
+		(void *) (*p));
+	p++;
+	printk("ra    : %08lx %pS\n",*p,
+		(void *) (*p));
+
+	p++;
+	printk("Status: %08x    ", (uint32_t) (*p));
+	p++;
+	printk("Cause : %08x\n", (*p));
+
+	p++;
+
+	while(dspram_data_len){
+		if(dspram_data_len % 8 == 0)
+			printk("\n       ");
+		printk(" %08lx", *p);
+
+		p++;
+		dspram_data_len--;
+	}
+	printk("\n       ");
+
+	show_raw_backtrace_nmi(dspram_base_addr(),NMI_STACK_LEN);
+
+}
+#endif
+
 #ifdef CONFIG_KALLSYMS
 int raw_show_trace;
 static int __init set_raw_show_trace(char *str)
@@ -174,6 +246,38 @@ static void show_stacktrace(struct task_struct *task,
 	printk("\n");
 	show_backtrace(task, regs);
 }
+
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+static void show_stacktrace_nmi(struct task_struct *task,
+	const struct pt_regs *regs)
+{
+	const int field = 2 * sizeof(unsigned long);
+	long stackdata;
+	int i;
+	unsigned long __user *sp = (unsigned long __user *)regs->regs[29];
+
+	printk("Stack :");
+	i = 0;
+	while ((unsigned long) sp & (PAGE_SIZE - 1)) {
+		if (i && ((i % (64 / field)) == 0))
+			printk("\n       ");
+		if (i > NMI_STACK_LEN-1) {
+			printk(" ...");
+			break;
+		}
+
+		if (__get_user(stackdata, sp++)) {
+			printk(" (Bad stack address)");
+			break;
+		}
+
+		printk(" %0*lx", field, stackdata);
+		i++;
+	}
+	printk("\n");
+	//show_backtrace(task, regs);
+}
+#endif
 
 void show_stack(struct task_struct *task, unsigned long *sp)
 {
@@ -327,6 +431,106 @@ static void __show_regs(const struct pt_regs *regs)
 	       cpu_name_string());
 }
 
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+static void __show_regs_nmi(const struct pt_regs *regs)
+{
+	const int field = 2 * sizeof(unsigned long);
+	unsigned int cause = regs->cp0_cause;
+	int i;
+
+	printk("Cpu %d\n", smp_processor_id());
+
+	/*
+	 * Saved main processor registers
+	 */
+	for (i = 0; i < 32; ) {
+		if ((i % 4) == 0)
+			printk("$%2d   :", i);
+		if (i == 0)
+			printk(" %0*lx", field, 0UL);
+		else if (i == 26 || i == 27)
+			printk(" %*s", field, "");
+		else
+			printk(" %0*lx", field, regs->regs[i]);
+
+		i++;
+		if ((i % 4) == 0)
+			printk("\n");
+	}
+
+#ifdef CONFIG_CPU_HAS_SMARTMIPS
+	printk("Acx    : %0*lx\n", field, regs->acx);
+#endif
+	printk("Hi    : %0*lx\n", field, regs->hi);
+	printk("Lo    : %0*lx\n", field, regs->lo);
+
+	/*
+	 * Saved cp0 registers
+	 */
+	//printk("epc   : %0*lx %pS\n", field, regs->cp0_epc,
+	//       (void *) regs->cp0_epc);
+	printk("epc   : %0*lx\n", field, regs->cp0_epc);
+	printk("    %s\n", print_tainted());
+	//printk("ra    : %0*lx %pS\n", field, regs->regs[31],
+	//       (void *) regs->regs[31]);
+	printk("ra    : %0*lx\n", field, regs->regs[31]);
+
+	printk("Status: %08x    ", (uint32_t) regs->cp0_status);
+
+	if (current_cpu_data.isa_level == MIPS_CPU_ISA_I) {
+		if (regs->cp0_status & ST0_KUO)
+			printk("KUo ");
+		if (regs->cp0_status & ST0_IEO)
+			printk("IEo ");
+		if (regs->cp0_status & ST0_KUP)
+			printk("KUp ");
+		if (regs->cp0_status & ST0_IEP)
+			printk("IEp ");
+		if (regs->cp0_status & ST0_KUC)
+			printk("KUc ");
+		if (regs->cp0_status & ST0_IEC)
+			printk("IEc ");
+	} else {
+		if (regs->cp0_status & ST0_KX)
+			printk("KX ");
+		if (regs->cp0_status & ST0_SX)
+			printk("SX ");
+		if (regs->cp0_status & ST0_UX)
+			printk("UX ");
+		switch (regs->cp0_status & ST0_KSU) {
+		case KSU_USER:
+			printk("USER ");
+			break;
+		case KSU_SUPERVISOR:
+			printk("SUPERVISOR ");
+			break;
+		case KSU_KERNEL:
+			printk("KERNEL ");
+			break;
+		default:
+			printk("BAD_MODE ");
+			break;
+		}
+		if (regs->cp0_status & ST0_ERL)
+			printk("ERL ");
+		if (regs->cp0_status & ST0_EXL)
+			printk("EXL ");
+		if (regs->cp0_status & ST0_IE)
+			printk("IE ");
+	}
+	printk("\n");
+
+	printk("Cause : %08x\n", cause);
+
+	cause = (cause & CAUSEF_EXCCODE) >> CAUSEB_EXCCODE;
+	if (1 <= cause && cause <= 5)
+		printk("BadVA : %0*lx\n", field, regs->cp0_badvaddr);
+
+	printk("PrId  : %08x (%s)\n", read_c0_prid(),
+			cpu_name_string());
+}
+#endif
+
 /*
  * FIXME: really the generic show_regs should take a const pointer argument.
  */
@@ -356,6 +560,30 @@ void show_registers(struct pt_regs *regs)
 	show_code((unsigned int __user *) regs->cp0_epc);
 	printk("\n");
 }
+
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+void show_registers_nmi(struct pt_regs *regs)
+{
+	const int field = 2 * sizeof(unsigned long);
+
+	__show_regs_nmi(regs);
+	//print_modules();
+	printk("Process %s (pid: %d, threadinfo=%p, task=%p, tls=%0*lx)\n",
+		current->comm, current->pid, current_thread_info(), current,
+		field, current_thread_info()->tp_value);
+	if (cpu_has_userlocal) {
+		unsigned long tls;
+
+		tls = read_c0_userlocal();
+		if (tls != current_thread_info()->tp_value)
+			printk("*HwTLS: %0*lx\n", field, tls);
+	}
+
+	show_stacktrace_nmi(current, regs);
+	//show_code((unsigned int __user *) regs->cp0_epc);
+	printk("\n");
+}
+#endif
 
 static int regs_to_trapnr(struct pt_regs *regs)
 {
@@ -400,6 +628,84 @@ void __noreturn die(const char *str, struct pt_regs *regs)
 
 	do_exit(sig);
 }
+
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+void nmi_info_store( struct pt_regs *regs)
+{
+	const int field = 2 * sizeof(unsigned long);
+	unsigned int cause = regs->cp0_cause;
+	long stackdata;
+	int i;
+	unsigned long __user *sp = (unsigned long __user *)regs->regs[29];
+	
+	/*Store Magic Number*/
+	write_to_dspram(NMI_STACK_MAGIC_NUM);
+
+	/*Store register value*/
+	write_to_dspram(regs->cp0_epc);
+	write_to_dspram(regs->regs[31]); //ra
+	write_to_dspram((uint32_t) regs->cp0_status);
+	write_to_dspram(cause);
+
+	/*Store stack data*/
+	i = 0;
+	while ((unsigned long) sp & (PAGE_SIZE - 1)) {
+		if (i > NMI_STACK_LEN-1) {
+			break;
+		}
+
+		if (__get_user(stackdata, sp++)) {
+			//printk(" (Bad stack address)");
+			break;
+		}
+
+		//printk(" %0*lx", field, stackdata);
+		write_to_dspram(stackdata);
+		i++;
+	}
+}
+
+void __noreturn die_nmi(const char *str, struct pt_regs *regs)
+{
+	static int die_counter;
+	int sig = SIGSEGV;
+#ifdef CONFIG_MIPS_MT_SMTC
+	unsigned long dvpret = dvpe();
+#endif /* CONFIG_MIPS_MT_SMTC */
+
+	notify_die(DIE_OOPS, str, regs, 0, regs_to_trapnr(regs), SIGSEGV);
+
+	console_verbose();
+	spin_lock_irq(&die_lock);
+	bust_spinlocks(1);
+#ifdef CONFIG_MIPS_MT_SMTC
+	mips_mt_regdump_nmi(dvpret);
+#endif /* CONFIG_MIPS_MT_SMTC */
+
+	if (notify_die(DIE_OOPS, str, regs, 0, regs_to_trapnr(regs), SIGSEGV) == NOTIFY_STOP)
+		sig = 0;
+
+	printk("%s[#%d]:\n", str, ++die_counter);
+	show_registers_nmi(regs);
+
+	while(1); //waiting for watchdog reboot
+#if 0
+	add_taint(TAINT_DIE);
+	spin_unlock_irq(&die_lock);
+
+	if (in_interrupt())
+		panic("Fatal exception in interrupt");
+
+	if (panic_on_oops) {
+		printk(KERN_EMERG "Fatal exception: panic in 5 seconds\n");
+		ssleep(5);
+		panic("Fatal exception");
+	}
+
+	do_exit(sig);
+#endif
+}
+#endif
 
 extern struct exception_table_entry __start___dbe_table[];
 extern struct exception_table_entry __stop___dbe_table[];
@@ -1300,8 +1606,15 @@ void ejtag_exception_handler(struct pt_regs *regs)
 NORET_TYPE void ATTRIB_NORET nmi_exception_handler(struct pt_regs *regs)
 {
 	bust_spinlocks(1);
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+	nmi_info_store(regs);
+#endif
 	printk("NMI taken!!!!\n");
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+	die_nmi("NMI", regs);
+#else
 	die("NMI", regs);
+#endif
 }
 
 #define VECTORSPACING 0x100	/* for EI/VI mode */
@@ -1404,10 +1717,17 @@ static void *set_vi_srs_handler(int n, vi_handler_t addr, int srs)
 
 		memcpy(b, vec_start, handler_len);
 #ifdef CONFIG_MIPS_MT_SMTC
-		BUG_ON(n > 7);	/* Vector index %d exceeds SMTC maximum. */
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+		if (!cpu_has_veic)
+#endif
+		BUG_ON(n > 7); /* Vector index %d exceeds SMTC maximum. */
 
 		w = (u32 *)(b + mori_offset);
+#if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
+		*w = (*w & 0xffff0000) | (n);
+#else
 		*w = (*w & 0xffff0000) | (0x100 << n);
+#endif
 #endif /* CONFIG_MIPS_MT_SMTC */
 		w = (u32 *)(b + lui_offset);
 		*w = (*w & 0xffff0000) | (((u32)handler >> 16) & 0xffff);
@@ -1437,6 +1757,7 @@ void *set_vi_handler(int n, vi_handler_t addr)
 {
 	return set_vi_srs_handler(n, addr, 0);
 }
+EXPORT_SYMBOL(set_vi_handler);
 
 extern void cpu_cache_init(void);
 extern void tlb_init(void);
@@ -1538,10 +1859,23 @@ void __cpuinit per_cpu_trap_init(void)
 	 */
 	if (cpu_has_mips_r2) {
 		cp0_compare_irq_shift = CAUSEB_TI - CAUSEB_IP;
-		cp0_compare_irq = (read_c0_intctl() >> INTCTLB_IPTI) & 7;
-		cp0_perfcount_irq = (read_c0_intctl() >> INTCTLB_IPPCI) & 7;
-		if (cp0_perfcount_irq == cp0_compare_irq)
+#ifdef CONFIG_RALINK_SOC
+		if (!cpu_has_veic) {
+#endif
+			cp0_compare_irq = (read_c0_intctl() >> INTCTLB_IPTI) & 7;
+			cp0_perfcount_irq = (read_c0_intctl() >> INTCTLB_IPPCI) & 7;
+			if (cp0_perfcount_irq == cp0_compare_irq)
+				cp0_perfcount_irq = -1;
+#ifdef CONFIG_RALINK_SOC
+		} else {
+			/* The value of IPTI & IPPCI are not meaningful if External Interrupt Controller
+			 * Mode is enabled. The external interrupt controller is expected
+			 * to provide this information for that interrupt mode.
+			 */
+			cp0_compare_irq = CP0_LEGACY_COMPARE_IRQ;
 			cp0_perfcount_irq = -1;
+		}
+#endif
 	} else {
 		cp0_compare_irq = CP0_LEGACY_COMPARE_IRQ;
 		cp0_compare_irq_shift = cp0_compare_irq;
