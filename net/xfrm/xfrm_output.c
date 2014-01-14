@@ -136,8 +136,8 @@ static int xfrm_output_one(struct sk_buff *skb, int err)
 resume:
 #if defined(CONFIG_MTK_CRYPTO_DRIVER) || defined(CONFIG_RALINK_HWCRYPTO) || defined(CONFIG_RALINK_HWCRYPTO_MODULE)
 		if (skb->protocol == htons(ETH_P_IPV6))
-#else
-		}
+#else	
+		{	
 			if (err) {
 				XFRM_INC_STATS(net, LINUX_MIB_XFRMOUTSTATEPROTOERROR);
 				goto error_nolock;

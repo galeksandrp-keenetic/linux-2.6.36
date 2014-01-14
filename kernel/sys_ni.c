@@ -1,7 +1,7 @@
 
 #include <linux/linkage.h>
 #include <linux/errno.h>
-#include <linux/autoconf.h>
+#include <generated/autoconf.h>
 
 #include <asm/unistd.h>
 
