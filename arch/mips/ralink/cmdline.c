@@ -41,21 +41,9 @@
 
 #include <asm/bootinfo.h>
 
-#if defined (CONFIG_RT2880_ROOTFS_IN_FLASH)
-#ifdef CONFIG_SYSFS
-char rt2880_cmdline[]="console=ttyS1,57600n8 root=/dev/mtdblock5";
-#else
-char rt2880_cmdline[]="console=ttyS1,57600n8 root=1f05";
-#endif
-#elif defined (CONFIG_RT2880_ROOTFS_IN_RAM)
-char rt2880_cmdline[]="console=ttyS1,57600n8 root=/dev/ram0";
-#else
-#error "RT2880 Root File System not defined"
-#endif
-
 extern int prom_argc;
 extern int *_prom_argv;
-
+char rt2880_cmdline[]="console=ttyS1,57600n8 panic=1";
 /*
  * YAMON (32-bit PROM) pass arguments and environment as 32-bit pointer.
  * This macro take care of sign extension.
@@ -68,31 +56,42 @@ char * __init prom_getcmdline(void)
 {
 	return &(arcs_cmdline[0]);
 }
+#ifdef CONFIG_IMAGE_CMDLINE_HACK
+extern char __image_cmdline[];
+void  __init prom_init_cmdline(void)
+{
+	char *p = __image_cmdline;
+	int replace = 0;
 
+	if (*p == '-') {
+		replace = 1;
+		p++;
+	}
+
+	if (*p == '\0')
+		return 0;
+
+	if (replace) {
+		strlcpy(arcs_cmdline, p, sizeof(arcs_cmdline));
+	} else {
+		strlcat(arcs_cmdline, " ", sizeof(arcs_cmdline));
+		strlcat(arcs_cmdline, p, sizeof(arcs_cmdline));
+	}
+}
+#else
 void  __init prom_init_cmdline(void)
 {
 	char *cp;
-#ifdef CONFIG_UBOOT_CMDLINE
-	int actr=1; /* Always ignore argv[0] */
-#endif
 
 	cp = &(arcs_cmdline[0]);
 
-#ifdef CONFIG_UBOOT_CMDLINE
-	while(actr < prom_argc) {
-	    strcpy(cp, prom_argv(actr));
-	    cp += strlen(prom_argv(actr));
-	    *cp++ = ' ';
-	    actr++;
-	}
-#else
 	strcpy(cp, rt2880_cmdline);
 	cp += strlen(rt2880_cmdline);
 	*cp++ = ' ';
-#endif
 
 	if (cp != &(arcs_cmdline[0])) /* get rid of trailing space */
 	    --cp;
 	*cp = '\0';
 	
 }
+#endif

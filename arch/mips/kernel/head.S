@@ -121,6 +121,8 @@
 #endif
 	.endm
 
+	j kernel_entry
+	nop
 #ifndef CONFIG_NO_EXCEPT_FILL
 	/*
 	 * Reserved space for exception handlers.
@@ -140,6 +142,12 @@ EXPORT(_stext)
 FEXPORT(__kernel_entry)
 	j	kernel_entry
 #endif
+
+#ifdef CONFIG_IMAGE_CMDLINE_HACK
+	.ascii	"CMDLINE:"
+EXPORT(__image_cmdline)
+	.fill	0x400
+#endif /* CONFIG_IMAGE_CMDLINE_HACK */
 
 	__REF
 
