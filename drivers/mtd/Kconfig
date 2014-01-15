@@ -353,7 +353,7 @@ if CONFIG_MIPS_TC3262
 source "drivers/mtd/mtk/Kconfig"
 endif
 
-if CONFIG_RALINK_SOC
+if RALINK_SOC
 source "drivers/mtd/ralink/Kconfig"
 endif
 

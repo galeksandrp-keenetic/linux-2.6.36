@@ -133,12 +133,13 @@ static int create_mtd_partitions(struct mtd_info *master,
 		for (i = 7; i < ARRAY_SIZE(ndm_parts); i++){
 			ndm_parts[i]=ndm_parts[i+1];
 		}
+		ndm_parts[6].offset = flash_size - master->erasesize;
 	} else {
 		ndm_parts[7].offset = flash_size - ndm_parts[7].size;
+		ndm_parts[6].offset = ndm_parts[7].offset - master->erasesize;
 	}
 	
 	/* Config */
-	ndm_parts[6].offset = ndm_parts[7].offset - master->erasesize;
 	ndm_parts[6].size = master->erasesize;
 	
 	/* Firmware */
