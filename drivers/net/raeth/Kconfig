@@ -203,6 +203,8 @@ choice
 		bool "External_CPU (MII_RvMII)"
 	config P5_RMII_TO_MAC_MODE
 		bool "External_CPU (RvMII_MII)"
+	config P5_RGMII_TO_MAC_MODE_AR8316
+		bool "Giga_Switch_Atheros_AR8316"
 endchoice
 
 config  MAC_TO_GIGAPHY_MODE_ADDR
