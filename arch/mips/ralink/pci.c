@@ -50,7 +50,7 @@
 #include <linux/init.h>
 #include <linux/mod_devicetable.h>
 #include <linux/delay.h>
-#include <asm/rt2880/surfboardint.h>
+#include <asm/mach-ralink/surfboardint.h>
 
 extern void pcie_phy_init(void);
 extern void chk_phy_pll(void);
