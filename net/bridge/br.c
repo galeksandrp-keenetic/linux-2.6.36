@@ -23,6 +23,10 @@
 #include "br_private.h"
 
 int (*br_should_route_hook)(struct sk_buff *skb);
+#ifdef CONFIG_NDMS_IGMP_PASSTHROUGH
+void (*br_igmp_frame_hook)(struct net_device *from_dev, struct sk_buff *skb) = NULL;
+nt  (*br_igmp_flood_hook)(struct net_device *to_dev, const struct sk_buff *skb) = NULL;
+#endif
 
 static const struct stp_proto br_stp_proto = {
 	.rcv	= br_stp_rcv,
@@ -103,6 +107,10 @@ static void __exit br_deinit(void)
 }
 
 EXPORT_SYMBOL(br_should_route_hook);
+#ifdef CONFIG_NDMS_IGMP_PASSTHROUGH
+EXPORT_SYMBOL(br_igmp_frame_hook);
+EXPORT_SYMBOL(br_igmp_flood_hook);
+#endif
 
 module_init(br_init)
 module_exit(br_deinit)

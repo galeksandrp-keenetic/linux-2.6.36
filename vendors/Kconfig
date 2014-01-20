@@ -7,3 +7,5 @@ endif # RALINK_SOC
 if MIPS_TC3262 || MIPS_TC3162
 source "vendors/Kconfig.econet"
 endif # MIPS_TC3262 || MIPS_TC3162
+
+source "vendors/Kconfig.ndms"

@@ -3441,6 +3441,11 @@ int __skb_bond_should_drop(struct sk_buff *skb, struct net_device *master)
 }
 EXPORT_SYMBOL(__skb_bond_should_drop);
 
+#idef CONFIG_NDMS_IGMP_PASSTHROUGH
+int (*igmp_pthrough)(struct sk_buff *skb) = NULL;
+EXPORT_SYMBOL(igmp_pthrough);
+#endif
+
 static int __netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;
@@ -3451,6 +3456,10 @@ static int __netif_receive_skb(struct sk_buff *skb)
 	struct net_device *orig_or_bond;
 	int ret = NET_RX_DROP;
 	__be16 type;
+#idef CONFIG_NDMS_IGMP_PASSTHROUGH
+	int (*mhook)(struct sk_buff *skb);
+#endif
+
 #if defined(CONFIG_TCSUPPORT_PON_VLAN)
 	int vlan_mode = MODE_HGU;
 #endif
@@ -3611,6 +3620,13 @@ static int __netif_receive_skb(struct sk_buff *skb)
 	pt_prev = NULL;
 
 	rcu_read_lock();
+
+#idef CONFIG_NDMS_IGMP_PASSTHROUGH
+	if( (mhook = rcu_dereference(igmp_pthrough)) && mhook(skb) ) {
+		ret = NET_RX_SUCCESS;
+		goto out;
+	}
+#endif
 
 #ifdef CONFIG_NET_CLS_ACT
 	if (skb->tc_verd & TC_NCLS) {

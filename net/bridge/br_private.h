@@ -618,6 +618,11 @@ extern unsigned long br_timer_value(const struct timer_list *timer);
 extern int (*br_fdb_test_addr_hook)(struct net_device *dev, unsigned char *addr);
 #endif
 
+#ifdef CONFIG_NDMS_IGMP_PASSTHROUGH
+extern void (*br_igmp_frame_hook)(struct net_device *from_dev, struct sk_buff *skb);
+extern int  (*br_igmp_flood_hook)(struct net_device *to_dev, const struct sk_buff *skb);
+#endif
+
 /* br_netlink.c */
 extern int br_netlink_init(void);
 extern void br_netlink_fini(void);

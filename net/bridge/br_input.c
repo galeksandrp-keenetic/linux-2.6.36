@@ -229,6 +229,9 @@ __IMEM struct sk_buff *br_handle_frame(struct sk_buff *skb)
 	struct net_bridge_port *p;
 	const unsigned char *dest = eth_hdr(skb)->h_dest;
 	int (*rhook)(struct sk_buff *skb);
+#ifdef CONFIG_NDMS_IGMP_PASSTHROUGH
+	void (*mhook)(struct net_device *from_dev, struct sk_buff *skb);
+#endif
 
 	if (skb->pkt_type == PACKET_LOOPBACK)
 		return skb;
@@ -242,6 +245,10 @@ __IMEM struct sk_buff *br_handle_frame(struct sk_buff *skb)
 
 	p = br_port_get_rcu(skb->dev);
 
+#ifdef CONFIG_NDMS_IGMP_PASSTHROUGH
+	if (is_multicast_ether_addr(dest) && (mhook = rcu_dereference(br_igmp_frame_hook)))
+		mhook(p->dev, skb);
+#endif
 	if (unlikely(is_link_local(dest))) {
 		/* Pause frames shouldn't be passed up by driver anyway */
 		if (skb->protocol == htons(ETH_P_PAUSE))
