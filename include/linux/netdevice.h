@@ -171,10 +171,10 @@ static inline bool dev_xmit_complete(int rc)
  */
 
 struct net_device_stats {
-	unsigned long	rx_packets;
-	unsigned long	tx_packets;
-	unsigned long	rx_bytes;
-	unsigned long	tx_bytes;
+	unsigned long long	rx_packets;
+	unsigned long long	tx_packets;
+	unsigned long long	rx_bytes;
+	unsigned long long	tx_bytes;
 	unsigned long	rx_errors;
 	unsigned long	tx_errors;
 	unsigned long	rx_dropped;
