@@ -232,6 +232,7 @@ struct ppp_net {
 #define seq_after(a, b)		((s32)((a) - (b)) > 0)
 
 /* Prototypes. */
+void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb);
 static int ppp_unattached_ioctl(struct net *net, struct ppp_file *pf,
 			struct file *file, unsigned int cmd, unsigned long arg);
 static void ppp_xmit_process(struct ppp *ppp);
@@ -2533,6 +2534,16 @@ ppp_get_stats(struct ppp *ppp, struct ppp_stats *st)
 	st->vj.vjs_compressedin = vj->sls_i_compressed;
 }
 
+void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb) {
+	struct channel *pch = chan->ppp;
+	
+	if (pch == 0 || pch->ppp == 0 ) return;
+	
+	skb->dev = pch->ppp->dev;
+	pch->ppp->stats.rx_packets++;
+	pch->ppp->stats.rx_bytes += skb->len;
+	skb->dev->last_rx = jiffies;
+}
 /*
  * Stuff for handling the lists of ppp units and channels
  * and for initialization.
