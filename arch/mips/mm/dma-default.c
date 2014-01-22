@@ -117,7 +117,7 @@ void *dma_alloc_coherent(struct device *dev, size_t size,
 #endif
 	void *ret;
 
-	if (dma_alloc_from_coherent(dev, size, dma_handle, &ret))
+	if (dma_alloc_from_coherent(dev, size, dma_handle, &ret) == 1)
 		return ret;
 
 	gfp = massage_gfp_flags(dev, gfp);

@@ -31,6 +31,7 @@
 #ifndef SQUASHFS_MAGIC
 #define SQUASHFS_MAGIC	0x73717368
 #endif
+#define NDMS_MAGIC    0x736D646E
 
 #define KERNEL_MAGIC	be32_to_cpu(0x27051956)
 #define ROOTFS_MAGIC	SQUASHFS_MAGIC
@@ -116,7 +117,7 @@ static int create_mtd_partitions(struct mtd_info *master,
 			ndm_parts[5].offset = offset;	//Firmware offset
 			ndm_parts[8].offset = offset;	//Backup offset
 		}
-		if (magic == ROOTFS_MAGIC) {
+		if ((magic == ROOTFS_MAGIC)||(magic == NDMS_MAGIC)) {
 			printk("Found rootfs at offset 0x%x\n",offset);
 			ndm_parts[3].size = offset - ndm_parts[3].offset;
 			ndm_parts[4].offset = offset;
