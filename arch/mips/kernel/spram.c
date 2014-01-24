@@ -82,7 +82,7 @@ void write_to_dspram(long  data)
 	}
 }
 
-unsigned int dspram_base_addr()
+unsigned int dspram_base_addr(void)
 {
 	return DSPRAM_BASE;
 }

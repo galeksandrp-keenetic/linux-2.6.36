@@ -404,14 +404,14 @@ static int mtd_do_writeoob(struct file *file, struct mtd_info *mtd,
 
 	if (!(file->f_mode & FMODE_WRITE)){
 #if defined(CONFIG_TCSUPPORT_VOIP)
-			atomic_set(&eraseAction, 0);
+		atomic_set(&eraseAction, 0);
 #endif
 		return -EPERM;
 	}
 
 	if (length > 4096){
 #if defined(CONFIG_TCSUPPORT_VOIP)
-			atomic_set(&eraseAction, 0);
+		atomic_set(&eraseAction, 0);
 #endif
 		return -EINVAL;
 	}
@@ -423,7 +423,7 @@ static int mtd_do_writeoob(struct file *file, struct mtd_info *mtd,
 
 	if (ret){
 #if defined(CONFIG_TCSUPPORT_VOIP)
-			atomic_set(&eraseAction, 0);
+		atomic_set(&eraseAction, 0);
 #endif
 		return ret;
 	}
@@ -435,7 +435,7 @@ static int mtd_do_writeoob(struct file *file, struct mtd_info *mtd,
 
 	if (ops.ooboffs && ops.ooblen > (mtd->oobsize - ops.ooboffs)){
 #if defined(CONFIG_TCSUPPORT_VOIP)
-			atomic_set(&eraseAction, 0);
+		atomic_set(&eraseAction, 0);
 #endif
 		return -EINVAL;
 	}
@@ -443,7 +443,7 @@ static int mtd_do_writeoob(struct file *file, struct mtd_info *mtd,
 	ops.oobbuf = memdup_user(ptr, length);
 	if (IS_ERR(ops.oobbuf)){
 #if defined(CONFIG_TCSUPPORT_VOIP)
-			atomic_set(&eraseAction, 0);
+		atomic_set(&eraseAction, 0);
 #endif
 		return PTR_ERR(ops.oobbuf);
 	}
@@ -456,10 +456,10 @@ static int mtd_do_writeoob(struct file *file, struct mtd_info *mtd,
 	retlen = ops.oobretlen;
 	if (copy_to_user(retp, &retlen, sizeof(length))){
 		ret = -EFAULT;
+	}
 
 	kfree(ops.oobbuf);
 	return ret;
-	}
 }
 
 static int mtd_do_readoob(struct mtd_info *mtd, uint64_t start,

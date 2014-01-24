@@ -37,26 +37,6 @@ void nf_unregister_queue_imq_handler(void)
 {
 	mutex_lock(&queue_handler_mutex);
 	rcu_assign_pointer(queue_imq_handler, NULL);
-	mutex_unlock(&queue_handler_mutex);
-}
-EXPORT_SYMBOL(nf_unregister_queue_imq_handler);
-#endif
-
-#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
-static const struct nf_queue_handler *queue_imq_handler;
-
-void nf_register_queue_imq_handler(const struct nf_queue_handler *qh)
-{
-	mutex_lock(&queue_handler_mutex);
-	rcu_assign_pointer(queue_imq_handler, qh);
-	mutex_unlock(&queue_handler_mutex);
-}
-EXPORT_SYMBOL(nf_register_queue_imq_handler);
-
-void nf_unregister_queue_imq_handler(void)
-{
-	mutex_lock(&queue_handler_mutex);
-	rcu_assign_pointer(queue_imq_handler, NULL);
   mutex_unlock(&queue_handler_mutex);
 }
 EXPORT_SYMBOL(nf_unregister_queue_imq_handler);

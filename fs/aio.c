@@ -1253,7 +1253,7 @@ static void io_destroy(struct kioctx *ioctx)
 SYSCALL_DEFINE2(io_setup, unsigned, nr_events, aio_context_t __user *, ctxp)
 {
 	struct kioctx *ioctx = NULL;
-	unsigned long ctx;
+	unsigned long ctx = 0;
 	long ret;
 
 	ret = get_user(ctx, ctxp);
@@ -1760,7 +1760,7 @@ SYSCALL_DEFINE3(io_cancel, aio_context_t, ctx_id, struct iocb __user *, iocb,
 	int (*cancel)(struct kiocb *iocb, struct io_event *res);
 	struct kioctx *ctx;
 	struct kiocb *kiocb;
-	u32 key;
+	u32 key = 0;
 	int ret;
 
 	ret = get_user(key, &iocb->aio_key);

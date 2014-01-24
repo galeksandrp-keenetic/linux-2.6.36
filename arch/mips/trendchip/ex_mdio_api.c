@@ -55,7 +55,6 @@ static uint32 bit2Word( uint8 *bit){
 }
 
 static void HwGpioSetMode(uint8 mode){
-	uint32 word;
 	if(isRT63365)
 		VPint(0xbfb00860) &=~((1<<9)|(1<<12));//>63365 GPIO 7 and 10 share use for enthnet LED
 

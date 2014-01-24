@@ -117,21 +117,6 @@ struct nf_conn {
 #ifdef CONFIG_NF_CONNTRACK_SECMARK
 	u_int32_t secmark;
 #endif
-#if defined(CONFIG_NETFILTER_XT_MATCH_LAYER7) || \
-    defined(CONFIG_NETFILTER_XT_MATCH_LAYER7_MODULE)
-	struct {
-	/*
-		 * e.g. "http". NULL before decision. "unknown" after decision
-		 * if no match.
-		 */
-		char *app_proto;
-		/*
-		 * application layer data so far. NULL after match decision.
-		 */
-		char *app_data;
-		unsigned int app_data_len;
-	} layer7;
-#endif
 
 #if defined(CONFIG_NETFILTER_XT_MATCH_LAYER7) || \
     defined(CONFIG_NETFILTER_XT_MATCH_LAYER7_MODULE)

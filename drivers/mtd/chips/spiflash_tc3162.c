@@ -179,14 +179,14 @@ spiflash_regread32(int reg)
 {
 	//volatile __u32 *addr = (__u32 *)(CR_SPI_BASE + reg);
 	//return (*addr);
-	return regRead32((__u32 *)(CR_SPI_BASE + reg));
+	return regRead32((__u32)(CR_SPI_BASE + reg));
 }
 
 static void
 spiflash_regwrite32(int reg, __u32 data)
 {
 	//volatile __u32 *addr = (__u32 *)(CR_SPI_BASE + reg);
-	regWrite32((__u32 *)(CR_SPI_BASE + reg),data);
+	regWrite32((__u32)(CR_SPI_BASE + reg),data);
 	//*addr = data;
 	return;
 }
@@ -375,7 +375,7 @@ spiflash_write (struct map_info *map, u32 from, u32 to, u32 len)
 	int done = FALSE, page_offset, bytes_left, finished;
 #if defined(TC_SOC) 
 	__u32 xact_len, spi_data[8], opcode, reg;
-	__u32 reg_value;
+	__u32 reg_value = 0;
 	unsigned char words, bytes, finalrun, i, j;
 #else
 	__u32 xact_len, spi_data = 0, opcode, reg;
@@ -750,7 +750,7 @@ struct spi_chip_info *spiflash_probe_tc3162(struct map_info *map)
 	unsigned long flash_id;
 #if defined(TC_SOC) && defined(CONFIG_MIPS_TC3262)
 	if(down_interruptible(&SPI_SEM))
-		return -ERESTARTSYS;
+		return NULL;
 
 	*((__u32 *)(CR_SPI_BASE | SPI_FLASH_MM)) = reg0x28;
 #endif

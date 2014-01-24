@@ -170,6 +170,7 @@ void __flush_anon_page(struct page *page, unsigned long vmaddr)
 			kunmap_coherent();
 		} else
 			flush_data_cache_page(addr);
+	}
 #endif
 }
 

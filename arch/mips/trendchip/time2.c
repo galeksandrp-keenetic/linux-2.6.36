@@ -167,10 +167,12 @@ static void mips_timer_dispatch(void)
 	do_IRQ(SI_TIMER_INT);
 }
 
+#if 0
 static void mips_perf_dispatch(void)
 {
 	do_IRQ(cp0_perfcount_irq);
 }
+#endif
 
 extern int (*perf_irq)(void);
 
@@ -212,11 +214,14 @@ irqreturn_t mips_perf_interrupt(int irq, void *dev_id)
 	return perf_irq();
 }
 
+#if 0
 static struct irqaction perf_irqaction = {
 	.handler = mips_perf_interrupt,
 	.flags = IRQF_DISABLED | IRQF_PERCPU,
 	.name = "performance",
 };
+#endif
+
 extern struct clocksource clocksource_mips;
 
 #if defined(CONFIG_TCSUPPORT_DYING_GASP) && (defined(CONFIG_MIPS_RT63365))
@@ -352,7 +357,7 @@ unsigned int __cpuinit get_c0_compare_int(void)
 
 	return mips_cpu_timer_irq;
 }
-static cycle_t cputmr_hpt_read(void)
+static cycle_t cputmr_hpt_read(struct clocksource *cs)
 {
 	return regRead32(CR_CPUTMR_CNT0);
 }

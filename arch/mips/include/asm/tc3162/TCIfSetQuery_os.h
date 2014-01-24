@@ -237,6 +237,8 @@
 void TCIfQuery( unsigned short query_id, void *result1, void *result2 );
 void TCIfSet( unsigned short set_id, void *value1, void *value2 );
 
+#include <linux/skbuff.h>
+
 typedef struct {
 	void (*query)(unsigned short query_id, void *result1, void *result2);
 	void (*set)(unsigned short set_id, void *value1, void *value2);

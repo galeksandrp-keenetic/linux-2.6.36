@@ -183,7 +183,7 @@ static int watchdog_reset_write_proc(struct file *file, const char *buffer,
 
 extern int is_nmi_enable(void);
 extern void set_nmi_enable(uint8 nmi_enable);
-extern void show_stack_nmi();
+extern void show_stack_nmi(void);
 
 
 static int nmi_enable_read_proc(char *page, char **start, off_t off,

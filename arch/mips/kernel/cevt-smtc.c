@@ -272,10 +272,7 @@ static unsigned long cycles_per_jiffy __read_mostly;
 extern struct clocksource clocksource_mips;
 
 int reset_time_value(int time_shift){
-	u64 temp=0;
-	u32 shift=0;
 	int i=0;
-	unsigned int cpu = smp_processor_id();
 
 #ifdef DBG
 	printk("cycles_per_jiffy %x\n",cycles_per_jiffy);

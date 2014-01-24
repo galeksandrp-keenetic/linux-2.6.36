@@ -1551,8 +1551,8 @@ static long vmsplice_to_user(struct file *file, const struct iovec __user *iov,
 
 	error = ret = 0;
 	while (nr_segs) {
-		void __user *base;
-		size_t len;
+		void __user *base = NULL;
+		size_t len = 0;
 
 		/*
 		 * Get user address base and length for this iovec.

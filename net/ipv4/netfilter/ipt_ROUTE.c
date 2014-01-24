@@ -30,14 +30,14 @@
 #else
 #define DEBUGP(format, args...)
 #endif
-
+/*
 #define NF_IP_PRE_ROUTING	NF_INET_PRE_ROUTING
 #define NF_IP_LOCAL_IN		NF_INET_LOCAL_IN
 #define NF_IP_FORWARD		NF_INET_FORWARD
 #define NF_IP_LOCAL_OUT		NF_INET_LOCAL_OUT
 #define NF_IP_POST_ROUTING	NF_INET_POST_ROUTING
 #define NF_IP_NUMHOOKS		NF_INET_NUMHOOKS
-
+*/
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Cedric de Launois <delaunois@info.ucl.ac.be>");
 MODULE_DESCRIPTION("iptables ROUTE target module");
@@ -354,13 +354,14 @@ static unsigned int ipt_route_target (struct sk_buff *skb,
 	}
 
 	if ((route_info->flags & IPT_ROUTE_TEE)) {
+		struct sk_buff *pskb = skb;
 		/*
 		 * Copy the *pskb, and route the copy. Will later return
 		 * IPT_CONTINUE for the original skb, which should continue
 		 * on its way as if nothing happened. The copy should be
 		 * independantly delivered to the ROUTE --gw.
 		 */
-		skb = skb_copy(*pskb, GFP_ATOMIC);
+		skb = skb_copy(pskb, GFP_ATOMIC);
 		if (!skb) {
 			if (net_ratelimit()) 
 				DEBUGP(KERN_DEBUG "ipt_ROUTE: copy failed!\n");

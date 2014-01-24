@@ -145,7 +145,7 @@ void
 dumpCell(uint8* src, int len){
 	int i=0;
 
-	printk("\r\nCell content %08x (len:%d) as flow:\r\n", src,len);
+	printk("\r\nCell content %08x (len:%d) as flow:\r\n", (u32)src,len);
 	for(i=0; i<len; i++){
 		if((i&7)==0){
 			printk("\r\n");
@@ -185,9 +185,9 @@ find_appropriate_src(struct net *net, u16 zone,
 				printk("\r\nDBG:: CT = NULL  h = %d",h);
 				printk("\r\nDBG::  null_ct_cnt = %d\r\n",rcu_cnt);
 					if(nat){
-						printk("\r\nDBG:: nat =%08x\n",nat);
-						dumpCell(nat,sizeof(struct nf_conn_nat));	
-					}		
+						printk("\r\nDBG:: nat =%08x\n", (u32)nat);
+						dumpCell((uint8 *)nat,sizeof(struct nf_conn_nat));
+					}
 			}
 
 		if (same_src(ct, tuple) && nf_ct_zone(ct) == zone) {

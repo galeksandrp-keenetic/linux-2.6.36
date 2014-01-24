@@ -85,7 +85,7 @@ DEFINE_PER_CPU(struct rcu_data, rcu_bh_data);
 int rcu_scheduler_active __read_mostly;
 EXPORT_SYMBOL_GPL(rcu_scheduler_active);
 #if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
-extern void show_mem();
+extern void show_mem(void);
 #endif
 
 /*

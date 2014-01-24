@@ -143,13 +143,16 @@ void show_raw_backtrace_nmi(unsigned long sp_start, unsigned long stack_len)
 	printk("\n");
 }
 
-void show_stack_nmi()
+extern unsigned int dspram_base_addr(void);
+extern void write_to_dspram(long  data);
+
+void show_stack_nmi(void)
 {
 	unsigned int dspram_addr = dspram_base_addr();
-	int i, dspram_data_len=NMI_STACK_LEN;
+	int dspram_data_len=NMI_STACK_LEN;
 	unsigned int *p = (unsigned int *)dspram_addr;
 
-	printk("dspram_addr=0x%x\n", dspram_addr);
+	printk("dspram_addr=0x%08x\n", dspram_addr);
 
 	if(*p != NMI_STACK_MAGIC_NUM){
 		printk("No NMI Happen!\n");
@@ -157,10 +160,10 @@ void show_stack_nmi()
 	}
 	
 	p++;
-	printk("epc   : %08lx %pS\n", *p,
+	printk("epc   : %08x %pS\n", *p,
 		(void *) (*p));
 	p++;
-	printk("ra    : %08lx %pS\n",*p,
+	printk("ra    : %08x %pS\n",*p,
 		(void *) (*p));
 
 	p++;
@@ -173,7 +176,7 @@ void show_stack_nmi()
 	while(dspram_data_len){
 		if(dspram_data_len % 8 == 0)
 			printk("\n       ");
-		printk(" %08lx", *p);
+		printk(" %08x", *p);
 
 		p++;
 		dspram_data_len--;
@@ -632,7 +635,7 @@ void __noreturn die(const char *str, struct pt_regs *regs)
 #if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
 void nmi_info_store( struct pt_regs *regs)
 {
-	const int field = 2 * sizeof(unsigned long);
+	//const int field = 2 * sizeof(unsigned long);
 	unsigned int cause = regs->cp0_cause;
 	long stackdata;
 	int i;
@@ -664,6 +667,10 @@ void nmi_info_store( struct pt_regs *regs)
 		i++;
 	}
 }
+
+#ifdef CONFIG_MIPS_MT_SMTC
+extern void mips_mt_regdump_nmi(unsigned long mvpctl);
+#endif
 
 void __noreturn die_nmi(const char *str, struct pt_regs *regs)
 {

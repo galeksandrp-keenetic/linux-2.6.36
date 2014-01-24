@@ -1846,10 +1846,12 @@ int skb_splice_bits(struct sk_buff *__skb, unsigned int offset,
 		.ops = &sock_pipe_buf_ops,
 		.spd_release = sock_spd_release,
 	};
+	struct sk_buff *frag_iter;
+	struct sock *sk;
+	int ret = 0;
 
 #ifndef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
 	struct sk_buff *skb;
-
 	/*
 	 * I'd love to avoid the clone here, but tcp_read_sock()
 	 * ignores reference counts and unconditonally kills the sk_buff
@@ -1860,13 +1862,11 @@ int skb_splice_bits(struct sk_buff *__skb, unsigned int offset,
 		return -ENOMEM;
 #endif
 
-	struct sk_buff *frag_iter;
 #ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
-	struct sock *sk = skb->sk;
+	sk = skb->sk;
 #else
-	struct sock *sk = __skb->sk;
+	sk = __skb->sk;
 #endif
-	int ret = 0;
 
 	if (splice_grow_spd(pipe, &spd))
 		return -ENOMEM;
@@ -4036,7 +4036,7 @@ static int register_proc_skbmgr(void)
 	return 1;
 }
 
-static void unregister_proc_skbmgr(void)
+void unregister_proc_skbmgr(void)
 {
 	remove_proc_entry("skbmgr_hot_list_len", init_net.proc_net);
 	remove_proc_entry("skbmgr_info", init_net.proc_net);
@@ -4047,7 +4047,7 @@ static void unregister_proc_skbmgr(void)
 	remove_proc_entry("auto_kill_process", init_net.proc_net);
 #endif
 }
-
+EXPORT_SYMBOL(unregister_proc_skbmgr);
 #endif
 
 #endif

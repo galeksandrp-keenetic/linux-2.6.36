@@ -5,12 +5,6 @@
 struct nf_queue_entry {
 	struct list_head	list;
 	struct sk_buff		*skb;
-
-#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
-	int			(*next_outfn)(struct nf_queue_entry *entry,
-	unsigned int queuenum);
-	unsigned int		next_queuenum;
-#endif
 	unsigned int		id;
 
 	struct nf_hook_ops	*elem;

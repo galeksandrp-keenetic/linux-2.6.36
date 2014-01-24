@@ -897,7 +897,7 @@ out:
 SYSCALL_DEFINE4(sendfile, int, out_fd, int, in_fd, off_t __user *, offset, size_t, count)
 {
 	loff_t pos;
-	off_t off;
+	off_t off = 0;
 	ssize_t ret;
 
 	if (offset) {

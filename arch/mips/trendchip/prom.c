@@ -30,9 +30,10 @@ EXPORT_SYMBOL(io_swap_noneed);
 
 static void tc3162_component_setup(void)
 {
+#if defined(CONFIG_CPU_TC3162) && (defined(CONFIG_TC3162_IMEM) || defined(CONFIG_TC3162_DMEM))
 	unsigned int controlReg;
 	unsigned long flags;
-
+#endif
 	/* setup bus timeout value */
 	VPint(CR_AHB_AACS) = 0xffff;
 
@@ -109,7 +110,7 @@ void flash_init(void)
 #ifdef CONFIG_TCSUPPORT_ADDR_MAPPING
 		if(isMT751020){
 			flash_base = 0xbc000000;
-			printk("%s: flash_base:%x \n",__func__,flash_base);
+			printk("%s: flash_base: 0x%08lx \n",__func__, flash_base);
 		}
 		else if (isTC3162U || isRT63260 || isRT65168 || isTC3182 || isRT63165 || isRT63365)
 #else
@@ -118,7 +119,7 @@ void flash_init(void)
 			flash_base = 0xb0000000;
 		else
 			flash_base = 0xbfc00000;
-		printk("%s: flash_base:%x \n",__func__,flash_base);
+		printk("%s: flash_base: 0x%08lx \n",__func__, flash_base);
 	}
 }
 
@@ -182,7 +183,7 @@ void __init mips_nmi_setup (void)
 		(void *)(ebase + 0x200 + VECTORSPACING*64) :
 		(void *)(ebase + 0x380);
 		
-	printk("nmi base is %x\n",base);
+	printk("nmi base is 0x%08lx\n", (unsigned long)base);
 
 	//Fill the NMI_Handler address in a register, which is a R/W register
 	//start.S will read it, then jump to NMI_Handler address
@@ -195,7 +196,9 @@ void __init mips_nmi_setup (void)
 void __init prom_init(void)
 {
 	unsigned long memsize;
+#ifndef CONFIG_MIPS_TC3262
 	unsigned char samt;
+#endif
 	unsigned long col;
 	unsigned long row;
 
@@ -224,8 +227,8 @@ void __init prom_init(void)
 	}
 
 	if(isMT751020){
-		memsize = 0x800000 * (1 << (((VPint(0xbfb0008c) >> 13) & 0x7) - 1));	
-		printk("memsize:%dMB\n", (memsize>>20));
+		memsize = 0x800000 * (1 << (((VPint(0xbfb0008c) >> 13) & 0x7) - 1));
+		printk("memsize: %luMB\n", (memsize>>20));
 	}
 	else if (isRT63165 || isRT63365) {
 		/* DDR */
