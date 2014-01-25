@@ -1070,6 +1070,9 @@ static void usb_debugfs_cleanup(void)
 /*
  * Init
  */
+#if defined(CONFIG_MIPS_TC3162U) || defined(CONFIG_MIPS_TC3262)
+extern void usb_phy_init(void);
+#endif
 static int __init usb_init(void)
 {
 	
