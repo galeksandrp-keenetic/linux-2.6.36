@@ -37,7 +37,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 	seq_printf(m, "processor\t\t: %ld\n", n);
 	sprintf(fmt, "cpu model\t\t: %%s V%%d.%%d%s\n",
 	        cpu_data[n].options & MIPS_CPU_FPU ? "  FPU V%d.%d" : "");
-	seq_printf(m, fmt, __cpu_name[n] ? __cpu_name[n] : "Virtual",
+	seq_printf(m, fmt, __cpu_name[n] ? __cpu_name[n] : __cpu_name[0],
 	                           (version >> 4) & 0x0f, version & 0x0f,
 	                           (fp_vers >> 4) & 0x0f, fp_vers & 0x0f);
 	seq_printf(m, "BogoMIPS\t\t: %u.%02u\n",

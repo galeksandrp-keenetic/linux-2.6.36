@@ -10,7 +10,7 @@ static char irq_tab_tc3162[] __initdata = {
 #endif
 };
 
-int __init pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 #ifndef PCIE_PCI_COEXIT
 	if (slot <= 0)

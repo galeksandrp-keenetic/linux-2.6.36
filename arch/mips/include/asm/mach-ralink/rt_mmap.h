@@ -792,5 +792,54 @@
 #define CPLL_DIV_RATIO                  (0x3UL << CPLL_DIV_RATIO_SHIFT)
 #define BASE_CLOCK                      40      /* Mhz */
 
+#elif defined (CONFIG_MIPS_RT63365) || defined (CONFIG_MIPS_TC3262)
+
+#define RALINK_SYSCTL_BASE              0xBFB00000
+#define RALINK_TIMER_BASE               0xBFBF0100
+#define RALINK_INTCL_BASE               0xBFB40000
+#define RALINK_MEMCTRL_BASE             0xBFB20000
+#define RALINK_PIO_BASE                 0xBFBF0200
+#define RALINK_NAND_CTRL_BASE           0xBFBE0010
+#define RALINK_I2C_BASE                 0xBFBF8000
+#define RALINK_I2S_BASE                 0xBFBF8100
+#define RALINK_SPI_BASE                 0xBFBC0B00
+#define RALINK_UART_LITE_BASE           0xBFBF0000
+#define RALINK_UART_LITE2_BASE          0xBFBF0300
+#define RALINK_PCM_BASE                 0xBFBD0000
+#define RALINK_GDMA_BASE                0xBFB30000
+#define RALINK_FRAME_ENGINE_BASE        0xBFB50000
+#define RALINK_ETH_SW_BASE              0xBFB58000
+#define RALINK_11N_MAC_BASE		0x00000000
+//#define RALINK_USB_DEV_BASE           0xB0120000
+#define RALINK_CRYPTO_ENGINE_BASE       0xBFB70000
+#define RALINK_PCI_BASE                 0xBFB80000
+//#define RALINK_USB_HOST_BASE          0xB01C0000
+#define RALINK_PCIE_BASE                0xBFB81000
+
+//Interrupt Controller
+#define RALINK_INTCTL_UARTLITE          (1<<0)
+#define RALINK_INTCTL_PIO               (1<<10)
+#define RALINK_INTCTL_PCM               (1<<11)
+#define RALINK_INTCTL_DMA               (1<<14)
+#define RALINK_INTCTL_GMAC2             (1<<15)
+#define RALINK_INTCTL_PCI               (1<<17)
+#define RALINK_INTCTL_UHST2             (1<<20)
+#define RALINK_INTCTL_GMAC1             (1<<21)
+#define RALINK_INTCTL_UHST1             (1<<23)
+#define RALINK_INTCTL_PCIE              (1<<24)
+#define RALINK_INTCTL_NAND              (1<<25)
+#define RALINK_INTCTL_SPI               (1<<27)
+
+//Reset Control Register
+#define RALINK_PCM_RST                  (1<<11)
+#define RALINK_DMA_RST                  (1<<14)
+#define RALINK_I2C_RST                  (1<<16)
+#define RALINK_I2S_RST                  (1<<2)          /* IMR1 */
+
+//Clock Conf Register
+#define RALINK_UPHY0_CLK_EN		(1<<25)
+#define RALINK_PCIE0_CLK_EN		(1<<26)
+#define RALINK_PCIE1_CLK_EN		(1<<27)
+
 #endif
 #endif

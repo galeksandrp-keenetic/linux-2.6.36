@@ -51,6 +51,26 @@
 #define RALINK_INT_PCIE0         13	/* PCIE0 */
 #define RALINK_INT_PCIE1	 14	/* PCIE1 */
 
+#elif defined (CONFIG_MIPS_RT63365) || defined (CONFIG_MIPS_TC3262)
+/* README: RT6855A interrupt shall be the value in the datasheet plus 1 */
+//#define RALINK_CPU_TIMER_IRQ 	 5	/* mips timer */
+#define SURFBOARDINT_GPIO	 11	/* GPIO */
+#define SURFBOARDINT_DMA	 15	/* DMA */
+//#define SURFBOARDINT_NAND	 8	/* NAND */
+//#define SURFBOARDINT_PC	 	 9	/* Performance counter */
+#define SURFBOARDINT_I2S 	 35	/* I2S */
+#define SURFBOARDINT_ESW	 16	/* ESW */
+//#define SURFBOARDINT_UART1	 12 	/* UART Lite */
+#define SURFBOARDINT_UHST	 18	/* USB Host */
+//#define SURFBOARDINT_SYSCTL 	 32	/* SYSCTL */
+//#define SURFBOARDINT_TIMER0	 33	/* timer0 */
+//#define SURFBOARDINT_WDG	 34	/* watch dog */
+//#define SURFBOARDINT_ILL_ACC	 35	/* illegal access */
+#define SURFBOARDINT_PCM	 12	/* PCM */
+//#define SURFBOARDINT_UART	 37	/* UART */
+#define RALINK_INT_PCIE0         25	/* PCIE0 */
+#define RALINK_INT_PCIE1	 24	/* PCIE1 */
+#define SURFBOARDINT_CRYPTO	 29
 
 #elif defined (CONFIG_RALINK_MT7628)
 #define SURFBOARDINT_SYSCTL      0      /* SYSCTL */
@@ -183,8 +203,9 @@
         
 /* bobtseng added --, 2006.3.6. */
 
+#if !defined(CONFIG_MIPS_TC3262)
 void surfboardint_init(void);
 u32 get_surfboard_sysclk(void);
-
+#endif
 
 #endif /* !(_SURFBOARDINT_H) */

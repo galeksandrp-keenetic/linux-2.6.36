@@ -431,7 +431,7 @@ static void __show_regs(const struct pt_regs *regs)
 		printk("BadVA : %0*lx\n", field, regs->cp0_badvaddr);
 
 	printk("PrId  : %08x (%s)\n", read_c0_prid(),
-	       cpu_name_string());
+	       cpu_name_string() ? cpu_name_string() : __cpu_name[0]);
 }
 
 #if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
@@ -530,7 +530,7 @@ static void __show_regs_nmi(const struct pt_regs *regs)
 		printk("BadVA : %0*lx\n", field, regs->cp0_badvaddr);
 
 	printk("PrId  : %08x (%s)\n", read_c0_prid(),
-			cpu_name_string());
+			cpu_name_string() ? cpu_name_string() : __cpu_name[0]);
 }
 #endif
 

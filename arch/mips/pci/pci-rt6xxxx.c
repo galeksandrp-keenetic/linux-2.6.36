@@ -36,11 +36,11 @@
 #include <linux/version.h>
 #include <asm/pci.h>
 #include <asm/io.h>
-//#include <asm/rt2880/eureka_ep430.h>
+#include <asm/mach-ralink/eureka_ep430.h>
 #include <linux/init.h>
 #include <linux/mod_devicetable.h>
 #include <linux/delay.h>
-//#include <asm/rt2880/surfboardint.h>
+#include <asm/mach-ralink/surfboardint.h>
 
 #ifdef CONFIG_PCI
 
@@ -74,40 +74,10 @@
 
 #define RALINK_PCI_MM_MAP_BASE					0x20000000
 #define RALINK_PCI_IO_MAP_BASE					0x1f600000
-#define MEMORY_BASE								0
+#define MEMORY_BASE							0
 #define PCI_ACCESS_READ							0
 #define PCI_ACCESS_WRITE						1
-#define RALINK_PCI_CONFIG_ADDR 					0x20
-#define RALINK_PCI_CONFIG_DATA_VIRTUAL_REG		0x24
-#define RALINK_PCI_BASE							0xBFB80000
 
-#define RALINK_INT_PCIE0						25
-#define RALINK_INT_PCIE1						24
-
-#define RT6855_PCIE0_OFFSET						0x2000
-#define RT6855_PCIE1_OFFSET						0x3000
-
-
-#define RALINK_PCI_MEMBASE 		*(volatile u32 *)(RALINK_PCI_BASE + 0x0028)
-#define RALINK_PCI_IOBASE 		*(volatile u32 *)(RALINK_PCI_BASE + 0x002C)
-#define RALINK_PCI_PCICFG_ADDR 		*(volatile u32 *)(RALINK_PCI_BASE + 0x0000)
-#define RALINK_PCI_PCIMSK_ADDR 		*(volatile u32 *)(RALINK_PCI_BASE + 0x000C)
-
-#define RALINK_PCI0_BAR0SETUP_ADDR 	*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0010)
-#define RALINK_PCI0_IMBASEBAR0_ADDR 	*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0018)
-#define RALINK_PCI0_ID 			*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0030)
-#define RALINK_PCI0_CLASS 		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0034)
-#define RALINK_PCI0_SUBID 		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0038)
-#define RALINK_PCI0_STATUS		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0050)
-#define RALINK_PCI0_ECRC		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE0_OFFSET + 0x0064)
-
-#define RALINK_PCI1_BAR0SETUP_ADDR 	*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0010)
-#define RALINK_PCI1_IMBASEBAR0_ADDR 	*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0018)
-#define RALINK_PCI1_ID 			*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0030)
-#define RALINK_PCI1_CLASS 		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0034)
-#define RALINK_PCI1_SUBID 		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0038)
-#define RALINK_PCI1_STATUS		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0050)
-#define RALINK_PCI1_ECRC		*(volatile u32 *)(RALINK_PCI_BASE + RT6855_PCIE1_OFFSET + 0x0064)
 /*
  * pcie_disable = 0 mean there is a card on this slot
  * pcie_disable = 1 mean there is no card on this slot
@@ -321,7 +291,7 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 
 #else
 
-int __init pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 {
 	u16 cmd;
 	u32 val;
