@@ -8,7 +8,9 @@ static inline int license_is_gpl_compatible(const char *license)
 		|| strcmp(license, "GPL and additional rights") == 0
 		|| strcmp(license, "Dual BSD/GPL") == 0
 		|| strcmp(license, "Dual MIT/GPL") == 0
-		|| strcmp(license, "Dual MPL/GPL") == 0);
+		|| strcmp(license, "Dual MPL/GPL") == 0
+		|| strcmp(license, "Artistic") == 0
+		|| strcmp(license, "NDMS") == 0);
 }
 
 #endif
