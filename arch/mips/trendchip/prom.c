@@ -187,7 +187,7 @@ void __init mips_nmi_setup (void)
 
 	//Fill the NMI_Handler address in a register, which is a R/W register
 	//start.S will read it, then jump to NMI_Handler address
-	VPint(0xbfb00244) = base;
+	VPint(0xbfb00244) = (unsigned long)base;
 	
 	memcpy(base, &except_vec_nmi, 0x80);
 	flush_icache_range((unsigned long)base, (unsigned long)base + 0x80);

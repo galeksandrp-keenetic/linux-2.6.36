@@ -333,8 +333,8 @@ __cpuinit void ispram_fill(void)
 		return;
 
 	for (offset = 0; offset < size; offset += 8) {
-		datalo = *(unsigned int *) (PHYS_TO_K0(pa + offset));
-		datahi = *(unsigned int *) (PHYS_TO_K0(pa + offset + 4));
+		datalo = *(unsigned int *) ((unsigned int)PHYS_TO_K0(pa + offset));
+		datahi = *(unsigned int *) ((unsigned int)PHYS_TO_K0(pa + offset + 4));
 		ispram_store_data(offset, datalo, datahi);
 	}
 }
@@ -365,7 +365,7 @@ void __cpuinit spram_config(void)
 #ifdef CONFIG_TC3162_DMEM
 		if (isRT63165 || isRT63365) {
 			VPint(CR_SRAM) = (CPHYSADDR(DSPRAM_BASE) & 0xffffc000) | (1<<0);
-			printk("Enable SRAM=%08lx\n", VPint(CR_SRAM));
+			printk("Enable SRAM=0x%08lx\n", VPint(CR_SRAM));
 
 			sram_allocp = (char *) CKSEG1ADDR(DSPRAM_BASE);
 			sram_size = sram_free = 0x8000;

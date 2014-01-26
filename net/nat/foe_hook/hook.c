@@ -33,6 +33,7 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/skbuff.h>
+#include <linux/foe_hook.h>
 
 int (*ra_sw_nat_hook_rx) (struct sk_buff * skb) = NULL;
 #ifdef CONFIG_TCSUPPORT_MT7510_FE
@@ -51,7 +52,7 @@ int (*ra_sw_nat_hook_drop_packet) (struct sk_buff * skb) = NULL;
 int (*ra_sw_nat_hook_clean_table) (void) = NULL;
 #endif
 int (*ra_sw_nat_hook_foeentry) (void * inputvalue,int operation) = NULL;
- void (*ra_sw_nat_hook_pse_stats) (struct psepkt_stats* pf,int port) = NULL;
+void (*ra_sw_nat_hook_pse_stats) (struct psepkt_stats* pf,int port) = NULL;
 
 
 
@@ -69,6 +70,3 @@ EXPORT_SYMBOL(ra_sw_nat_hook_clean_table);
 #endif
 EXPORT_SYMBOL(ra_sw_nat_hook_foeentry);
 EXPORT_SYMBOL(ra_sw_nat_hook_pse_stats);
-
-
-

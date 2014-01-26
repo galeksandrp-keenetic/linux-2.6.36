@@ -84,15 +84,14 @@ struct port_info {
 		unsigned long int word;
 	};
 };
+#endif
 
 struct psepkt_stats {
 	unsigned long	rx_pkts;		/* total packets received	*/
 	unsigned long	tx_pkts;		/* total packets transmitted	*/
 };
 
-#endif
-
-struct sk_buff;
+#include <linux/skbuff.h>
 
 extern int (*ra_sw_nat_hook_rx) (struct sk_buff * skb);
 #ifdef CONFIG_TCSUPPORT_MT7510_FE
