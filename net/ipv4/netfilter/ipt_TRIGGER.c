@@ -293,12 +293,11 @@ trigger_target(struct sk_buff *skb,
     return IPT_CONTINUE; 
 } 
 
-static int 
-trigger_check(const struct xt_mtchk_param *par)
+static int trigger_check(const struct xt_tgchk_param *par)
 { 
-     const struct ipt_trigger_info *info = par->matchinfo; 
-     struct list_head *cur_item = NULL, *tmp_item = NULL; 
-	 char *tablename = par->table;
+     const struct ipt_trigger_info *info = par->targinfo;
+     struct list_head *cur_item = NULL, *tmp_item = NULL;
+	 char *tablename = (char *)par->table;
 		
         if ((strcmp(tablename, "mangle") == 0)) { 
                 DEBUGP("trigger_check: bad table `%s'.\n", tablename); 
