@@ -292,20 +292,20 @@ trigger_target(struct sk_buff *skb,
  
     return IPT_CONTINUE; 
 } 
-static bool 
+
+static int 
 trigger_check(const struct xt_mtchk_param *par)
 { 
      const struct ipt_trigger_info *info = par->matchinfo; 
      struct list_head *cur_item = NULL, *tmp_item = NULL; 
-	 unsigned int hook_mask = par->hook_mask;
 	 char *tablename = par->table;
 		
         if ((strcmp(tablename, "mangle") == 0)) { 
                 DEBUGP("trigger_check: bad table `%s'.\n", tablename); 
 				return -EINVAL;
         } 
-        if (hook_mask & ~((1 << NF_IP_PRE_ROUTING) | (1 << NF_IP_FORWARD))) { 
-                DEBUGP("trigger_check: bad hooks %x.\n", hook_mask); 
+        if (par->hook_mask & ~((1 << NF_IP_PRE_ROUTING) | (1 << NF_IP_FORWARD))) { 
+                DEBUGP("trigger_check: bad hooks %x.\n", par->hook_mask); 
 				return -EINVAL;
         } 
 	

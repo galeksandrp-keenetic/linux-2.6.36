@@ -441,10 +441,12 @@ checkentry(const char *tablename,
        return 1;
 }
 #endif
+/*
 static int checkentry(const struct xt_mtchk_param *par)
 {
 	return 1;
 }
+*/
 
 static struct xt_match xt_webstr_match[] = {
 	{
