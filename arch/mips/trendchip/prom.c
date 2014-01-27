@@ -133,13 +133,20 @@ const char *get_system_type(void)
 	else if (isRT63165){
 		io_swap_noneed = 1;
 		return "Ralink RT63165 SOC";
+	} else if (isRT63368) {
+		io_swap_noneed = 1;
+#ifdef __BIG_ENDIAN
+		return "Ralink RT63368 SOC";
+#else
+		return "Ralink RT6856 SOC";
+#endif
 	} else if (isRT63365) {
 		io_swap_noneed = 1;
-#ifdef CONFIG_TCSUPPORT_DYING_GASP		
-		if(!isRT63368){
+#ifdef CONFIG_TCSUPPORT_DYING_GASP
+		//if(!isRT63368){
 			//gpio 4 is share pin for rt63365.
 			VPint(0xbfb00860) &= ~(1<<13);//disable port 4 led when use rt63365.
-		}
+		//}
 #endif		
 		return "Ralink RT63365 SOC";
 	}else if (isMT751020){
@@ -148,14 +155,14 @@ const char *get_system_type(void)
 	}else
 		return "TrendChip TC3169 SOC";
 #else
-	if (isRT63260)	
+	if (isRT63260)
 		return "Ralink RT63260 SOC";
 	else if (isTC3162U)
 		return "TrendChip TC3162U SOC";
 	else if (isTC3162L5P5)
 		return "TrendChip TC3162L5/P5 SOC";
 	else if (isTC3162L4P4)
-		return "TrendChip TC3162L4/P4 SOC";	
+		return "TrendChip TC3162L4/P4 SOC";
 	else if (isTC3162L3P3)
 		return "TrendChip TC3162L2F/P2F";
 	else if (isTC3162L2P2)

@@ -23,6 +23,8 @@ typedef int (*wext_ioctl_func)(struct net_device *, struct iwreq *,
 			       unsigned int, struct iw_request_info *,
 			       iw_handler);
 
+int wifi_link_monitor = 0; /* link up = 1, link down = 0 */
+EXPORT_SYMBOL(wifi_link_monitor);
 
 /*
  * Meta-data about all the standard Wireless Extension request we

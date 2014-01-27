@@ -199,7 +199,11 @@ static inline unsigned long int regReadPhy32(uint32 reg)	\
 #define isRT65168 	(((regRead32(0xbfb00064)&0xffff0000))==0x00020000)
 #define isRT63165 	(((regRead32(0xbfb00064)&0xffff0000))==0x00030000)
 #define isRT63365 	(((regRead32(0xbfb00064)&0xffff0000))==0x00040000)
+#ifdef __BIG_ENDIAN
 #define isRT63368   (isRT63365 ? ((((regRead32(0xbfb0008c)>>8) & 0x3) == 0x3) ? 1 : 0): 0)
+#else
+#define isRT63368   (isRT63365 ? 1 : 0) /* fixup for RT6856 in little_endian */
+#endif
 #define isRT62806   (((gswPbusRead(0x7ffc))&0xffff0000)==0x28060000)
 
 #define isENP_MOD	(((regRead32(0xBFBF8214)&0x8)==0x8)?(((regRead32(0xBFBF8214)&0x20)==0x20)?1:0):(((regRead32(0xBFBF8214)&0x2)==0x2)?1:0))
