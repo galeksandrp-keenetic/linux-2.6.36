@@ -46,16 +46,13 @@ static inline int should_deliver(const struct net_bridge_port *p,
 #ifdef CONFIG_NDMS_IGMP_PASSTHROUGH
 	int (*mhook)(struct net_device *to_dev, const struct sk_buff *skb);
 
-	if ((!(p->flags & BR_HAIRPIN_MODE) && skb->dev == p->dev) || p->state == BR_STATE_FORWARDING)
-		return 0;
-	else if ((mhook = rcu_dereference(br_igmp_flood_hook)))
+	if ((mhook = rcu_dereference(br_igmp_flood_hook)))
 		return mhook(p->dev, skb);
 	else
-		return 1;
-#else
+#endif
 	return (((p->flags & BR_HAIRPIN_MODE) || skb->dev != p->dev) &&
 		p->state == BR_STATE_FORWARDING);
-#endif
+
 }
 
 static inline unsigned packet_length(const struct sk_buff *skb)
