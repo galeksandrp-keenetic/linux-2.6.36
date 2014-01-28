@@ -3446,6 +3446,15 @@ int (*igmp_pthrough)(struct sk_buff *skb) = NULL;
 EXPORT_SYMBOL(igmp_pthrough);
 #endif
 
+int (*vpn_pthrough)(struct sk_buff *skb, int in) = NULL;
+EXPORT_SYMBOL(vpn_pthrough);
+
+int (*vpn_pthrough_setup)(uint32_t sip, int add) = NULL;
+EXPORT_SYMBOL(vpn_pthrough_setup);
+
+int (*l2tp_input)(struct sk_buff *skb) = NULL;
+EXPORT_SYMBOL(l2tp_input);
+
 static int __netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;
