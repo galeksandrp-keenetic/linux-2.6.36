@@ -464,6 +464,13 @@ static inline notrace void rcu_read_unlock_sched_notrace(void)
 #define rcu_dereference_sched(p) \
 		rcu_dereference_check(p, rcu_read_lock_sched_held())
 
+
+#define __rcu_assign_pointer(p, v, space) \
+	do { \
+		smp_wmb(); \
+		(p) = (typeof(*v) __force space *)(v); \
+	} while (0)
+
 /**
  * rcu_assign_pointer - assign (publicize) a pointer to a newly
  * initialized structure that will be dereferenced by RCU read-side
@@ -478,12 +485,7 @@ static inline notrace void rcu_read_unlock_sched_notrace(void)
  */
 
 #define rcu_assign_pointer(p, v) \
-	({ \
-		if (!__builtin_constant_p(v) || \
-		    ((v) != NULL)) \
-			smp_wmb(); \
-		(p) = (v); \
-	})
+	__rcu_assign_pointer((p), (v), __rcu)
 
 /* Infrastructure to implement the synchronize_() primitives. */
 
