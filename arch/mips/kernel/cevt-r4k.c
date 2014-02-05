@@ -225,7 +225,7 @@ int __cpuinit r4k_clockevent_init(void)
 
 	/* Calculate the min / max delta */
 	cd->name		= "MIPS";
-#ifdef CONFIG_RALINK_SOC
+#if defined (CONFIG_RALINK_SOC) || defined (CONFIG_MIPS_TC3262)
 	clockevent_set_clock(cd, mips_hpt_frequency);
 #endif
 	cd->max_delta_ns	= clockevent_delta2ns(0x7fffffff, cd);
