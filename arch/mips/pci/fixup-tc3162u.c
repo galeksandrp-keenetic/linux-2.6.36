@@ -4,6 +4,8 @@
 #include <asm/tc3162/tc3162.h>
 #include <linux/delay.h>
 
+void aer_config(int aerEnable);
+int pcie_timeout_disable(void);
 #ifndef PCIE_PCI_COEXIT
 /*
 static char irq_tab_tc3162_pcie[] __initdata = {
