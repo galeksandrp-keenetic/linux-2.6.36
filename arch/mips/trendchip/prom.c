@@ -199,7 +199,34 @@ void __init mips_nmi_setup (void)
 	memcpy(base, &except_vec_nmi, 0x80);
 	flush_icache_range((unsigned long)base, (unsigned long)base + 0x80);
 }
+#ifdef CONFIG_IMAGE_CMDLINE_HACK
+extern char __image_cmdline[];
+static void  __init prom_init_cmdline(void)
+{
+	char *p = __image_cmdline;
+	int replace = 0;
 
+	if (*p == '-') {
+		replace = 1;
+		p++;
+	}
+
+	if (*p == '\0')
+		return 0;
+
+	if (replace) {
+		strlcpy(arcs_cmdline, p, sizeof(arcs_cmdline));
+	} else {
+		strlcat(arcs_cmdline, " ", sizeof(arcs_cmdline));
+		strlcat(arcs_cmdline, p, sizeof(arcs_cmdline));
+	}
+}
+#else
+static void  __init prom_init_cmdline(void)
+{
+    return;
+}
+#endif
 void __init prom_init(void)
 {
 	unsigned long memsize;
@@ -212,6 +239,7 @@ void __init prom_init(void)
 	/* frankliao added 20101222 */
 	flash_init();
 
+    prom_init_cmdline();
 #ifdef CONFIG_MIPS_TC3262
 	if (isRT63165 || isRT63365 || isMT751020) {
 		/* enable external sync */
