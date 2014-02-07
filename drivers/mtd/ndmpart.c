@@ -117,7 +117,8 @@ static int create_mtd_partitions(struct mtd_info *master,
 			ndm_parts[5].offset = offset;	//Firmware offset
 			ndm_parts[8].offset = offset;	//Backup offset
 		}
-		if ((magic == ROOTFS_MAGIC)||(magic == NDMS_MAGIC)) {
+		if ((le32_to_cpu(magic) == ROOTFS_MAGIC)||
+            (le32_to_cpu(magic) == NDMS_MAGIC)) {
 			printk("Found rootfs at offset 0x%x\n",offset);
 			ndm_parts[3].size = offset - ndm_parts[3].offset;
 			ndm_parts[4].offset = offset;
