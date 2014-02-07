@@ -250,6 +250,8 @@ static int ip_local_deliver_finish(struct sk_buff *skb)
 	return 0;
 }
 
+extern int (*l2tp_input)(struct sk_buff *skb);
+
 /*
  * 	Deliver IP Packets to the higher protocol layers.
  */
