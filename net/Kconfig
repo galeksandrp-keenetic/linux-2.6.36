@@ -23,6 +23,11 @@ menuconfig NET
 
 if NET
 
+config PPTP
+	tristate "PPTP support"
+	help
+	  This enables PPTP protocol.
+
 config WANT_COMPAT_NETLINK_MESSAGES
 	bool
 	help

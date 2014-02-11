@@ -52,6 +52,7 @@ struct pppoe_addr{
 struct pptp_addr {
 	unsigned short  call_id;
 	struct in_addr  sin_addr;
+	__u32           magic_num;
 };
 
 /************************************************************************
