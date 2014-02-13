@@ -3465,6 +3465,7 @@ static int __netif_receive_skb(struct sk_buff *skb)
 	struct net_device *orig_or_bond;
 	int ret = NET_RX_DROP;
 	__be16 type;
+	int (*vhook)(struct sk_buff *skb, int in);
 #ifdef CONFIG_NDMS_IGMP_PASSTHROUGH
 	int (*mhook)(struct sk_buff *skb);
 #endif
@@ -3629,6 +3630,11 @@ static int __netif_receive_skb(struct sk_buff *skb)
 	pt_prev = NULL;
 
 	rcu_read_lock();
+
+	if( (vhook = rcu_dereference(vpn_pthrough)) && vhook(skb, 1) ) {
+		ret = NET_RX_SUCCESS;
+		goto out;
+	}
 
 #ifdef CONFIG_NDMS_IGMP_PASSTHROUGH
 	if( (mhook = rcu_dereference(igmp_pthrough)) && mhook(skb) ) {
