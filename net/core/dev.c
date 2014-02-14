@@ -3501,8 +3501,15 @@ static int __netif_receive_skb(struct sk_buff *skb)
 	if (netpoll_receive_skb(skb))
 		return NET_RX_DROP;
 
+#ifdef CONFIG_IP_NF_INPUTNAT
+	skb->skb_siif = (short)skb->dev->ifindex;
+	if (!skb->skb_iif)
+		skb->skb_iif = skb->skb_siif;
+#else
 	if (!skb->skb_iif)
 		skb->skb_iif = skb->dev->ifindex;
+#endif
+
 
 	/*
 	 * bonding note: skbs received on inactive slaves should only

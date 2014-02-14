@@ -274,10 +274,10 @@ config NF_NAT_TFTP
 	depends on NF_CONNTRACK && NF_NAT
 	default NF_NAT && NF_CONNTRACK_TFTP
 
-config NF_NAT_RTSP                                            
-	tristate                                              
+config NF_NAT_RTSP
+	tristate
 	depends on NF_CONNTRACK && NF_NAT
-	default NF_NAT && NF_CONNTRACK_RTSP   
+	default NF_NAT && NF_CONNTRACK_RTSP
 
 config NF_NAT_AMANDA
 	tristate
@@ -310,8 +310,8 @@ config IP_NF_MANGLE
 	  which can effect how the packet is routed.
 
 	  To compile it as a module, choose M here.  If unsure, say N.
-	  
-config IP_NF_TARGET_TRIGGER                     
+
+config IP_NF_TARGET_TRIGGER
     tristate "TRIGGER target support"
     default y
 
@@ -325,7 +325,7 @@ config IP_NF_TARGET_CLUSTERIP
 	  The CLUSTERIP target allows you to build load-balancing clusters of
 	  network servers without having a dedicated load-balancing
 	  router/server/switch.
-	
+
 	  To compile it as a module, choose M here.  If unsure, say N.
 
 config IP_NF_TARGET_ECN
@@ -334,7 +334,7 @@ config IP_NF_TARGET_ECN
 	depends on NETFILTER_ADVANCED
 	---help---
 	  This option adds a `ECN' target, which can be used in the iptables mangle
-	  table.  
+	  table.
 
 	  You can use this target to remove the ECN bits from the IPv4 header of
 	  an IP packet.  This is particularly useful, if you need to work around
@@ -360,7 +360,7 @@ config IP_NF_RAW
 	  This option adds a `raw' table to iptables. This table is the very
 	  first in the netfilter framework and hooks in at the PREROUTING
 	  and OUTPUT chains.
-	
+
 	  If you want to compile it as a module, say M here and read
 	  <file:Documentation/kbuild/modules.txt>.  If unsure, say `N'.
 
@@ -372,10 +372,15 @@ config IP_NF_SECURITY
 	help
 	  This option adds a `security' table to iptables, for use
 	  with Mandatory Access Control (MAC) policy.
-	 
+
 	  If unsure, say N.
 
 endif # IP_NF_IPTABLES
+
+# postrouting on input device
+config IP_NF_INPUTNAT
+       bool  'input device postrouting support (use for MASQUERADE/SNAT)'
+       depends on IP_NF_IPTABLES
 
 # ARP tables
 config IP_NF_ARPTABLES

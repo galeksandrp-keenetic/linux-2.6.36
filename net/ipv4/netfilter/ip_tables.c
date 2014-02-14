@@ -318,6 +318,12 @@ ipt_do_table(struct sk_buff *skb,
 
 	/* Initialization */
 	ip = ip_hdr(skb);
+
+#ifdef CONFIG_IP_NF_INPUTNAT
+	if( !in )
+		in = __dev_get_by_index(sock_net(skb->sk), skb->skb_siif);
+#endif
+
 	indev = in ? in->name : nulldevname;
 	outdev = out ? out->name : nulldevname;
 	/* We handle fragments by dealing with the first fragment as

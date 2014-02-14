@@ -395,7 +395,13 @@ struct sk_buff {
 	struct nf_bridge_info	*nf_bridge;
 #endif
 
+#ifdef CONFIG_IP_NF_INPUTNAT
+	short                   skb_iif;
+	short                   skb_siif;
+#else	
 	int			skb_iif;
+#endif
+
 #ifdef CONFIG_NET_SCHED
 	__u16			tc_index;	/* traffic control index */
 #ifdef CONFIG_NET_CLS_ACT
