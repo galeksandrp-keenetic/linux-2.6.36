@@ -33,11 +33,7 @@
 #endif
 #define NDMS_MAGIC    0x736D646E
 
-#ifdef CONFIG_MIPS_MT7510
-#define KERNEL_MAGIC    be32_to_cpu(0x32524448)
-#else
 #define KERNEL_MAGIC	be32_to_cpu(0x27051956)
-#endif
 #define ROOTFS_MAGIC	SQUASHFS_MAGIC
 
 struct mtd_partition ndm_parts[] = {
