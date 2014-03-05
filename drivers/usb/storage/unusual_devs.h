@@ -1999,3 +1999,71 @@ USUAL_DEV(US_SC_QIC, US_PR_BULK, USB_US_TYPE_STOR),
 USUAL_DEV(US_SC_UFI, US_PR_BULK, USB_US_TYPE_STOR),
 USUAL_DEV(US_SC_8070, US_PR_BULK, USB_US_TYPE_STOR),
 USUAL_DEV(US_SC_SCSI, US_PR_BULK, 0),
+
+UNUSUAL_DEV(  0x0408, 0xea40, 0x0000, 0xffff,
+		"Qualcomm, Incorporated",
+		"CD-ROM",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_DEVICE),
+
+UNUSUAL_DEV(  0x0408, 0xea42, 0x0000, 0xffff,
+		"Qualcomm, Incorporated",
+		"CD-ROM",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_DEVICE),
+
+UNUSUAL_DEV(  0x12d1, 0x1506, 0x0000, 0xffff,
+		"Huawei",
+		"CD-ROM/SD-Card",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_DEVICE),
+
+/* Reported by Stefan de Konink <skinkie@xs4all.nl> */	
+UNUSUAL_DEV(  0x04b0, 0x0401, 0x0200, 0x0200,
+		"NIKON",
+		"NIKON DSC D100",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY),
+
+/* Reported by Milinevsky Dmitry <niam.niam@gmail.com> */
+UNUSUAL_DEV(  0x04b0, 0x0409, 0x0100, 0x0100,
+		"NIKON",
+		"NIKON DSC D50",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY),
+
+/* Reported by Graber and Mike Pagano <mpagano-kernel@mpagano.com> */
+UNUSUAL_DEV(  0x04b0, 0x040f, 0x0200, 0x0200,
+		"NIKON",
+		"NIKON DSC D200",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY),
+
+/* Reported by Ortwin Glueck <odi@odi.ch> */
+UNUSUAL_DEV(  0x04b0, 0x0413, 0x0110, 0x0110,
+		"NIKON",
+		"NIKON DSC D40",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY),
+
+/* Reported by Shan Destromp (shansan@gmail.com) */
+UNUSUAL_DEV(  0x04b0, 0x0417, 0x0100, 0x0100,
+		"NIKON",
+		"NIKON DSC D40X",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_FIX_CAPACITY),
+
+/* Jeremy Katz <katzj@redhat.com>:
+ * The Blackberry Pearl can run in two modes; a usb-storage only mode
+ * and a mode that allows access via mass storage and to its database.
+ * The berry_charge module will set the device to dual mode and thus we
+ * should ignore its native mode if that module is built
+ */
+#ifdef CONFIG_USB_BERRY_CHARGE
+UNUSUAL_DEV(  0x0fca, 0x0006, 0x0001, 0x0001,
+		"RIM",
+		"Blackberry Pearl",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_IGNORE_DEVICE ),
+#endif
+
