@@ -271,6 +271,10 @@ typedef struct {
 				    (FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE)   || \
 				    (FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN))
 
+#define FOE_ALG_SKIP(skb) \
+	if( IS_SPACE_AVAILABLED(skb) && IS_MAGIC_TAG_VALID(skb) ) FOE_ALG(skb)=1
+
+#define FOE_ALG_RXIF(skb) ((FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ? 0 : 1)
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,21)
 #define LAYER2_HEADER(skb)		(skb)->mac_header

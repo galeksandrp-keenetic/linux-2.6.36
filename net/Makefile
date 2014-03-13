@@ -75,7 +75,7 @@ ifneq ($(CONFIG_RA_NAT_NONE),y)
 obj-y				+= nat/foe_hook/
 endif
 
-obj-$(CONFIG_RA_HW_NAT)		+= nat/hw_nat/
+#obj-$(CONFIG_RA_HW_NAT)		+= nat/hw_nat/
 
 #obj-$(CONFIG_RA_CLASSIFIER)	+= ra_classifier/
 #ifneq ($(CONFIG_RA_CLASSIFIER),)
