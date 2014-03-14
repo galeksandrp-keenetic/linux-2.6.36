@@ -19,16 +19,10 @@ config RAETH_SCATTER_GATHER_RX_DMA
 choice
 	prompt "Network BottomHalves"	
         depends on RAETH
-	default RA_NETWORK_WORKQUEUE_BH
+	default RA_NETWORK_TASKLET_BH
 
 	config RA_NETWORK_TASKLET_BH
 	bool "Tasklet"
-
-	config RA_NETWORK_WORKQUEUE_BH
-	bool "Work Queue"
-
-	config RAETH_NAPI
-        bool "NAPI"
 
 endchoice
 
@@ -64,7 +58,7 @@ config 32B_DESC
 config RAETH_LRO
         bool "LRO (Large Receive Offload )"
 	select INET_LRO
-        depends on RAETH && (MIPS_RT63365 || RALINK_MT7620 || RALINK_MT7621)
+        depends on RAETH && (MIPS_RT63365 || MIPS_MT7510 ||RALINK_MT7620 || RALINK_MT7621)
 
 config RAETH_HW_VLAN_TX
         bool "Transmit VLAN HW (DoubleVLAN is not supported)"
@@ -80,7 +74,7 @@ config RAETH_HW_VLAN_RX
 
 config RAETH_TSO
         bool "TSOV4 (Tcp Segmentaton Offload)"
-	depends on RAETH_HW_VLAN_TX && (RALINK_RT6855 || MIPS_RT63365 || RALINK_MT7621)
+	depends on RAETH_HW_VLAN_TX && (RALINK_RT6855 || MIPS_RT63365 || MIPS_MT7510 ||RALINK_MT7621)
 
 config RAETH_TSOV6
         bool "TSOV6 (Tcp Segmentaton Offload)"
@@ -88,7 +82,7 @@ config RAETH_TSOV6
 
 config RAETH_RW_PDMAPTR_FROM_VAR
 	bool
-	default y if MIPS_RT63365 || RALINK_MT7620
+	default y if MIPS_RT63365 || MIPS_MT7510 ||RALINK_MT7620
         depends on RAETH
 
 choice
@@ -105,6 +99,11 @@ config  RAETH_QOS_VPRI_BASED
         depends on RAETH_QOS
 
 endchoice
+
+config RAETH_QDMA
+        bool "Choose QDMA instead PDMA"
+	default n
+        depends on RAETH && (RALINK_MT7621 || MIPS_MT7510)
 
 choice
         prompt "GMAC is connected to"
@@ -134,7 +133,7 @@ config  GE1_RGMII_AN
 
 config  RT_3052_ESW
         bool "Ralink Embedded Switch"
-        depends on RALINK_RT3052 || RALINK_RT3352 || RALINK_RT5350 || RALINK_RT6855 || MIPS_RT63365 || RALINK_MT7620
+        depends on RALINK_RT3052 || RALINK_RT3352 || RALINK_RT5350 || RALINK_RT6855 || MIPS_RT63365 || MIPS_MT7510 || RALINK_MT7620
 
 
 endchoice
@@ -189,7 +188,7 @@ config  MAC_TO_GIGAPHY_MODE_ADDR2
 
 config RAETH_HAS_PORT5
         bool "Port 5 Support"
-        depends on RAETH && (RALINK_RT3052 || RALINK_RT3352 || RALINK_RT6855 || MIPS_RT63365 || RALINK_MT7620)
+        depends on RAETH && (RALINK_RT3052 || RALINK_RT3352 || RALINK_RT6855 || MIPS_RT63365 || MIPS_MT7510 || RALINK_MT7620)
 choice
         prompt "Target Mode"
         depends on RAETH_HAS_PORT5
