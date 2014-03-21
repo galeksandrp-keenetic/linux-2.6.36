@@ -294,6 +294,12 @@ typedef struct {
 #define LAYER4_HEADER(skb)		(skb)->h.raw
 #endif
 
+#if defined (CONFIG_RALINK_RT6855) || defined(CONFIG_RALINK_RT6855A) || \
+    defined (CONFIG_RALINK_MT7620) || defined(CONFIG_RALINK_MT7621)
+#define REG_ESW_VLAN_VTCR		0x90
+#define REG_ESW_VLAN_VAWD1		0x94
+#define REG_ESW_VLAN_VAWD2		0x98
+#endif
 
 /*
  * EXPORT FUNCTION

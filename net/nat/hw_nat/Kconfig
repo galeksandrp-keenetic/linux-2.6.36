@@ -320,7 +320,7 @@ config  RA_HW_NAT_NTU_DLTA
 config  RA_HW_NAT_IPV6
         bool "IPv6 Acceleration"
 	depends on RA_HW_NAT && (RALINK_MT7620 || RALINK_MT7621)
-	default n
+	default y if (RA_HW_NAT && IPV6)
 	help
 	"ipv6 routing accelerated by HNAT"
 
@@ -338,9 +338,10 @@ config  PPE_MCAST
         bool "PPE built-in multicast table support"
 	depends on RA_HW_NAT && RALINK_MT7621
 
-#config  RA_HW_NAT_WIFI
-#	bool "WiFi Acceleration"
-#	depends on RA_HW_NAT
+config  RA_HW_NAT_WIFI
+	bool "WiFi Acceleration"
+	default y if (RT2860V2_AP || RT5392_AP)
+	depends on RA_HW_NAT
 
 #config  RA_HW_NAT_NIC_USB
 #	bool "PCIe Ethernet NIC/USB Acceleration"

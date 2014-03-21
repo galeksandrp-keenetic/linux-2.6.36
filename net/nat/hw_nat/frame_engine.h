@@ -30,7 +30,7 @@
 #define OUT
 #define INOUT
 
-#define NAT_DEBUG
+//#define NAT_DEBUG
 
 #ifdef NAT_DEBUG
 #define NAT_PRINT(fmt, args...) printk(KERN_INFO fmt, ## args)
