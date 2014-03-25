@@ -57,6 +57,12 @@ extern void chk_phy_pll(void);
 
 #ifdef CONFIG_PCI
 
+#ifdef DEBUG
+#define DBG(f, a...)	printk(f, ## a )
+#else
+#define DBG(f, a...)	do {} while (0)
+#endif
+
 /*
  * These functions and structures provide the BIOS scan and mapping of the PCI
  * devices.
@@ -855,8 +861,8 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 
   for(i=0;i<6;i++){
     res = &dev->resource[i];
-    printk("res[%d]->start = %x\n", i, res->start);
-    printk("res[%d]->end = %x\n", i, res->end);
+    DBG("res[%d]->start = %x\n", i, res->start);
+    DBG("res[%d]->end = %x\n", i, res->end);
   }
 
   pci_write_config_byte(dev, PCI_CACHE_LINE_SIZE, 0x14);  //configure cache line size 0x14
