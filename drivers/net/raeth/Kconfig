@@ -80,10 +80,10 @@ config RAETH_TSOV6
         bool "TSOV6 (Tcp Segmentaton Offload)"
 	depends on RAETH_TSO
 
-config RAETH_RW_PDMAPTR_FROM_VAR
-	bool
-	default y if MIPS_RT63365 || MIPS_MT7510 ||RALINK_MT7620
-        depends on RAETH
+#config RAETH_RW_PDMAPTR_FROM_VAR
+#	bool
+#	default y if MIPS_RT63365 || MIPS_MT7510 ||RALINK_MT7620
+#       depends on RAETH
 
 choice
         prompt "QoS Type"
@@ -105,6 +105,10 @@ config RAETH_QDMA
 	default n
         depends on RAETH && (RALINK_MT7621 || MIPS_MT7510)
 
+config RAETH_PDMA
+	bool "Choose PDMA"
+	default y
+	depends on RAETH && !RAETH_QDMA
 choice
         prompt "GMAC is connected to"
         depends on RAETH
@@ -255,6 +259,9 @@ config  MAC_TO_GIGAPHY_MODE_ADDR2
 	default 0x1E
         depends on GE2_MII_AN || GE2_RGMII_AN
 
+config RAETH_EXT_SWITCH
+	bool
+	default  y if P5_RGMII_TO_MAC_MODE_AR8316 || P5_RGMII_PHY_MODE_RTL8367 || P5_RGMII_PHY_MODE_MT7530
 
 #force 100M
 config RAETH_ROUTER
