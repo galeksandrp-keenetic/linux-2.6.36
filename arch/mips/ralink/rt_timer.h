@@ -42,7 +42,7 @@
     Steven Liu  2007-07-04      Initial version
 */
 
-#include <asm/rt2880/rt_mmap.h>
+#include <asm/mach-ralink/rt_mmap.h>
 
 #ifndef _TIMER_WANTED
 #define _TIMER_WANTED
