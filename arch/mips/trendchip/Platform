@@ -2,6 +2,7 @@
 # Ralink boards
 #
 platform-$(CONFIG_MIPS_TC3262)	+= trendchip/
+platform-$(CONFIG_SOFTFLOAT_LIB)+= softfloat/
 cflags-$(CONFIG_MIPS_TC3262)	+= -I$(srctree)/arch/mips/include/asm/tc3162/
 ifneq ($(strip $(CONFIG_TCSUPPORT_FREE_BOOTBASE)),)
 load-$(CONFIG_MIPS_TC3262) += 		0x80002000

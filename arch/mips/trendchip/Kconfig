@@ -1,0 +1,6 @@
+if MIPS_RT63365
+config SOFTFLOAT_LIB
+  bool "Compile softfloat library"
+  help
+  
+endif

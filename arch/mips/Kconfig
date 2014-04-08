@@ -942,6 +942,7 @@ source "arch/mips/vr41xx/Kconfig"
 source "arch/mips/cavium-octeon/Kconfig"
 source "arch/mips/loongson/Kconfig"
 source "arch/mips/ralink/Kconfig"
+source "arch/mips/trendchip/Kconfig"
 source "arch/mips/kprofile/Kconfig"
 
 endmenu
