@@ -1,6 +1,5 @@
 config  RA_HW_NAT
         tristate "Ralink HW NAT(** Work At Module Mode ONLY **)"
-	depends on !RALINK_RT5350
 
 config  RA_HW_NAT_LAN_VLANID
         int "VLAN ID of LAN Ports"

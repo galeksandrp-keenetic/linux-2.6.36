@@ -303,8 +303,5 @@ config DWC_OTG_DEBUG
 #depends on !RALINK_RT5350
 #endchoice
 
-source "net/nat/hw_nat/Kconfig"
-
-
 endmenu
 

@@ -1,7 +1,5 @@
 menu "NDM Systems options"
 
-config NDMS_IGMP_PASSTHROUGH
-	bool "NDMS IGMP Passthrough hooks"
-	default y
+source "net/nat/hw_nat/Kconfig"
 
 endmenu
