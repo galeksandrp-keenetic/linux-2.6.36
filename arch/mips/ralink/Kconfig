@@ -176,42 +176,6 @@ endif
 config FLASH_REMAP_NEED
        bool
        default y if (RALINK_RT2880)
-choice
-       prompt "DRAM Size"
-       default RT2880_DRAM_16M
-
-config RT2880_DRAM_8M
-       bool "8M"
-
-config RT2880_DRAM_16M
-       bool "16M"
-
-config RT2880_DRAM_32M
-       bool "32M"
-
-config RT2880_DRAM_64M
-       bool "64M"
-
-config RT2880_DRAM_128M
-       bool "128M"
-
-config RT2880_DRAM_256M
-       bool "256M"
-
-config RT2880_DRAM_512M
-       bool "512M"
-       depends on  RALINK_MT7621
-       select HIGHMEM
-
-endchoice
-
-
-config  DUAL_IMAGE
-	bool 'Dual Image' 
-
-config  KERNEL_NVRAM
-	bool 'Kernel NVRAM'
-	default n
 
 config  RALINK_TIMER
 	tristate 'Ralink Hardware Timer0/Timer1' 
