@@ -904,6 +904,18 @@ void vlan_ioctl_set(int (*hook) (struct net *, void __user *))
 	mutex_unlock(&vlan_ioctl_mutex);
 }
 EXPORT_SYMBOL(vlan_ioctl_set);
+
+static DEFINE_MUTEX(igmpsn_ioctl_mutex);
+static int (*igmpsn_ioctl_hook) (struct net *, void __user *arg);
+
+void igmpsn_ioctl_set(int (*hook) (struct net *, void __user *))
+{
+	mutex_lock(&igmpsn_ioctl_mutex);
+	igmpsn_ioctl_hook = hook;
+	mutex_unlock(&igmpsn_ioctl_mutex);
+}
+EXPORT_SYMBOL(igmpsn_ioctl_set);
+
 #ifdef CONFIG_SMUX
 static DEFINE_MUTEX(smux_ioctl_mutex);
 static int (*smux_ioctl_hook) (void __user *arg);
@@ -1007,6 +1019,17 @@ static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 			if (vlan_ioctl_hook)
 				err = vlan_ioctl_hook(net, argp);
 			mutex_unlock(&vlan_ioctl_mutex);
+			break;
+		case SIOCGIGMPSN:
+		case SIOCSIGMPSN:
+			err = -ENOPKG;
+			if (!igmpsn_ioctl_hook)
+				request_module("igmpsn");
+
+			mutex_lock(&igmpsn_ioctl_mutex);
+			if (igmpsn_ioctl_hook)
+				err = igmpsn_ioctl_hook(net, argp);
+			mutex_unlock(&igmpsn_ioctl_mutex);
 			break;
 #ifdef CONFIG_SMUX
 		case SIOCSIFSMUX:

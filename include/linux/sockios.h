@@ -107,6 +107,9 @@
 #define SIOCGIFVLAN	0x8982		/* 802.1Q VLAN support		*/
 #define SIOCSIFVLAN	0x8983		/* Set 802.1Q VLAN options 	*/
 
+#define SIOCGIGMPSN	0x8984		/* IGMPSN support			*/
+#define SIOCSIGMPSN	0x8985		/* Set IGMPSN options 		*/
+
 /* bonding calls */
 
 #define SIOCBONDENSLAVE	0x8990		/* enslave a device to the bond */
