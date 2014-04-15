@@ -96,6 +96,7 @@ static inline struct icmp6hdr *icmp6_hdr(const struct sk_buff *skb)
 #define ICMPV6_PKT_TOOBIG		2
 #define ICMPV6_TIME_EXCEED		3
 #define ICMPV6_PARAMPROB		4
+#define ICMPV6_SOURCE_FAILED_POLICY	5
 
 #define ICMPV6_INFOMSG_MASK		0x80
 
