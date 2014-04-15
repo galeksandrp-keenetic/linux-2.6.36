@@ -165,6 +165,7 @@ struct pppol2tp_ioc_stats {
 #define SIOCGPPPSTATS   (SIOCDEVPRIVATE + 0)
 #define SIOCGPPPVER     (SIOCDEVPRIVATE + 1)	/* NEVER change this!! */
 #define SIOCGPPPCSTATS  (SIOCDEVPRIVATE + 2)
+#define SIOCSPPPSTATS   (SIOCDEVPRIVATE + 3)
 
 #if !defined(ifr_mtu)
 #define ifr_mtu	ifr_ifru.ifru_metric
