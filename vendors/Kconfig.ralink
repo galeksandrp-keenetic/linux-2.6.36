@@ -237,8 +237,10 @@ config RTDEV_MII
 #        depends on RT3090_AP_WSC || RT3572_AP_WSC || RT5392_AP_WSC || RT5572_AP_WSC || RT5592_AP_WSC
 #	default n
 
-    
-#source "drivers/net/wireless/rt2860v2_ap/Kconfig"
+
+source "drivers/net/wireless/rt2860v2_ap/Kconfig"
+source "drivers/net/wireless/rt5x9x_ap/Kconfig"
+
 #source "drivers/net/wireless/rt2860v2_sta/Kconfig"
 #source "drivers/net/wireless/RTPCI_ap/Kconfig"
 #source "drivers/net/wireless/RT3090_ap/Kconfig"
