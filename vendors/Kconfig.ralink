@@ -19,8 +19,8 @@ config  RALINK_HWCRYPTO
 #############
 # Wireless
 #############
-menuconfig WIFI_DRIVER
-	bool "WiFi Driver Support"
+#menuconfig WIFI_DRIVER
+#	bool "WiFi Driver Support"
 
 if WIFI_DRIVER
 
@@ -238,8 +238,8 @@ config RTDEV_MII
 #	default n
 
 
-source "drivers/net/wireless/rt2860v2_ap/Kconfig"
-source "drivers/net/wireless/rt5x9x_ap/Kconfig"
+#source "drivers/net/wireless/rt2860v2_ap/Kconfig"
+#source "drivers/net/wireless/rt5x9x_ap/Kconfig"
 
 #source "drivers/net/wireless/rt2860v2_sta/Kconfig"
 #source "drivers/net/wireless/RTPCI_ap/Kconfig"
