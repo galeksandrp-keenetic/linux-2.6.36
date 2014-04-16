@@ -48,9 +48,21 @@
 #include <asm/mach-ralink/generic.h>
 #include <asm/mach-ralink/prom.h>
 #include <asm/mach-ralink/surfboardint.h>
+#include <asm/mach-ralink/rt_mmap.h>
 #include <asm/time.h>
 #include <asm/traps.h>
 #include <asm/gcmpregs.h>  
+
+#define PHYS_TO_K1(physaddr) KSEG1ADDR(physaddr)
+#define sysRegRead(phys) (*(volatile unsigned int *)PHYS_TO_K1(phys))
+#define sysRegWrite(phys, val)  ((*(volatile unsigned int *)PHYS_TO_K1(phys)) = (val))
+
+#if defined (CONFIG_RALINK_MT7620) || defined(CONFIG_RALINK_RT5350) || defined(CONFIG_RALINK_RT3052)
+#define TESTSTAT1     RALINK_SYSCTL_BASE + 0x18
+#define TESTSTAT2     RALINK_SYSCTL_BASE + 0x1C
+#else
+#error Need define TESTSTAT
+#endif
 
 #if defined(CONFIG_SERIAL_CONSOLE) || defined(CONFIG_PROM_CONSOLE)
 extern void console_setup(char *, int *);
@@ -75,6 +87,20 @@ const char *get_system_type(void)
 
 extern void mips_time_init(void);
 extern void mips_timer_setup(struct irqaction *irq);
+
+static void __init set_reset_flag(void)
+{
+	unsigned int value;
+
+	value = sysRegRead(TESTSTAT1);
+
+	if(value & 0x01) {
+		printk("Status: soft reset\n");
+	} else {
+		printk("Status: hard reset\n");
+		sysRegWrite(TESTSTAT1, 0x01);
+	}
+}
 
 int coherentio = -1;    /* no DMA cache coherency (may be set by user) */
 int hw_coherentio;      /* init to 0 => no HW DMA cache coherency (reflects real HW) */
@@ -225,6 +251,8 @@ void __init rt2880_setup(void)
 
 	plat_setup_iocoherency();
 	mips_reboot_setup();
+
+	set_reset_flag();
 }
 
 void __init plat_mem_setup(void)
