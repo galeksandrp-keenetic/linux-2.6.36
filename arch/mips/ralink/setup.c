@@ -57,7 +57,8 @@
 #define sysRegRead(phys) (*(volatile unsigned int *)PHYS_TO_K1(phys))
 #define sysRegWrite(phys, val)  ((*(volatile unsigned int *)PHYS_TO_K1(phys)) = (val))
 
-#if defined (CONFIG_RALINK_MT7620) || defined(CONFIG_RALINK_RT5350) || defined(CONFIG_RALINK_RT3052)
+#if defined (CONFIG_RALINK_MT7620) || defined(CONFIG_RALINK_RT5350) \
+		|| defined(CONFIG_RALINK_RT3052) || defined(CONFIG_RALINK_RT3352)
 #define TESTSTAT1     RALINK_SYSCTL_BASE + 0x18
 #define TESTSTAT2     RALINK_SYSCTL_BASE + 0x1C
 #else
