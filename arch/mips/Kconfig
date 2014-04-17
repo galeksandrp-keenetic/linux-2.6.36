@@ -23,6 +23,9 @@ config ZONE_DMA
 	bool
 config RALINK_SOC
 	bool
+	select WEXT_SPY
+	select WEXT_PRIV
+	select WIRELESS_EXT
 config RALINK_RT2880_MP
 	bool
 config RALINK_RT2880_SHUTTLE
