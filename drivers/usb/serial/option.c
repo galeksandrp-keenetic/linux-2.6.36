@@ -1048,7 +1048,7 @@ static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(0x201e, 0x10f8) }, /*smartfren CE81B*/
 	{ USB_DEVICE(0x20a6, 0x1105) }, /*TE*/
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x2001, 0x7d02, 0xff, 2, 1) }, /*D-link DWM-157 iface #2*/
-	{ USB_DEVICE(0x2020, 0x4000) }, /*Rostelekom Sense R41*/
+	{ USB_DEVICE_AND_INTERFACE_INFO(0x2020, 0x4000, 0xff, 0x02, 0x01) }, /*Rostelekom Sense R41*/
 
 	{ } /* Terminating entry */
 };
