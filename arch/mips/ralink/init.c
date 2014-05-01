@@ -155,7 +155,7 @@ int wait_pciephy_busy(void)
 		else
 			break;
 		if(retry++ > WAITRETRY_MAX){
-			printk("PCIE-PHY retry failed.\n");
+			printk(KERN_ERR "PCIE-PHY retry failed\n");
 			return -1;
 		}
 	}
@@ -198,24 +198,24 @@ void Pcie_BypassDLL(void)
 
 static void prom_pcieinit(void)
 {
-        printk(" PCIE: bypass PCIe DLL.\n");
+        printk(KERN_INFO " PCIE: bypass PCIe DLL\n");
         Pcie_BypassDLL();
 
-	printk(" PCIE: Elastic buffer control: Addr:0x68 -> 0xB4\n");
+//	printk(" PCIE: Elastic buffer control: Addr:0x68 -> 0xB4\n");
 	pcie_phy('w', 0x68, 0xB4);
 
 	RALINK_RSTCTRL = (RALINK_RSTCTRL | RALINK_PCIE0_RST);
 	RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE0_CLK_EN);
 	PPLL_DRV = (PPLL_DRV & ~(1<<19));
 	PPLL_DRV = (PPLL_DRV | 1<<31);
-	printk(" disable all power about PCIe\n");
+	printk(KERN_INFO " PCIE: power off\n");
 
 #if defined (CONFIG_RALINK_MT7620)
 	if(!( REVID & ((0x1UL)<<16))){
 		/* Only MT7620N do this, not MT7620A */
 		PPLL_CFG0 = (PPLL_CFG0 | (1UL << 31));
 		PPLL_CFG1 = (PPLL_CFG1 | (1UL << 26));
-		printk(" PCIE: PLL power down for MT7620N\n");
+		printk(KERN_INFO " PCIE: PLL power down for MT7620N\n");
 	}
 #elif defined (CONFIG_RALINK_MT7628)
 	/* TODO */
@@ -265,17 +265,17 @@ int get_ethernet_addr(char *ethernet_addr)
 
         ethaddr_str = prom_getenv("ethaddr");
 	if (!ethaddr_str) {
-	        printk("ethaddr not set in boot prom\n");
+	        printk(KERN_ERR "ethaddr not set in boot prom\n");
 		return -1;
 	}
 	str2eaddr(ethernet_addr, ethaddr_str);
 
 	if (init_debug > 1) {
 	        int i;
-		printk("get_ethernet_addr: ");
+		printk(KERN_INFO "get_ethernet_addr: ");
 	        for (i=0; i<5; i++)
-		        printk("%02x:", (unsigned char)*(ethernet_addr+i));
-		printk("%02x\n", *(ethernet_addr+i));
+		        printk(KERN_INFO "%02x:", (unsigned char)*(ethernet_addr+i));
+		printk(KERN_INFO "%02x\n", *(ethernet_addr+i));
 	}
 
 	return 0;
@@ -549,11 +549,11 @@ void prom_init_sysclk(void)
 #else
 	surfboard_sysclk = mips_cpu_feq/3;
 #endif
-	printk("\n The CPU feqenuce set to %u MHz\n",mips_cpu_feq / 1000 / 1000);
+	printk(KERN_INFO "\n The CPU feqenuce set to %u MHz\n",mips_cpu_feq / 1000 / 1000);
 
 
 #ifdef CONFIG_RALINK_CPUSLEEP
-	printk("\n MIPS CPU sleep mode enabled.\n");
+	printk(KERN_INFO "\n MIPS CPU sleep mode enabled.\n");
 #if defined (CONFIG_RALINK_MT7620) || defined (CONFIG_RALINK_MT7628)
 #ifdef CONFIG_USB_SUPPORT
 	reg = (*((volatile u32 *)(RALINK_SYSCTL_BASE + 0x3C)));
