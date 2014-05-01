@@ -467,14 +467,14 @@ init(void)
 	struct nf_conntrack_helper *hlpr;
 	char *tmpname;
 
-	printk("nf_conntrack_rtsp v" IP_NF_RTSP_VERSION " loading\n");
+	printk(KERN_INFO "nf_conntrack_rtsp v" IP_NF_RTSP_VERSION " loading\n");
 
 	if (max_outstanding < 1) {
-		printk("nf_conntrack_rtsp: max_outstanding must be a positive integer\n");
+		printk(KERN_ERR "nf_conntrack_rtsp: max_outstanding must be a positive integer\n");
 		return -EBUSY;
 	}
 	if (setup_timeout < 0) {
-		printk("nf_conntrack_rtsp: setup_timeout must be a positive integer\n");
+		printk(KERN_ERR "nf_conntrack_rtsp: setup_timeout must be a positive integer\n");
 		return -EBUSY;
 	}
 
@@ -517,7 +517,7 @@ init(void)
 		ret = nf_conntrack_helper_register(hlpr);
 
 		if (ret) {
-			printk("nf_conntrack_rtsp: ERROR registering port %d\n", ports[i]);
+			printk(KERN_ERR "nf_conntrack_rtsp: ERROR registering port %d\n", ports[i]);
 			fini();
 			return -EBUSY;
 		}
