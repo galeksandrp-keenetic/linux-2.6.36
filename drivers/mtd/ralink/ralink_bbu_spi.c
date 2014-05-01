@@ -940,7 +940,7 @@ struct chip_info *chip_prob(void)
 #ifdef BBU_MODE
 	printk("flash manufacture id: %x, device id %x %x\n", buf[0], buf[1], buf[2]);
 #else
-	printk("deice id : %x %x %x %x %x (%x)\n", buf[0], buf[1], buf[2], buf[3], buf[4], jedec);
+	printk(KERN_INFO "device ID: %x %x %x %x %x (%x)\n", buf[0], buf[1], buf[2], buf[3], buf[4], jedec);
 #endif
 	
 
@@ -1534,10 +1534,10 @@ static struct mtd_info *raspi_probe(struct map_info *map)
 	flash->mtd.lock = ramtd_lock;
 	flash->mtd.unlock = ramtd_unlock;
 
-	printk("%s(%02x %04x) (%d Kbytes)\n", 
+	printk(KERN_INFO "%s(%02x %04x) (%d Kbytes)\n",
 	       chip->name, chip->id, chip->jedec_id, (int)(flash->mtd.size / 1024));
 
-	printk("mtd .name = %s, .size = 0x%.8x (%uM) "
+	printk(KERN_INFO "mtd .name = %s, .size = 0x%.8x (%uM) "
 			".erasesize = 0x%.8x (%uK) .numeraseregions = %d\n",
 		flash->mtd.name,
 		(unsigned int)flash->mtd.size, (unsigned int)(flash->mtd.size / (1024*1024)),
@@ -1546,7 +1546,7 @@ static struct mtd_info *raspi_probe(struct map_info *map)
 
 	if (flash->mtd.numeraseregions)
 		for (i = 0; i < flash->mtd.numeraseregions; i++)
-			printk("mtd.eraseregions[%d] = { .offset = 0x%.8x, "
+			printk(KERN_INFO "mtd.eraseregions[%d] = { .offset = 0x%.8x, "
 				".erasesize = 0x%.8x (%uK), "
 				".numblocks = %d }\n",
 				i, (unsigned int)flash->mtd.eraseregions[i].offset,

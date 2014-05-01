@@ -1259,12 +1259,11 @@ struct chip_info *chip_prob(void)
 	u32 jedec, weight;
 	int i;
 
-
 	raspi_read_devid(buf, 5);
 	jedec = (u32)((u32)(buf[1] << 24) | ((u32)buf[2] << 16) | ((u32)buf[3] <<8) | (u32)buf[4]);
 
-	printk("deice id : %x %x %x %x %x (%x)\n", buf[0], buf[1], buf[2], buf[3], buf[4], jedec);
-	
+	printk(KERN_INFO "device ID: %x %x %x %x %x (%x)\n", buf[0], buf[1], buf[2], buf[3], buf[4], jedec);
+
 	// FIXME, assign default as AT25D
 	weight = 0xffffffff;
 	match = &chips_data[0];
@@ -1280,9 +1279,8 @@ struct chip_info *chip_prob(void)
 			}
 		}
 	}
+
 	printk("Warning: un-recognized chip ID, please update SPI driver!\n");
-
-
 
 	return match;
 }
@@ -1323,10 +1321,10 @@ static struct mtd_info *raspi_probe(struct map_info *map)
 	flash->mtd.lock = ramtd_lock;
 	flash->mtd.unlock = ramtd_unlock;
 
-	printk("%s(%02x %04x) (%d Kbytes)\n", 
+	printk(KERN_INFO "%s(%02x %04x) (%d Kbytes)\n",
 	       chip->name, chip->id, chip->jedec_id, flash->mtd.size / 1024);
 
-	printk("mtd .name = %s, .size = 0x%.8x (%lluM) "
+	printk(KERN_INFO "mtd .name = %s, .size = 0x%.8x (%lluM) "
 			".erasesize = 0x%.8x (%uK) .numeraseregions = %d\n",
 		flash->mtd.name,
 		flash->mtd.size, flash->mtd.size / (1024*1024),
@@ -1335,7 +1333,7 @@ static struct mtd_info *raspi_probe(struct map_info *map)
 
 	if (flash->mtd.numeraseregions)
 		for (i = 0; i < flash->mtd.numeraseregions; i++)
-			printk("mtd.eraseregions[%d] = { .offset = 0x%.8x, "
+			printk(KERN_INFO "mtd.eraseregions[%d] = { .offset = 0x%.8x, "
 				".erasesize = 0x%.8x (%uK), "
 				".numblocks = %llu }\n",
 				i, flash->mtd.eraseregions[i].offset,
@@ -1347,7 +1345,7 @@ static struct mtd_info *raspi_probe(struct map_info *map)
 	if (np > 0) {
 		add_mtd_partitions(&flash->mtd, mtd_parts, np);
 	} else {
-		printk("No partitions found on flash.n");
+		printk("No partitions found on a flash.");
 	}
 	
 	return &flash->mtd;;

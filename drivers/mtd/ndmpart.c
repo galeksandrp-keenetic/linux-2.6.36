@@ -92,7 +92,7 @@ static int create_mtd_partitions(struct mtd_info *master,
 
 	flash_size = master->size;
 	
-	printk("Current flash size = 0x%x\n",flash_size);
+	printk(KERN_INFO "Current flash size = 0x%x\n",flash_size);
 	
 	/* U-Boot */	
 	ndm_parts[0].offset = 0;
@@ -111,7 +111,7 @@ static int create_mtd_partitions(struct mtd_info *master,
 		master->read(master, offset, sizeof(magic), 
 						&len, (uint8_t *)&magic);
 		if (magic == KERNEL_MAGIC){
-			printk("Found kernel at offset 0x%x\n",offset);
+			printk(KERN_INFO "Found kernel at offset 0x%x\n",offset);
 			ndm_parts[2].size = offset - ndm_parts[2].offset;
 			ndm_parts[3].offset = offset;	//Kernel offset
 			ndm_parts[5].offset = offset;	//Firmware offset
@@ -119,7 +119,7 @@ static int create_mtd_partitions(struct mtd_info *master,
 		}
 		if ((le32_to_cpu(magic) == ROOTFS_MAGIC)||
             (le32_to_cpu(magic) == NDMS_MAGIC)) {
-			printk("Found rootfs at offset 0x%x\n",offset);
+			printk(KERN_INFO "Found rootfs at offset 0x%x\n",offset);
 			ndm_parts[3].size = offset - ndm_parts[3].offset;
 			ndm_parts[4].offset = offset;
 			break;
@@ -164,7 +164,7 @@ static struct mtd_part_parser ndm_parser = {
 
 static int __init ndm_parser_init(void)
 {
-	printk("Registering NDM partiotions parser\n");
+	printk(KERN_INFO "Registering NDM partiotions parser\n");
 	return register_mtd_parser(&ndm_parser);
 }
 
