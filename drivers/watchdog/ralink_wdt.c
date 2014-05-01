@@ -147,13 +147,13 @@ int __init ralink_wdt_init(void)
 
 	ralink_wdt_refresh(wdg_load_value);
 	ralink_wdt_enable(1);
-	printk("Ralink WDG Timer Loaded\n");
+	printk(KERN_INFO "Ralink WDG timer loaded\n");
 	return 0;
 }
 
 void __exit ralink_wdt_exit(void)
 {
-	printk("Ralink WDG Timer Unloaded\n");
+	printk(KERN_INFO "Ralink WDG timer unloaded\n");
 
 	ralink_wdt_enable(0);
 	del_timer_sync(&wdg_timer);
