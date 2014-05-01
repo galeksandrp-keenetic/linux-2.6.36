@@ -966,7 +966,7 @@ int __init br_netfilter_init(void)
 		return -ENOMEM;
 	}
 #endif
-	printk(KERN_NOTICE "Bridge firewalling registered\n");
+	printk(KERN_INFO "Bridge firewalling registered\n");
 	return 0;
 }
 
