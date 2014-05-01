@@ -101,7 +101,7 @@ static struct platform_device *rt3xxx_devices[] __initdata = {
 
 int __init init_rt3xxx_ehci_ohci(void)
 {
-	printk("RT3xxx EHCI/OHCI init.\n");
+	printk(KERN_INFO "RT3xxx EHCI/OHCI initialized\n");
 	platform_add_devices(rt3xxx_devices, ARRAY_SIZE(rt3xxx_devices));
 	return 0;
 }
