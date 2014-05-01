@@ -1071,9 +1071,9 @@ int init_rt2880pci(void)
 	pcie_phy_init();
 	//chk_phy_pll();
 #endif
-	printk("RALINK_GPIOMODE = %x \n", RALINK_GPIOMODE);
+//	printk("RALINK_GPIOMODE = %x \n", RALINK_GPIOMODE);
 	RALINK_GPIOMODE &= ~(0x1<<9);	//PCIe RESET GPIO mode
-	printk("RALINK_GPIOMODE = %x \n", RALINK_GPIOMODE);
+//	printk("RALINK_GPIOMODE = %x \n", RALINK_GPIOMODE);
 	
 	RALINK_RSTCTRL &= ~RALINK_PCIE0_RST;
 	RALINK_CLKCFG1 |= RALINK_PCIE0_CLK_EN;
@@ -1088,22 +1088,22 @@ int init_rt2880pci(void)
 #endif
 #if defined(CONFIG_RALINK_MT7620)
 
-	printk("RALINK_GPIOMODE = %x\n", RALINK_GPIOMODE);
+//	printk("RALINK_GPIOMODE = %x\n", RALINK_GPIOMODE);
 	RALINK_GPIOMODE = (RALINK_GPIOMODE & ~(0x3<<16));	//PERST_GPIO_MODE = 2'b00
-	printk("RALINK_GPIOMODE = %x\n", RALINK_GPIOMODE);
+//	printk("RALINK_GPIOMODE = %x\n", RALINK_GPIOMODE);
 
 	/* enable it since bsp will disable by default for power saving */
 	RALINK_RSTCTRL = (RALINK_RSTCTRL & ~RALINK_PCIE0_RST);
 	RALINK_CLKCFG1 = (RALINK_CLKCFG1 | RALINK_PCIE0_CLK_EN);
 
-	//mdelay(100);
+	mdelay(100);
 
 #if defined(CONFIG_MT7620_ASIC)
-	printk("PPLL_CFG1=0x%x\n", PPLL_CFG1);
+//	printk("PPLL_CFG1=0x%x\n", PPLL_CFG1);
 	if(PPLL_CFG1 & 1<<23){
-		printk("MT7620 PPLL lock\n");
+		printk(KERN_INFO "MT7620 PPLL locked\n");
 	}else{
-		printk("MT7620 PPLL unlock\n");
+		printk(KERN_INFO "MT7620 PPLL unlocked\n");
 		/* for power saving */
 		RALINK_RSTCTRL |= (1<<26);
 		RALINK_CLKCFG1 &= ~(1<<26);
@@ -1113,9 +1113,9 @@ int init_rt2880pci(void)
 	PPLL_DRV &= ~(0x1<<18);		//Reference PCIe Output clock mode enable
 	PPLL_DRV &= ~(0x1<<17);		//PCIe PHY clock enable
 	PPLL_DRV |= 0x1 << 31;		//PDRV SW Set
-	printk("PPLL_DRV =0x%x\n", PPLL_DRV);
+//	printk("PPLL_DRV =0x%x\n", PPLL_DRV);
 
-	//mdelay(100);
+	mdelay(100);
 #endif
 #endif
 #if defined(CONFIG_PCIE_ONLY) || defined(CONFIG_PCIE_PCI_CONCURRENT)
