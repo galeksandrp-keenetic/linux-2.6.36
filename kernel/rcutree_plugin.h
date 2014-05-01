@@ -34,34 +34,34 @@
 static void __init rcu_bootup_announce_oddness(void)
 {
 #ifdef CONFIG_RCU_TRACE
-	printk(KERN_INFO "\tRCU debugfs-based tracing is enabled.\n");
+	printk(KERN_INFO "  RCU debugfs-based tracing is enabled.\n");
 #endif
 #if (defined(CONFIG_64BIT) && CONFIG_RCU_FANOUT != 64) || (!defined(CONFIG_64BIT) && CONFIG_RCU_FANOUT != 32)
-	printk(KERN_INFO "\tCONFIG_RCU_FANOUT set to non-default value of %d\n",
+	printk(KERN_INFO "  CONFIG_RCU_FANOUT set to non-default value of %d\n",
 	       CONFIG_RCU_FANOUT);
 #endif
 #ifdef CONFIG_RCU_FANOUT_EXACT
-	printk(KERN_INFO "\tHierarchical RCU autobalancing is disabled.\n");
+	printk(KERN_INFO "  Hierarchical RCU autobalancing is disabled.\n");
 #endif
 #ifdef CONFIG_RCU_FAST_NO_HZ
 	printk(KERN_INFO
-	       "\tRCU dyntick-idle grace-period acceleration is enabled.\n");
+	       "  RCU dyntick-idle grace-period acceleration is enabled.\n");
 #endif
 #ifdef CONFIG_PROVE_RCU
-	printk(KERN_INFO "\tRCU lockdep checking is enabled.\n");
+	printk(KERN_INFO "  RCU lockdep checking is enabled.\n");
 #endif
 #ifdef CONFIG_RCU_TORTURE_TEST_RUNNABLE
-	printk(KERN_INFO "\tRCU torture testing starts during boot.\n");
+	printk(KERN_INFO "  RCU torture testing starts during boot.\n");
 #endif
 #ifndef CONFIG_RCU_CPU_STALL_DETECTOR
 	printk(KERN_INFO
-	       "\tRCU-based detection of stalled CPUs is disabled.\n");
+	       "  RCU-based detection of stalled CPUs is disabled.\n");
 #endif
 #ifndef CONFIG_RCU_CPU_STALL_VERBOSE
-	printk(KERN_INFO "\tVerbose stalled-CPUs detection is disabled.\n");
+	printk(KERN_INFO "  Verbose stalled-CPUs detection is disabled.\n");
 #endif
 #if NUM_RCU_LVL_4 != 0
-	printk(KERN_INFO "\tExperimental four-level hierarchy is enabled.\n");
+	printk(KERN_INFO "  Experimental four-level hierarchy is enabled.\n");
 #endif
 }
 
