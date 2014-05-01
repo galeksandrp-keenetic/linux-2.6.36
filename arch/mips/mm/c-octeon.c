@@ -217,14 +217,14 @@ static void __cpuinit probe_octeon(void)
 	c->dcache.sets = dcache_size / (c->dcache.linesz * c->dcache.ways);
 
 	if (smp_processor_id() == 0) {
-		pr_notice("Primary instruction cache %ldkB, %s, %d way, "
+		pr_notice(KERN_INFO "Primary instruction cache %ldkB, %s, %d way, "
 			  "%d sets, linesize %d bytes.\n",
 			  icache_size >> 10,
 			  cpu_has_vtag_icache ?
 				"virtually tagged" : "physically tagged",
 			  c->icache.ways, c->icache.sets, c->icache.linesz);
 
-		pr_notice("Primary data cache %ldkB, %d-way, %d sets, "
+		pr_notice(KERN_INFO "Primary data cache %ldkB, %d-way, %d sets, "
 			  "linesize %d bytes.\n",
 			  dcache_size >> 10, c->dcache.ways,
 			  c->dcache.sets, c->dcache.linesz);

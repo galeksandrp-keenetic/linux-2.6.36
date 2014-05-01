@@ -1123,10 +1123,10 @@ static void __cpuinit probe_pcache(void)
 #endif
 
 #ifdef CONFIG_RALINK_SOC
-	printk("Primary instruction cache %ldkB, %s, %s, %slinesize %d bytes.\n",
+	printk(KERN_INFO "Primary instruction cache %ldkB, %s, %s, %slinesize %d bytes.\n",
 	       icache_size >> 10,
 	       c->icache.flags & MIPS_CACHE_VTAG ? "VIVT" : "VIPT",
-	       (c->icache.flags & MIPS_CACHE_ALIASES) ?  "I-cache aliases, " : "",
+	       (c->icache.flags & MIPS_CACHE_ALIASES) ?  "I-cache aliases" : "no aliases",
 	       way_string[c->icache.ways], c->icache.linesz);
 #else
 	printk("Primary instruction cache %ldkB, %s, %s, linesize %d bytes.\n",
@@ -1135,7 +1135,7 @@ static void __cpuinit probe_pcache(void)
 	       way_string[c->icache.ways], c->icache.linesz);
 #endif
 
-	printk("Primary data cache %ldkB, %s, %s, %s, linesize %d bytes\n",
+	printk(KERN_INFO "Primary data cache %ldkB, %s, %s, %s, linesize %d bytes\n",
 	       dcache_size >> 10, way_string[c->dcache.ways],
 	       (c->dcache.flags & MIPS_CACHE_PINDEX) ? "PIPT" : "VIPT",
 	       (c->dcache.flags & MIPS_CACHE_ALIASES) ?
