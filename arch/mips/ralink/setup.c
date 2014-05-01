@@ -96,9 +96,9 @@ static void __init set_reset_flag(void)
 	value = sysRegRead(TESTSTAT1);
 
 	if(value & 0x01) {
-		printk("Status: soft reset\n");
+		printk(KERN_INFO "SoC status: soft reset\n");
 	} else {
-		printk("Status: hard reset\n");
+		printk(KERN_INFO "SoC status: hard reset\n");
 		sysRegWrite(TESTSTAT1, 0x01);
 	}
 }
