@@ -210,6 +210,8 @@ choice
 		bool "Giga_Switch_Atheros_AR8316"
 	config P5_RGMII_PHY_MODE_RTL8367
 		bool "Giga_Phy RTL8367RB (RGMII)"
+	config P5_RGMII_PHY_MODE_MT7530
+		bool "Giga_Phy MT7530 (RGMII)"
 endchoice
 
 config  MAC_TO_GIGAPHY_MODE_ADDR
