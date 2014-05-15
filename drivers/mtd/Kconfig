@@ -349,7 +349,7 @@ source "drivers/mtd/lpddr/Kconfig"
 source "drivers/mtd/ubi/Kconfig"
 
 
-if CONFIG_MIPS_TC3262
+if MIPS_TC3262
 source "drivers/mtd/mtk/Kconfig"
 endif
 

@@ -800,6 +800,7 @@
 #define RALINK_MEMCTRL_BASE             0xBFB20000
 #define RALINK_PIO_BASE                 0xBFBF0200
 #define RALINK_NAND_CTRL_BASE           0xBFBE0010
+#define RALINK_NANDECC_CTRL_BASE        0xBFBE0040
 #define RALINK_I2C_BASE                 0xBFBF8000
 #define RALINK_I2S_BASE                 0xBFBF8100
 #define RALINK_SPI_BASE                 0xBFBC0B00
@@ -809,6 +810,7 @@
 #define RALINK_GDMA_BASE                0xBFB30000
 #define RALINK_FRAME_ENGINE_BASE        0xBFB50000
 #define RALINK_ETH_SW_BASE              0xBFB58000
+
 #define RALINK_11N_MAC_BASE		0x00000000
 //#define RALINK_USB_DEV_BASE           0xB0120000
 #define RALINK_CRYPTO_ENGINE_BASE       0xBFB70000

@@ -3,7 +3,8 @@ obj-y := \
 	setup.o \
 	irq.o \
 	tcwdog.o \
-	ex_mdio_api.o
+	ex_mdio_api.o \
+	platform.o
 #	tcadsl.o 
 #	ledcetrl.o
 

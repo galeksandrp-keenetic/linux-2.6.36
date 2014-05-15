@@ -638,6 +638,76 @@ int default_mtd_writev(struct mtd_info *mtd, const struct kvec *vecs,
 	return ret;
 }
 
+int ra_mtd_read_nm(char *name, loff_t from, size_t len, u_char *buf)
+{
+	int ret;
+	size_t rdlen;
+	struct mtd_info *mtd;
+
+	mtd = get_mtd_device_nm(name);
+	if (IS_ERR(mtd))
+		return (int)mtd;
+
+	ret = mtd->read(mtd, from, len, &rdlen, buf);
+	if (rdlen != len)
+		printk("warning: ra_mtd_read_nm: rdlen is not equal to len\n");
+
+	put_mtd_device(mtd);
+	return ret;
+}
+
+int ra_mtd_write_nm(char *name, loff_t to, size_t len, const u_char *buf)
+{
+	int ret = -1;
+	size_t rdlen, wrlen;
+	struct mtd_info *mtd;
+	struct erase_info ei;
+	u_char *bak = NULL;
+
+	mtd = get_mtd_device_nm(name);
+	if (IS_ERR(mtd))
+		return (int)mtd;
+	if (len > mtd->erasesize) {
+		put_mtd_device(mtd);
+		return -E2BIG;
+	}
+
+	bak = kmalloc(mtd->erasesize, GFP_KERNEL);
+	if (bak == NULL) {
+		put_mtd_device(mtd);
+		return -ENOMEM;
+	}
+
+	ret = mtd->read(mtd, 0, mtd->erasesize, &rdlen, bak);
+	if (ret != 0) {
+		put_mtd_device(mtd);
+		kfree(bak);
+		return ret;
+	}
+	if (rdlen != mtd->erasesize)
+		printk("warning: ra_mtd_write: rdlen is not equal to erasesize\n");
+
+	memcpy(bak + to, buf, len);
+
+	ei.mtd = mtd;
+	ei.callback = NULL;
+	ei.addr = 0;
+	ei.len = mtd->erasesize;
+	ei.priv = 0;
+	ret = mtd->erase(mtd, &ei);
+	if (ret != 0) {
+		put_mtd_device(mtd);
+		kfree(bak);
+		return ret;
+	}
+
+	ret = mtd->write(mtd, 0, mtd->erasesize, &wrlen, bak);
+
+	put_mtd_device(mtd);
+	kfree(bak);
+	return ret;
+}
+
 EXPORT_SYMBOL_GPL(add_mtd_device);
 EXPORT_SYMBOL_GPL(del_mtd_device);
 EXPORT_SYMBOL_GPL(get_mtd_device);
@@ -648,6 +718,8 @@ EXPORT_SYMBOL_GPL(__put_mtd_device);
 EXPORT_SYMBOL_GPL(register_mtd_user);
 EXPORT_SYMBOL_GPL(unregister_mtd_user);
 EXPORT_SYMBOL_GPL(default_mtd_writev);
+EXPORT_SYMBOL_GPL(ra_mtd_read_nm);
+EXPORT_SYMBOL_GPL(ra_mtd_write_nm);
 
 #ifdef CONFIG_PROC_FS
 

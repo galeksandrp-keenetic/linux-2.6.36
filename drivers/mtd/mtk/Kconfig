@@ -1,11 +1,11 @@
-menu "MTK Nand Flash Interface Device Drivers"
+menu "Ralink Non-volatile Device Drivers"
 	depends on MTD!=n
 
-config MTK_MTD_NAND
+config MTD_NAND_MTK
 	tristate "NAND Flash Support"
 	depends on MIPS_RT63365
 	select MTD_PARTITIONS
 	help
-	  support MT7510 Nand flash controller.
+	  support NAND flash controller.
 
 endmenu
