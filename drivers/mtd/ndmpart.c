@@ -96,14 +96,17 @@ static int create_mtd_partitions(struct mtd_info *master,
 	
 	/* U-Boot */	
 	ndm_parts[0].offset = 0;
-	ndm_parts[0].size = (3*master->erasesize);
+	if (master->type == MTD_NANDFLASH) 
+		ndm_parts[0].size = (master->erasesize);
+	else
+		ndm_parts[0].size = (3*master->erasesize);
 
 	/* U-Config */
-	ndm_parts[1].offset = (3*master->erasesize);
+	ndm_parts[1].offset = ndm_parts[0].size;
 	ndm_parts[1].size = master->erasesize;
 
 	/* RF-EEPROM */
-	ndm_parts[2].offset = (4*master->erasesize);
+	ndm_parts[2].offset = ndm_parts[1].offset + ndm_parts[1].size;
 	
 	for (offset = ndm_parts[1].offset; offset < flash_size;
 		offset += master->erasesize) {
@@ -164,7 +167,7 @@ static struct mtd_part_parser ndm_parser = {
 
 static int __init ndm_parser_init(void)
 {
-	printk(KERN_INFO "Registering NDM partiotions parser\n");
+	printk(KERN_INFO "Registering NDM partitions parser\n");
 	return register_mtd_parser(&ndm_parser);
 }
 
