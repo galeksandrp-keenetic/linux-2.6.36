@@ -1,4 +1,4 @@
-obj-$(CONFIG_RALINK_SOC)	+= ralink-flash.o
+#obj-$(CONFIG_RALINK_SOC)	+= ralink-flash.o
 obj-$(CONFIG_MTD_NAND_RALINK)	+= ralink_nand.o
 obj-$(CONFIG_MTD_SPI_RALINK)	+= ralink_spi.o 
 
