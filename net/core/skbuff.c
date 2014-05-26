@@ -105,11 +105,6 @@ atomic_t skbmgr_4k_alloc_no;
 #define SKBMGR_INDICATION		1
 #define SKBMGR_4K_INDICATION		2
 
-atomic_t g_used_skb_num;
-int g_max_skb_num = 1280;
-EXPORT_SYMBOL(g_used_skb_num);
-
-int peak_skb_num = 0;
 #endif
 
 static struct kmem_cache *skbuff_head_cache __read_mostly;
@@ -317,12 +312,7 @@ __IMEM struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	skb = kmem_cache_alloc_node(cache, gfp_mask & ~__GFP_DMA, node);
 	if (!skb)
 		goto out;
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-	/*if number of skb reach the max number,go to nodata*/
-	if(atomic_read(&g_used_skb_num) > g_max_skb_num){
-			goto nodata;
-	}
-#endif
+
 	prefetchw(skb);
 
 	size = SKB_DATA_ALIGN(size);
@@ -332,14 +322,6 @@ __IMEM struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 		goto nodata;
 	prefetchw(data + size);
 
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-	/*alloc successfully*/
-	atomic_inc(&g_used_skb_num);
-	if(peak_skb_num < atomic_read(&g_used_skb_num))
-	{
-		peak_skb_num = atomic_read(&g_used_skb_num);
-	}
-#endif
 
 	/*
 	 * Only clear those fields we need to clear, not those that we will
@@ -497,10 +479,6 @@ __IMEM static void skb_release_data(struct sk_buff *skb)
 		if (skb_has_frags(skb))
 			skb_drop_fraglist(skb);
 		kfree(skb->head);
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-		/*sub used skb number*/
-		atomic_dec(&g_used_skb_num);
-#endif
 	}
 }
 
@@ -1060,22 +1038,12 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 	if (skb_shared(skb))
 		BUG();
 
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-	/*the skb num reach the max number,go to nodata*/
-	if(atomic_read(&g_used_skb_num) > g_max_skb_num)
-		goto nodata;
-#endif
-	
 	size = SKB_DATA_ALIGN(size);
 
 	data = kmalloc(size + sizeof(struct skb_shared_info), gfp_mask);
 	if (!data)
 		goto nodata;
 
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-	/*add skb num*/
-	atomic_inc(&g_used_skb_num);
-#endif
 
 	/* Copy only real data... and, alas, header. This should be
 	 * optimized for the cases when header is void. */
@@ -3766,47 +3734,6 @@ static int hot_list_len_write(struct file *file, const char __user * buffer,
 	return count;
 }
 
-/*add proc function,user can change max_skb_num value */
-static int driver_max_skb_read(char *page, char **start, off_t offset,
-		int count, int *eof, void *data)
-{
-	char *out = page;
-	int len;
-
-	out += sprintf(out, "%d (%d,%d)\n", g_max_skb_num, atomic_read(&g_used_skb_num), peak_skb_num);
-
-	len = out - page;
-	len -= offset;
-	if (len < count) {
-		*eof = 1;
-		if (len <= 0)
-			return 0;
-	} else
-		len = count;
-
-	*start = page + offset;
-	return len;
-}
-
-static int driver_max_skb_write(struct file *file, const char __user * buffer,
-			unsigned long count, void *data)
-{
-	char buf[64];
-	int val;
-
-	if (count > 64)
-		return -EINVAL;
-
-	if (copy_from_user(buf, buffer, count))
-		return -EFAULT;
-
-	val = simple_strtoul(buf, NULL, 10);
-
-	g_max_skb_num = val;
-
-	return count;
-}
-
 static int limit_read(char *page, char **start, off_t offset,
 			int count, int *eof, void *data)
 {
@@ -4011,13 +3938,6 @@ static int register_proc_skbmgr(void)
 	p->read_proc = limit_read;
 	p->write_proc = limit_write;
 
-	p = create_proc_entry("skbmgr_driver_max_skb", 0644, init_net.proc_net);
-	if (!p) 
-		return 0;
-
-	p->read_proc = driver_max_skb_read;
-	p->write_proc = driver_max_skb_write;
-
 #if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
 	p = create_proc_entry("auto_clear_cache", 0644, init_net.proc_net);
 	if (!p) 
@@ -4058,7 +3978,7 @@ void __init skb_init(void)
 	int i;
 
 	atomic_set(&skbmgr_alloc_no, 0);
-	atomic_set(&g_used_skb_num, 0);
+
 
 	for (i=0; i<SKBMGR_MAX_QUEUE; i++) {
 		skb_queue_head_init(&skbmgr_pool[i].list);
