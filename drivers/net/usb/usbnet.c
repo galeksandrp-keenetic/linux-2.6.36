@@ -1264,6 +1264,9 @@ static struct device_type wwan_type = {
 	.name	= "wwan",
 };
 
+int (*is_wimax_devname_hook)(u16 vendor_id, u16 product_id) = NULL;
+EXPORT_SYMBOL(is_wimax_devname_hook);
+
 int
 usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 {
@@ -1274,6 +1277,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	struct usb_device		*xdev;
 	int				status;
 	const char			*name;
+	int (*is_wimax_devname)(u16 vendor_id, u16 product_id);
 	struct usb_driver 	*driver = to_usb_driver(udev->dev.driver);
 
 	/* usbnet already took usb runtime pm, so have to enable the feature
@@ -1358,8 +1362,13 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		// else "eth%d" when there's reasonable doubt.  userspace
 		// can rename the link if it knows better.
 		if ((dev->driver_info->flags & FLAG_ETHER) != 0 &&
-		    (net->dev_addr [0] & 0x02) == 0)
-			strcpy (net->name, "eth%d");
+		    (net->dev_addr [0] & 0x02) == 0) {
+			if( (is_wimax_devname = rcu_dereference(is_wimax_devname_hook)) &&
+			    is_wimax_devname(le16_to_cpu(xdev->descriptor.idVendor), le16_to_cpu(xdev->descriptor.idProduct)) )
+				strcpy (net->name, "wimax%d");
+			else
+				strcpy (net->name, "eth%d");
+		}
 		/* WLAN devices should always be named "wlan%d" */
 		if ((dev->driver_info->flags & FLAG_WLAN) != 0)
 			strcpy(net->name, "wlan%d");
