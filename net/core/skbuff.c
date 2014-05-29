@@ -69,43 +69,6 @@
 #include <trace/events/skb.h>
 
 #include "kmap_skb.h"
-#if defined(CONFIG_TCSUPPORT_HWNAT)
-#include <linux/pktflow.h
-#endif
-#if defined(CONFIG_TCSUPPORT_RA_HWNAT)
-#include <linux/foe_hook.h>
-#endif
-#if defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)
-#include "../net/nat/hw_nat/ra_nat.h"
-#include "../net/nat/hw_nat/frame_engine.h"
-#endif
-
-#if defined(CONFIG_RAETH_SKB_RECYCLE_2K)
-#ifdef CONFIG_PROC_FS
-#include <linux/proc_fs.h>
-#endif
-#endif
-
-
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-//only one skbmgr pool for every CPU. shnwind 20101215.
-#define SKBMGR_SINGLE_QUEUE
-
-#ifdef SKBMGR_SINGLE_QUEUE
-#define SKBMGR_QUEUE_ID				0
-#define SKBMGR_MAX_QUEUE			1
-#else
-#define SKBMGR_QUEUE_ID				smp_processor_id()
-#define SKBMGR_MAX_QUEUE			NR_CPUS
-#endif
-
-atomic_t skbmgr_alloc_no;
-atomic_t skbmgr_4k_alloc_no;
-
-#define SKBMGR_INDICATION		1
-#define SKBMGR_4K_INDICATION		2
-
-#endif
 
 static struct kmem_cache *skbuff_head_cache __read_mostly;
 static struct kmem_cache *skbuff_fclone_cache __read_mostly;
@@ -113,30 +76,16 @@ static struct kmem_cache *skbuff_fclone_cache __read_mostly;
 static struct kmem_cache *skbuff_cb_store_cache __read_mostly;
 #endif
 
-#ifdef CONFIG_RALINK_SOC
-#define HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
-#endif
-
 static void sock_pipe_buf_release(struct pipe_inode_info *pipe,
 				  struct pipe_buffer *buf)
 {
-#ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
 	put_page(buf->page);
-#else
-	struct sk_buff *skb = (struct sk_buff *) buf->private;
-	kfree_skb(skb);
-#endif
 }
 
 static void sock_pipe_buf_get(struct pipe_inode_info *pipe,
 				struct pipe_buffer *buf)
 {
-#ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
 	get_page(buf->page);
-#else
-	struct sk_buff *skb = (struct sk_buff *) buf->private;
-	skb_get(skb);
-#endif
 }
 
 static int sock_pipe_buf_steal(struct pipe_inode_info *pipe,
@@ -298,7 +247,7 @@ static void skb_under_panic(struct sk_buff *skb, int sz, void *here)
  *	Buffers may only be allocated from interrupts using a @gfp_mask of
  *	%GFP_ATOMIC.
  */
-__IMEM struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
+struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 			    int fclone, int node)
 {
 	struct kmem_cache *cache;
@@ -312,7 +261,6 @@ __IMEM struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	skb = kmem_cache_alloc_node(cache, gfp_mask & ~__GFP_DMA, node);
 	if (!skb)
 		goto out;
-
 	prefetchw(skb);
 
 	size = SKB_DATA_ALIGN(size);
@@ -321,7 +269,6 @@ __IMEM struct sk_buff *__alloc_skb(unsigned int size, gfp_t gfp_mask,
 	if (!data)
 		goto nodata;
 	prefetchw(data + size);
-
 
 	/*
 	 * Only clear those fields we need to clear, not those that we will
@@ -432,9 +379,7 @@ struct sk_buff *dev_alloc_skb(unsigned int length)
 	 * There is more code here than it seems:
 	 * __dev_alloc_skb is an inline
 	 */
-	//return __dev_alloc_skb(length, GFP_ATOMIC);
-	/*Not to printk warring message, it will be wasted cpu resource*/
-	return __dev_alloc_skb(length, GFP_ATOMIC|__GFP_NOWARN);
+	return __dev_alloc_skb(length, GFP_ATOMIC);
 }
 EXPORT_SYMBOL(dev_alloc_skb);
 
@@ -464,9 +409,8 @@ static void skb_clone_fraglist(struct sk_buff *skb)
 		skb_get(list);
 }
 
-__IMEM static void skb_release_data(struct sk_buff *skb)
+static void skb_release_data(struct sk_buff *skb)
 {
-
 	if (!skb->cloned ||
 	    !atomic_sub_return(skb->nohdr ? (1 << SKB_DATAREF_SHIFT) + 1 : 1,
 			       &skb_shinfo(skb)->dataref)) {
@@ -478,6 +422,7 @@ __IMEM static void skb_release_data(struct sk_buff *skb)
 
 		if (skb_has_frags(skb))
 			skb_drop_fraglist(skb);
+
 		kfree(skb->head);
 	}
 }
@@ -485,18 +430,11 @@ __IMEM static void skb_release_data(struct sk_buff *skb)
 /*
  *	Free an skbuff by memory without cleaning the state.
  */
-__IMEM static void kfree_skbmem(struct sk_buff *skb)
+static void kfree_skbmem(struct sk_buff *skb)
 {
 	struct sk_buff *other;
 	atomic_t *fclone_ref;
 
-#if defined(CONFIG_TCSUPPORT_HWNAT)
-	pktflow_free(skb);
-#endif
-#if defined(CONFIG_TCSUPPORT_RA_HWNAT)
-	if (ra_sw_nat_hook_free)
-		ra_sw_nat_hook_free(skb);
-#endif
 	switch (skb->fclone) {
 	case SKB_FCLONE_UNAVAILABLE:
 		kmem_cache_free(skbuff_head_cache, skb);
@@ -533,26 +471,6 @@ static void skb_release_head_state(struct sk_buff *skb)
 		WARN_ON(in_irq());
 		skb->destructor(skb);
 	}
-#if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
-	/* This should not happen. When it does, avoid memleak by restoring
-	the chain of cb-backups. */
-	while(skb->cb_next != NULL) {
-		if (net_ratelimit())
-			printk(KERN_WARNING "IMQ: kfree_skb: skb->cb_next: "
-				"%08x\n", (unsigned int)skb->cb_next);
-
-		skb_restore_cb(skb);
-	}
-	/* This should not happen either, nf_queue_entry is nullified in
-	 * imq_dev_xmit(). If we have non-NULL nf_queue_entry then we are
-	 * leaking entry pointers, maybe memory. We don't know if this is
-	 * pointer to already freed memory, or should this be freed.
-	 * If this happens we need to add refcounting, etc for nf_queue_entry.
-	 */
-	if (skb->nf_queue_entry && net_ratelimit())
-		printk(KERN_WARNING
-				"IMQ: kfree_skb: skb->nf_queue_entry != NULL");
-#endif
 #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
 	nf_conntrack_put(skb->nfct);
 	nf_conntrack_put_reasm(skb->nfct_reasm);
@@ -566,15 +484,6 @@ static void skb_release_head_state(struct sk_buff *skb)
 #ifdef CONFIG_NET_CLS_ACT
 	skb->tc_verd = 0;
 #endif
-#endif
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-	if (skb->skb_recycling_ind == SKBMGR_INDICATION) {
-		atomic_dec(&skbmgr_alloc_no);
-		skb->skb_recycling_ind = 0;
-	}else if(skb->skb_recycling_ind == SKBMGR_4K_INDICATION){
-		atomic_dec(&skbmgr_4k_alloc_no);
-		skb->skb_recycling_ind = 0;
-	}
 #endif
 }
 
@@ -593,27 +502,10 @@ static void skb_release_all(struct sk_buff *skb)
  *	Clean the state. This is an internal helper function. Users should
  *	always call kfree_skb
  */
-__IMEM void __kfree_skb(struct sk_buff *skb)
+
+void __kfree_skb(struct sk_buff *skb)
 {
-#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-	if(IS_MAGIC_TAG_VALID(skb) || (FOE_MAGIC_TAG(skb) == FOE_MAGIC_PPE))
-		memset(FOE_INFO_START_ADDR(skb), 0, FOE_INFO_LEN);
-#endif
-
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262) || defined(CONFIG_RAETH_SKB_RECYCLE_2K)
-	skb_release_head_state(skb);
-
-	if (skb->skb_recycling_callback) {
-		if ((*skb->skb_recycling_callback)(skb)) {
-			return;
-		}
-	}
-	skb->skb_recycling_callback = NULL;
-
-	skb_release_data(skb);
-#else
 	skb_release_all(skb);
-#endif
 	kfree_skbmem(skb);
 }
 EXPORT_SYMBOL(__kfree_skb);
@@ -625,7 +517,7 @@ EXPORT_SYMBOL(__kfree_skb);
  *	Drop a reference to the buffer and free it if the usage count has
  *	hit zero.
  */
-__IMEM void kfree_skb(struct sk_buff *skb)
+void kfree_skb(struct sk_buff *skb)
 {
 	if (unlikely(!skb))
 		return;
@@ -742,13 +634,6 @@ static void __copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 #endif
 #endif
 	new->vlan_tci		= old->vlan_tci;
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262) || defined(CONFIG_RAETH_SKB_RECYCLE_2K)
-	new->skb_recycling_callback = NULL;
-	new->skb_recycling_ind = 0;
-#endif
-#if defined(CONFIG_TCSUPPORT_BRIDGE_FASTPATH)
-	new->sc_mac_learned = old->sc_mac_learned;
-#endif
 
 	skb_copy_secmark(new, old);
 }
@@ -772,18 +657,6 @@ static struct sk_buff *__skb_clone(struct sk_buff *n, struct sk_buff *skb)
 	n->cloned = 1;
 	n->nohdr = 0;
 	n->destructor = NULL;
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262) || defined(CONFIG_RAETH_SKB_RECYCLE_2K)
-	n->skb_recycling_callback = NULL;
-	n->skb_recycling_ind = 0;
-	skb->skb_recycling_callback = NULL;
-#endif
-#if defined(CONFIG_TCSUPPORT_HWNAT)
-	pktflow_xfer(n, skb);
-#endif
-#if defined(CONFIG_TCSUPPORT_RA_HWNAT)
-	if (ra_sw_nat_hook_xfer)
-		ra_sw_nat_hook_xfer(n, skb);
-#endif
 	C(tail);
 	C(end);
 	C(head);
@@ -833,10 +706,6 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 {
 	struct sk_buff *n;
 
-#if defined(CONFIG_TCSUPPORT_HWNAT)
-	int skip_pktflow = gfp_mask & GFP_SKIP_PKTFLOW;
-	gfp_mask &= ~GFP_SKIP_PKTFLOW;
-#endif
 	n = skb + 1;
 	if (skb->fclone == SKB_FCLONE_ORIG &&
 	    n->fclone == SKB_FCLONE_UNAVAILABLE) {
@@ -852,16 +721,7 @@ struct sk_buff *skb_clone(struct sk_buff *skb, gfp_t gfp_mask)
 		kmemcheck_annotate_bitfield(n, flags2);
 		n->fclone = SKB_FCLONE_UNAVAILABLE;
 	}
-#if defined(CONFIG_TCSUPPORT_HWNAT)
-	if (skip_pktflow)
-		n->pktflow_p = NULL;
-	else
-		pktflow_xfer(n, skb);
-#endif
-#if defined(CONFIG_TCSUPPORT_RA_HWNAT)
-	if (ra_sw_nat_hook_xfer)
-		ra_sw_nat_hook_xfer(n, skb);
-#endif
+
 	return __skb_clone(n, skb);
 }
 EXPORT_SYMBOL(skb_clone);
@@ -873,14 +733,6 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	 *	Shift between the two data areas in bytes
 	 */
 	unsigned long offset = new->data - old->data;
-#endif
-#if defined(CONFIG_TCSUPPORT_HWNAT)
-	pktflow_xfer(new, old);
-#endif
-
-#if defined(CONFIG_TCSUPPORT_RA_HWNAT)
-	if (ra_sw_nat_hook_xfer)
-		ra_sw_nat_hook_xfer(new, old);
 #endif
 
 	__copy_skb_header(new, old);
@@ -1028,10 +880,6 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 	int size = nhead + (skb->end - skb->head) + ntail;
 #endif
 	long off;
-#if defined (HNAT_USE_TAILROOM)
-	ntail += FOE_INFO_LEN;
-	size += FOE_INFO_LEN; 
-#endif
 
 	BUG_ON(nhead < 0);
 
@@ -1044,7 +892,6 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 	if (!data)
 		goto nodata;
 
-
 	/* Copy only real data... and, alas, header. This should be
 	 * optimized for the cases when header is void. */
 #ifdef NET_SKBUFF_DATA_USES_OFFSET
@@ -1055,22 +902,12 @@ int pskb_expand_head(struct sk_buff *skb, int nhead, int ntail,
 	memcpy(data + size, skb_end_pointer(skb),
 	       offsetof(struct skb_shared_info, frags[skb_shinfo(skb)->nr_frags]));
 
-#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
-#if defined (HNAT_USE_HEADROOM)
-	memcpy(data, skb->head, FOE_INFO_LEN); //copy headroom
-#elif defined (HNAT_USE_TAILROOM)
-	memcpy( (data + size - FOE_INFO_LEN), (skb->end - FOE_INFO_LEN), FOE_INFO_LEN); //copy tailroom
-#endif
-#endif
 	for (i = 0; i < skb_shinfo(skb)->nr_frags; i++)
 		get_page(skb_shinfo(skb)->frags[i].page);
 
 	if (skb_has_frags(skb))
 		skb_clone_fraglist(skb);
 
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262) || defined(CONFIG_RAETH_SKB_RECYCLE_2K)
-	skb->skb_recycling_callback = NULL;
-#endif
 	skb_release_data(skb);
 
 	off = (data + nhead) - skb->head;
@@ -1616,7 +1453,6 @@ static void sock_spd_release(struct splice_pipe_desc *spd, unsigned int i)
 	put_page(spd->pages[i]);
 }
 
-#ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
 static inline struct page *linear_to_page(struct page *page, unsigned int *len,
 					  unsigned int *offset,
 					  struct sk_buff *skb, struct sock *sk)
@@ -1652,38 +1488,29 @@ new_page:
 
 	return p;
 }
-#endif
+
 /*
  * Fill page/offset/length into spd, if it can hold more pages.
  */
 static inline int spd_fill_page(struct splice_pipe_desc *spd,
 				struct pipe_inode_info *pipe, struct page *page,
 				unsigned int *len, unsigned int offset,
-#ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
 				struct sk_buff *skb, int linear,
-#else
-				struct sk_buff *skb,
-#endif
 				struct sock *sk)
 {
 	if (unlikely(spd->nr_pages == pipe->buffers))
 		return 1;
 
-#ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
 	if (linear) {
 		page = linear_to_page(page, len, &offset, skb, sk);
 		if (!page)
 			return 1;
 	} else
 		get_page(page);
-#endif
 
 	spd->pages[spd->nr_pages] = page;
 	spd->partial[spd->nr_pages].len = *len;
 	spd->partial[spd->nr_pages].offset = offset;
-#ifndef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
-	spd->partial[spd->nr_pages].private = (unsigned long) skb_get(skb);
-#endif
 	spd->nr_pages++;
 
 	return 0;
@@ -1706,11 +1533,7 @@ static inline void __segment_seek(struct page **page, unsigned int *poff,
 static inline int __splice_segment(struct page *page, unsigned int poff,
 				   unsigned int plen, unsigned int *off,
 				   unsigned int *len, struct sk_buff *skb,
-#ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
 				   struct splice_pipe_desc *spd, int linear,
-#else
-				   struct splice_pipe_desc *spd,
-#endif
 				   struct sock *sk,
 				   struct pipe_inode_info *pipe)
 {
@@ -1735,11 +1558,7 @@ static inline int __splice_segment(struct page *page, unsigned int poff,
 		/* the linear region may spread across several pages  */
 		flen = min_t(unsigned int, flen, PAGE_SIZE - poff);
 
-#ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
 		if (spd_fill_page(spd, pipe, page, &flen, poff, skb, linear, sk))
-#else
-		if (spd_fill_page(spd, pipe, page, &flen, poff, skb, sk))
-#endif
 			return 1;
 
 		__segment_seek(&page, &poff, &plen, flen);
@@ -1766,11 +1585,7 @@ static int __skb_splice_bits(struct sk_buff *skb, struct pipe_inode_info *pipe,
 	if (__splice_segment(virt_to_page(skb->data),
 			     (unsigned long) skb->data & (PAGE_SIZE - 1),
 			     skb_headlen(skb),
-#ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
 			     offset, len, skb, spd, 1, sk, pipe))
-#else
-			     offset, len, skb, spd, sk, pipe))
-#endif
 		return 1;
 
 	/*
@@ -1780,11 +1595,7 @@ static int __skb_splice_bits(struct sk_buff *skb, struct pipe_inode_info *pipe,
 		const skb_frag_t *f = &skb_shinfo(skb)->frags[seg];
 
 		if (__splice_segment(f->page, f->page_offset, f->size,
-#ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
 				     offset, len, skb, spd, 0, sk, pipe))
-#else
-				     offset, len, skb, spd, sk, pipe))
-#endif
 			return 1;
 	}
 
@@ -1797,11 +1608,7 @@ static int __skb_splice_bits(struct sk_buff *skb, struct pipe_inode_info *pipe,
  * the frag list, if such a thing exists. We'd probably need to recurse to
  * handle that cleanly.
  */
-#ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
 int skb_splice_bits(struct sk_buff *skb, unsigned int offset,
-#else
-int skb_splice_bits(struct sk_buff *__skb, unsigned int offset,
-#endif
 		    struct pipe_inode_info *pipe, unsigned int tlen,
 		    unsigned int flags)
 {
@@ -1815,26 +1622,8 @@ int skb_splice_bits(struct sk_buff *__skb, unsigned int offset,
 		.spd_release = sock_spd_release,
 	};
 	struct sk_buff *frag_iter;
-	struct sock *sk;
+	struct sock *sk = skb->sk;
 	int ret = 0;
-
-#ifndef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
-	struct sk_buff *skb;
-	/*
-	 * I'd love to avoid the clone here, but tcp_read_sock()
-	 * ignores reference counts and unconditonally kills the sk_buff
-	 * on return from the actor.
-	 */
-	skb = skb_clone(__skb, GFP_KERNEL);
-	if (unlikely(!skb))
-		return -ENOMEM;
-#endif
-
-#ifdef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
-	sk = skb->sk;
-#else
-	sk = __skb->sk;
-#endif
 
 	if (splice_grow_spd(pipe, &spd))
 		return -ENOMEM;
@@ -1859,14 +1648,6 @@ int skb_splice_bits(struct sk_buff *__skb, unsigned int offset,
 	}
 
 done:
-#ifndef HAVE_SPLICE_FROM_SOCKET2SOCKET_PATCH
-	/*
-	 * drop our reference to the clone, the pipe consumption will
-	 * drop the rest.
-	 */
-	kfree_skb(skb);
-#endif
-
 	if (spd.nr_pages) {
 		/*
 		 * Drop the socket lock, otherwise we have reverse
@@ -2960,210 +2741,6 @@ err:
 }
 EXPORT_SYMBOL_GPL(skb_segment);
 
-#if defined(CONFIG_RAETH_SKB_RECYCLE_2K)
-
-#define SKBMGR_RX_BUF_LEN                       SKB_WITH_OVERHEAD(2048)
-#define SKBMGR_DEF_HOT_LIST_LEN                 512
-
-int skbmgr_hot_list_len = SKBMGR_DEF_HOT_LIST_LEN;
-int skbmgr_max_list_len = 0;
-
-struct sk_buff_head		rx0_recycle;
-
-struct sk_buff *skbmgr_alloc_skb2k(void)
-{
-        struct sk_buff *skb;
-	unsigned long flags;
-
-        if (skb_queue_len(&rx0_recycle)) {
-                unsigned int size;
-                struct skb_shared_info *shinfo;
-                u8 *data;
-
-		local_irq_save(flags);
-                skb = __skb_dequeue_tail(&rx0_recycle);
-		local_irq_restore(flags);
-
-                if (unlikely(skb == NULL))
-                        goto try_normal;
-                
-		size = skb->truesize - sizeof(struct sk_buff);
-                data = skb->head;
-		
-		/*
-                 * See comment in sk_buff definition, just before the 'tail' member
-                 */
-                memset(skb, 0, offsetof(struct sk_buff, tail));
-                skb->truesize = size + sizeof(struct sk_buff);
-                atomic_set(&skb->users, 1);
-                skb->head = data;
-                skb->data = data;
-                skb_reset_tail_pointer(skb);
-                skb->end = skb->tail + size;
-                /* make sure we initialize shinfo sequentially */
-                shinfo = skb_shinfo(skb);
-                atomic_set(&shinfo->dataref, 1);
-                shinfo->nr_frags  = 0;
-                shinfo->gso_size = 0;
-                shinfo->gso_segs = 0;
-                shinfo->gso_type = 0;
-                shinfo->ip6_frag_id = 0;
-                shinfo->frag_list = NULL;
-                skb->skb_recycling_callback = skbmgr_recycling_callback;
-
-                return skb;
-        }
-
-try_normal:
-        skb = alloc_skb(SKBMGR_RX_BUF_LEN, GFP_ATOMIC|__GFP_NOWARN);
-        if (likely(skb))
-                skb->skb_recycling_callback = skbmgr_recycling_callback;
-        return skb;
-}
-
-EXPORT_SYMBOL(skbmgr_alloc_skb2k);
-
-int skbmgr_recycling_callback(struct sk_buff *skb)
-{
-
-	unsigned long flags;
-        
-	if (skb_queue_len(&rx0_recycle) < skbmgr_hot_list_len) {
-
-                if ((skb->truesize - sizeof(struct sk_buff) != SKBMGR_RX_BUF_LEN) ||
-                        (skb_shinfo(skb)->nr_frags) ||
-                        (skb_shinfo(skb)->frag_list)) {
-                        return 0;
-                }
-
-                if (skb_queue_len(&rx0_recycle) > skbmgr_max_list_len)
-                        skbmgr_max_list_len = skb_queue_len(&rx0_recycle) + 1;
-
-		local_irq_save(flags);
-                __skb_queue_head(&rx0_recycle, skb);
-		local_irq_restore(flags);
-
-                return 1;
-        }
-
-        return 0;
-}
-
-EXPORT_SYMBOL(skbmgr_recycling_callback);
-
-void skbmgr_free_all_skbs(void)
-{
-        struct sk_buff *skb;
-        int i;
-
-        for (i=0; i<NR_CPUS; i++) {
-                while ((skb = skb_dequeue(&rx0_recycle)) != NULL) {
-                        skb->skb_recycling_callback = NULL;
-                        kfree_skbmem(skb);
-                }
-        }
-
-}
-
-#ifdef CONFIG_PROC_FS
-static int hot_list_len_read(char *page, char **start, off_t offset,
-                            int count, int *eof, void *data)
-{
-        char *out = page;
-        int len;
-
-        out += sprintf(out, "skbmgr_hot_list_len %d\n", skbmgr_hot_list_len);
-
-        len = out - page;
-        len -= offset;
-        if (len < count) {
-                *eof = 1;
-                if (len <= 0)
-                        return 0;
-        } else
-                len = count;
-
-        *start = page + offset;
-        return len;
-}
-
-static int hot_list_len_write(struct file *file, const char __user * buffer,
-                             unsigned long count, void *data)
-{
-        char buf[64];
-        int val;
-
-        if (count > 64)
-                return -EINVAL;
-
-        if (copy_from_user(buf, buffer, count))
-                return -EFAULT;
-
-        val = simple_strtoul(buf, NULL, 10);
-
-        skbmgr_hot_list_len = val;
-        if (skbmgr_hot_list_len == 0) {
-                skbmgr_free_all_skbs();
-                skbmgr_max_list_len = 0;
-        }
-
-        return count;
-}
-
-static int skbmgr_info_read(char *page, char **start, off_t offset,
-                            int count, int *eof, void *data)
-{
-        char *out = page;
-        int len;
-
-        out += sprintf(out, "skbmgr_max_list_len = %d\n", skbmgr_max_list_len);
-	out += sprintf(out, "skbmgr_queue_len = %d\n", skb_queue_len(&rx0_recycle));
-
-
-        len = out - page;
-        len -= offset;
-        if (len < count) {
-                *eof = 1;
-                if (len <= 0)
-                        return 0;
-        } else
-                len = count;
-
-        *start = page + offset;
-        return len;
-}
-static int register_proc_skbmgr(void)
-{
-        struct proc_dir_entry *p;
-
-        p = create_proc_entry("skbmgr_hot_list_len", 0644, init_net.proc_net);
-        if (!p)
-                return 0;
-
-        p->read_proc = hot_list_len_read;
-        p->write_proc = hot_list_len_write;
-
-        p = create_proc_read_entry("skbmgr_info", 0, init_net.proc_net, skbmgr_info_read, NULL);
-        if (!p)
-                return 0;
-
-        return 1;
-}
-
-#if 0
-static void unregister_proc_skbmgr(void)
-{
-        remove_proc_entry("skbmgr_hot_list_len", init_net.proc_net);
-        remove_proc_entry("skbmgr_info", init_net.proc_net);
-}
-#endif
-
-#endif
-
-
-
-#endif
-
 int skb_gro_receive(struct sk_buff **head, struct sk_buff *skb)
 {
 	struct sk_buff *p = *head;
@@ -3272,740 +2849,13 @@ done:
 }
 EXPORT_SYMBOL_GPL(skb_gro_receive);
 
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-
-#if !defined(CONFIG_TCSUPPORT_CT)
-#define SKBMGR_RX_BUF_LEN 				SKB_WITH_OVERHEAD(2048)
-#endif
-#define SKBMGR_DEF_HOT_LIST_LEN			512
-
-__DMEM int skbmgr_limit = 1280;
-__DMEM int skbmgr_max_alloc_no = 0;
-__DMEM int skbmgr_alloc_fail = 0;
-
-__DMEM int skbmgr_hot_list_len = SKBMGR_DEF_HOT_LIST_LEN;
-__DMEM int skbmgr_max_list_len = 0;
-
-__DMEM union {
-	struct sk_buff_head     list;
-	char                    pad[SMP_CACHE_BYTES];
-} skbmgr_pool[SKBMGR_MAX_QUEUE];
-
-__IMEM struct sk_buff *skbmgr_alloc_skb2k(void)
-{
-	struct sk_buff_head *list;
-	struct sk_buff *skb;
-	int alloc_no;
-	
-	list = &skbmgr_pool[SKBMGR_QUEUE_ID].list;
-
-	if (skb_queue_len(list)) {
-		unsigned int size;
-		struct skb_shared_info *shinfo;
-		u8 *data;
-
-		skb = skb_dequeue(list);
-
-		if (unlikely(skb == NULL))
-			goto try_normal;
-
-		size = skb->truesize - sizeof(struct sk_buff);
-		data = skb->head;
-
-		/*
-		 * Only clear those fields we need to clear, not those that we will
-		 * actually initialise below. Hence, don't put any more fields after
-		 * the tail pointer in struct sk_buff!
-		 */
-		memset(skb, 0, offsetof(struct sk_buff, tail));
-		skb->truesize = size + sizeof(struct sk_buff);
-		atomic_set(&skb->users, 1);
-		skb->head = data;
-		skb->data = data;
-		skb_reset_tail_pointer(skb);
-		skb->end = skb->tail + size;
-		kmemcheck_annotate_bitfield(skb, flags1);
-		kmemcheck_annotate_bitfield(skb, flags2);
-#ifdef NET_SKBUFF_DATA_USES_OFFSET
-		skb->mac_header = ~0U;
-#endif
-
-		/* make sure we initialize shinfo sequentially */
-		shinfo = skb_shinfo(skb);
-		memset(shinfo, 0, offsetof(struct skb_shared_info, dataref));
-		atomic_set(&shinfo->dataref, 1);
-
-		skb->skb_recycling_callback = skbmgr_recycling_callback;
-		skb->skb_recycling_ind = SKBMGR_INDICATION;
-
-		atomic_inc(&skbmgr_alloc_no);
-		alloc_no = atomic_read(&skbmgr_alloc_no);
-		if (alloc_no > skbmgr_max_alloc_no)
-			skbmgr_max_alloc_no = alloc_no;
-
-		return skb;
-	}
-
-try_normal:
-	if ((skbmgr_limit == 0) || (atomic_read(&skbmgr_alloc_no) < skbmgr_limit)) {
-		skb = alloc_skb(SKBMGR_RX_BUF_LEN, GFP_ATOMIC|__GFP_NOWARN);
-		if (likely(skb)) {
-			skb->skb_recycling_callback = skbmgr_recycling_callback;
-			skb->skb_recycling_ind = SKBMGR_INDICATION;
-
-			atomic_inc(&skbmgr_alloc_no);
-			alloc_no = atomic_read(&skbmgr_alloc_no);
-			if (alloc_no > skbmgr_max_alloc_no)
-				skbmgr_max_alloc_no = alloc_no;
-		} else {
-			skbmgr_alloc_fail++;
-		}
-	} else {
-		skb = NULL;
-		skbmgr_alloc_fail++;
-	}
-	return skb;
-}
-
-EXPORT_SYMBOL(skbmgr_alloc_skb2k);
-
-__IMEM int skbmgr_recycling_callback(struct sk_buff *skb)
-{
-	struct sk_buff_head *list;
-
-	list = &skbmgr_pool[SKBMGR_QUEUE_ID].list;	
-
-	if (skb_queue_len(list) < skbmgr_hot_list_len) {
-		if ((skb->truesize - sizeof(struct sk_buff) != SKBMGR_RX_BUF_LEN) ||
-			skb_is_nonlinear(skb) ||
-			(skb->fclone != SKB_FCLONE_UNAVAILABLE) ||
-			skb_cloned(skb) ||
-			(skb_shinfo(skb)->nr_frags) || 
-			skb_has_frags(skb)) {
-			return 0;
-		}
-#if defined(CONFIG_TCSUPPORT_HWNAT)
-		pktflow_free(skb);
-#endif
-#if defined(CONFIG_TCSUPPORT_RA_HWNAT)
-		if (ra_sw_nat_hook_free)
-			ra_sw_nat_hook_free(skb);
-#endif
-		if (skb_queue_len(list) > skbmgr_max_list_len)
-			skbmgr_max_list_len = skb_queue_len(list) + 1;
-
-		skb_queue_head(list, skb);
-
-		return 1;
-	}
-
-	return 0;
-}
-
-EXPORT_SYMBOL(skbmgr_recycling_callback);
-
-//use for wifi driver, size 3840 is accord to wifi driver RX_BUFFER_AGGRESIZE.
-#define SKBMGR_4K_RX_BUF_LEN			SKB_WITH_OVERHEAD(4352)
-#define SKBMGR_4K_DEF_HOT_LIST_LEN		128
-#define SKBMGR_4K_LIMIT				512
-
-int skbmgr_4k_max_alloc_no = 0;
-int skbmgr_4k_alloc_fail = 0;
-//int skbmgr_limit = SKBMGR_4K_LIMIT; 
-int skbmgr_4k_hot_list_len = SKBMGR_4K_DEF_HOT_LIST_LEN;
-int skbmgr_4k_max_list_len = 0;
-
-union {
-	struct sk_buff_head     list;
-	char                    pad[SMP_CACHE_BYTES];
-} skbmgr_4k_pool[SKBMGR_MAX_QUEUE];
-
-#if defined(CONFIG_TCSUPPORT_MT7510_FE) || defined(CONFIG_MIPS_TC3162U)
-__IMEM
-#endif
-struct sk_buff *skbmgr_alloc_skb4k(void)
-{
-	struct sk_buff_head *list;
-	struct sk_buff *skb;
-	int alloc_no;
-	
-	list = &skbmgr_4k_pool[SKBMGR_QUEUE_ID].list;
-	
-	if (skb_queue_len(list)) {
-		unsigned int size;
-		struct skb_shared_info *shinfo;
-		u8 *data;
-
-		skb = skb_dequeue(list);
-
-		if (unlikely(skb == NULL))
-			goto try_normal;
-		
-		size = skb->truesize - sizeof(struct sk_buff);
-		data = skb->head;
-
-		/*
-		 * Only clear those fields we need to clear, not those that we will
-		 * actually initialise below. Hence, don't put any more fields after
-		 * the tail pointer in struct sk_buff!
-		 */
-		memset(skb, 0, offsetof(struct sk_buff, tail));
-		skb->truesize = size + sizeof(struct sk_buff);
-		atomic_set(&skb->users, 1);
-		skb->head = data;
-		skb->data = data;
-		skb_reset_tail_pointer(skb);
-		skb->end = skb->tail + size;
-		kmemcheck_annotate_bitfield(skb, flags1);
-		kmemcheck_annotate_bitfield(skb, flags2);
-#ifdef NET_SKBUFF_DATA_USES_OFFSET
-		skb->mac_header = ~0U;
-#endif
-
-		/* make sure we initialize shinfo sequentially */
-		shinfo = skb_shinfo(skb);
-		memset(shinfo, 0, offsetof(struct skb_shared_info, dataref));
-		atomic_set(&shinfo->dataref, 1);
-
-		skb->skb_recycling_callback = skbmgr_4k_recycling_callback;
-		skb->skb_recycling_ind = SKBMGR_4K_INDICATION;
-
-		atomic_inc(&skbmgr_4k_alloc_no);
-		alloc_no = atomic_read(&skbmgr_4k_alloc_no);
-		if (alloc_no > skbmgr_4k_max_alloc_no)
-			skbmgr_4k_max_alloc_no = alloc_no;
-
-		return skb;
-	}
-
-try_normal:
-	if ((atomic_read(&skbmgr_4k_alloc_no) < SKBMGR_4K_LIMIT)) {
-		skb = alloc_skb(SKBMGR_4K_RX_BUF_LEN , GFP_ATOMIC|__GFP_NOWARN);
-		if (likely(skb)) {
-			skb->skb_recycling_callback = skbmgr_4k_recycling_callback;
-			skb->skb_recycling_ind = SKBMGR_4K_INDICATION;
-			atomic_inc(&skbmgr_4k_alloc_no);
-			alloc_no = atomic_read(&skbmgr_4k_alloc_no);
-			if (alloc_no > skbmgr_4k_max_alloc_no)
-				skbmgr_4k_max_alloc_no = alloc_no;
-		} else {
-			skbmgr_4k_alloc_fail++;
-		}
-	} else {
-		skb = NULL;
-		skbmgr_4k_alloc_fail++;
-	}
-	return skb;
-}
-
-EXPORT_SYMBOL(skbmgr_alloc_skb4k);
-#if defined(CONFIG_TCSUPPORT_MT7510_FE) || defined(CONFIG_MIPS_TC3162U)
-__IMEM
-#endif
-int skbmgr_4k_recycling_callback(struct sk_buff *skb)
-{
-	struct sk_buff_head *list;
-
-	list = &skbmgr_4k_pool[SKBMGR_QUEUE_ID].list;
-
-	if (skb_queue_len(list) < skbmgr_4k_hot_list_len) {
-		if ((skb->truesize - sizeof(struct sk_buff) != SKBMGR_4K_RX_BUF_LEN) ||
-			(skb->fclone != SKB_FCLONE_UNAVAILABLE) ||
-			skb_cloned(skb) ||
-			(skb_shinfo(skb)->nr_frags) || 
-			skb_has_frags(skb)) {
-			return 0;
-		}
-
-#if defined(CONFIG_TCSUPPORT_HWNAT)
-		pktflow_free(skb);
-#endif
-#if defined(CONFIG_TCSUPPORT_RA_HWNAT)
-		if (ra_sw_nat_hook_free)
-			ra_sw_nat_hook_free(skb);
-#endif
-		if (skb_queue_len(list) > skbmgr_4k_max_list_len)
-			skbmgr_4k_max_list_len = skb_queue_len(list) + 1;
-
-		skb_queue_head(list, skb);
-
-		return 1;
-	}
-
-	return 0;
-}
-
-EXPORT_SYMBOL(skbmgr_4k_recycling_callback);
-#if defined(TC3262_GMAC_SG_MODE) || defined(TC3262_PTM_SG_MODE)
-
-#define SKBMGR_SG_RX_BUF_LEN		SKB_DATA_ALIGN(128+NET_SKB_PAD)
-
-__DMEM int skbmgr_sg_max_list_len = 0;
-
-__DMEM union {
-	struct sk_buff_head     list;
-	char                    pad[SMP_CACHE_BYTES];
-} skbmgr_sg_pool[NR_CPUS];
-
-struct sk_buff *skbmgr_alloc_skb128(void)
-{
-	struct sk_buff_head *list = &skbmgr_sg_pool[smp_processor_id()].list;
-	struct sk_buff *skb;
-
-	if (skb_queue_len(list)) {
-		unsigned long flags;
-		unsigned int size;
-		struct skb_shared_info *shinfo;
-		u8 *data;
-
- 		local_irq_save(flags);
-		skb = __skb_dequeue(list);
-		local_irq_restore(flags);
-
-		if (unlikely(skb == NULL))
-			goto try_normal;
-
-		size = skb->truesize - sizeof(struct sk_buff);
-		data = skb->head;
-
-		/*
-		 * Only clear those fields we need to clear, not those that we will
-		 * actually initialise below. Hence, don't put any more fields after
-		 * the tail pointer in struct sk_buff!
-		 */
-		memset(skb, 0, offsetof(struct sk_buff, tail));
-		skb->truesize = size + sizeof(struct sk_buff);
-		atomic_set(&skb->users, 1);
-		skb->head = data;
-		skb->data = data;
-		skb_reset_tail_pointer(skb);
-		skb->end = skb->tail + size;
-		kmemcheck_annotate_bitfield(skb, flags1);
-		kmemcheck_annotate_bitfield(skb, flags2);
-#ifdef NET_SKBUFF_DATA_USES_OFFSET
-		skb->mac_header = ~0U;
-#endif
-
-		/* make sure we initialize shinfo sequentially */
-		shinfo = skb_shinfo(skb);
-		memset(shinfo, 0, offsetof(struct skb_shared_info, dataref));
-		atomic_set(&shinfo->dataref, 1);
-
-		skb->skb_recycling_callback = skbmgr_sg_recycling_callback;
-
-		return skb;
-	}
-
-try_normal:
-	skb = alloc_skb(SKBMGR_SG_RX_BUF_LEN, GFP_ATOMIC|__GFP_NOWARN);
-	if (likely(skb)) 
-		skb->skb_recycling_callback = skbmgr_sg_recycling_callback;
-	return skb;
-}
-
-EXPORT_SYMBOL(skbmgr_alloc_skb128);
-int skbmgr_sg_recycling_callback(struct sk_buff *skb)
-{
-	struct sk_buff_head *list = &skbmgr_sg_pool[smp_processor_id()].list;
-
-	if (skb_queue_len(list) < skbmgr_hot_list_len) {
-		unsigned long flags;
-
-		if ((skb->truesize - sizeof(struct sk_buff) != SKBMGR_SG_RX_BUF_LEN) ||
-			(skb_shinfo(skb)->nr_frags) ||
-			(skb_shinfo(skb)->frag_list)) {
-			return 0;
-		}
-
-#if defined(CONFIG_TCSUPPORT_HWNAT)
-		pktflow_free(skb);
-#endif
-#ifdef CONFIG_TCSUPPORT_RA_HWNAT
-		if (ra_sw_nat_hook_free)
-			ra_sw_nat_hook_free(skb);
-#endif
-
-		if (skb_queue_len(list) > skbmgr_sg_max_list_len)
-			skbmgr_sg_max_list_len = skb_queue_len(list) + 1;
-
-		local_irq_save(flags);
-		__skb_queue_head(list, skb);
-		local_irq_restore(flags);
-
-		return 1;
-	}
-
-	return 0;
-}
-
-EXPORT_SYMBOL(skbmgr_sg_recycling_callback);
-#endif //xflu
-
-void skbmgr_free_all_skbs(void)
-{
-	struct sk_buff_head *list;
-	struct sk_buff *skb;
-	int i;
-
-	for (i=0; i<SKBMGR_MAX_QUEUE; i++) {
-		list = &skbmgr_pool[i].list;
-		while ((skb = skb_dequeue(list)) != NULL) {
-			skb->skb_recycling_callback = NULL;
-			if (skb->skb_recycling_ind == SKBMGR_INDICATION)
-				atomic_dec(&skbmgr_alloc_no);
-			skb->skb_recycling_ind = 0;
-			skb_release_data(skb);
-			kfree_skbmem(skb);
-		}
-	}
-#if 0
-	//do not need free 4k poll here. shnwind.
-	for (i=0; i<SKBMGR_MAX_QUEUE; i++) {
-		list = &skbmgr_4k_pool[i].list;
-		while ((skb = skb_dequeue(list)) != NULL) {
-			skb->skb_recycling_callback = NULL;
-			if (skb->skb_recycling_ind  == SKBMGR_4K_INDICATION)
-				atomic_dec(&skbmgr_4k_alloc_no);
-			skb->skb_recycling_ind = 0;
-			skb_release_data(skb);
-			kfree_skbmem(skb);
-		}
-	}
-#endif
-
-
-#if defined(TC3262_GMAC_SG_MODE) || defined(TC3262_PTM_SG_MODE)
-	for (i=0; i<NR_CPUS; i++) {
-		list = &skbmgr_sg_pool[i].list;
-		while ((skb = skb_dequeue(list)) != NULL) {
-			skb->skb_recycling_callback = NULL;
-			kfree_skbmem(skb);
-		}
-	}
-#endif
-}
-
-#ifdef CONFIG_PROC_FS
-
-static int hot_list_len_read(char *page, char **start, off_t offset,
-			    int count, int *eof, void *data)
-{
-	char *out = page;
-	int len;
-
-	out += sprintf(out, "skbmgr_hot_list_len %d skbmgr_4k_hot_list_len %d\n", skbmgr_hot_list_len,skbmgr_4k_hot_list_len);
-
-	len = out - page;
-	len -= offset;
-	if (len < count) {
-		*eof = 1;
-		if (len <= 0)
-			return 0;
-	} else
-		len = count;
-
-	*start = page + offset;
-	return len;
-}
-
-static int hot_list_len_write(struct file *file, const char __user * buffer,
-			     unsigned long count, void *data)
-{
-	char buf[64];
-	int val;
-
-	if (count > 64)
-		return -EINVAL;
-
-	if (copy_from_user(buf, buffer, count))
-		return -EFAULT;
-
-	val = simple_strtoul(buf, NULL, 10);
-
-	skbmgr_hot_list_len = val;
-	if (skbmgr_hot_list_len == 0) {
-		skbmgr_free_all_skbs();
-		skbmgr_max_list_len = 0;
-#if defined(TC3262_GMAC_SG_MODE) || defined(TC3262_PTM_SG_MODE)
-		skbmgr_sg_max_list_len = 0;
-#endif
-	}
-
-	return count;
-}
-
-static int limit_read(char *page, char **start, off_t offset,
-			int count, int *eof, void *data)
-{
-	char *out = page;
-	int len;
-
-	out += sprintf(out, "%d\n", skbmgr_limit);
-
-	len = out - page;
-	len -= offset;
-	if (len < count) {
-		*eof = 1;
-		if (len <= 0)
-			return 0;
-	} else
-		len = count;
-
-	*start = page + offset;
-	return len;
-}
-
-static int limit_write(struct file *file, const char __user * buffer,
-			     unsigned long count, void *data)
-{
-	char buf[64];
-	int val;
-
-	if (count > 64)
-		return -EINVAL;
-
-	if (copy_from_user(buf, buffer, count))
-		return -EFAULT;
-
-	val = simple_strtoul(buf, NULL, 10);
-
-	skbmgr_limit = val;
-	if (skbmgr_hot_list_len == 0) {
-		skbmgr_free_all_skbs();
-		skbmgr_max_list_len = 0;
-#if defined(TC3262_GMAC_SG_MODE) || defined(TC3262_PTM_SG_MODE)
-		skbmgr_sg_max_list_len = 0;
-#endif
-	}
-
-	return count;
-}
-
-static int skbmgr_info_read(char *page, char **start, off_t offset,
-			    int count, int *eof, void *data)
-{
-	char *out = page;
-	int len;
-	struct sk_buff_head *list;
-	int i;
-
-	out += sprintf(out, "skbmgr_limit = %d\n", skbmgr_limit);
-	out += sprintf(out, "skbmgr_max_alloc_no = %d\n", skbmgr_max_alloc_no);
-	out += sprintf(out, "skbmgr_alloc_fail = %d\n", skbmgr_alloc_fail);
-	out += sprintf(out, "skbmgr_alloc_no = %d\n", atomic_read(&skbmgr_alloc_no));
-	out += sprintf(out, "skbmgr_max_list_len = %d\n", skbmgr_max_list_len);
-	out += sprintf(out, "skbmgr_4k_limit = %d\n", SKBMGR_4K_LIMIT);
-	out += sprintf(out, "skbmgr_4k_max_alloc_no = %d\n", skbmgr_4k_max_alloc_no);
-	out += sprintf(out, "skbmgr_4k_alloc_fail = %d\n", skbmgr_4k_alloc_fail);
-	out += sprintf(out, "skbmgr_4k_alloc_no = %d\n", atomic_read(&skbmgr_4k_alloc_no));
-	out += sprintf(out, "skbmgr_4k_max_list_len = %d\n", skbmgr_4k_max_list_len);
-#if defined(TC3262_GMAC_SG_MODE) || defined(TC3262_PTM_SG_MODE)
-	out += sprintf(out, "skbmgr_sg_max_list_len = %d\n", skbmgr_sg_max_list_len);
-#endif
-
-	for (i=0; i<SKBMGR_MAX_QUEUE; i++) {
-		list = &skbmgr_pool[i].list;
-		out += sprintf(out, "skbmgr_queue_len CPU%d = %d\n", i, skb_queue_len(list));
-	}	
-
-	for (i=0; i<SKBMGR_MAX_QUEUE; i++) {
-		list = &skbmgr_4k_pool[i].list;
-		out += sprintf(out, "skbmgr_4k_queue_len CPU%d = %d\n", i, skb_queue_len(list));
-	}	
-#if defined(TC3262_GMAC_SG_MODE) || defined(TC3262_PTM_SG_MODE)
-	for (i=0; i<SKBMGR_MAX_QUEUE; i++) {
-		list = &skbmgr_sg_pool[i].list;
-		out += sprintf(out, "skbmgr_sg_queue_len CPU%d = %d\n", i, skb_queue_len(list));
-	}	
-#endif
-
-	len = out - page;
-	len -= offset;
-	if (len < count) {
-		*eof = 1;
-		if (len <= 0)
-			return 0;
-	} else
-		len = count;
-
-	*start = page + offset;
-	return len;
-}
-
-#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
-int auto_clear_cache_flag = 0;
-int auto_kill_process_flag = 0;
-static int auto_clear_cache_read(char *page, char **start, off_t offset,
-			    int count, int *eof, void *data)
-{
-	char *out = page;
-	int len;
-
-	out += sprintf(out, "%d\n", auto_clear_cache_flag);
-
-	len = out - page;
-	len -= offset;
-	if (len < count) {
-		*eof = 1;
-		if (len <= 0)
-			return 0;
-	} else
-		len = count;
-
-	*start = page + offset;
-	return len;
-}
-
-static int auto_clear_cache_write(struct file *file, const char __user * buffer,
-			     unsigned long count, void *data)
-{
-	char buf[64];
-	int val;
-
-	if (count > 64)
-		return -EINVAL;
-
-	if (copy_from_user(buf, buffer, count))
-		return -EFAULT;
-
-	val = simple_strtoul(buf, NULL, 10);
-
-	auto_clear_cache_flag = val;
-
-	return count;
-}
-
-static int auto_kill_process_read(char *page, char **start, off_t offset,
-			    int count, int *eof, void *data)
-{
-	char *out = page;
-	int len;
-
-	out += sprintf(out, "%d\n", auto_kill_process_flag);
-
-	len = out - page;
-	len -= offset;
-	if (len < count) {
-		*eof = 1;
-		if (len <= 0)
-			return 0;
-	} else
-		len = count;
-
-	*start = page + offset;
-	return len;
-}
-
-static int auto_kill_process_write(struct file *file, const char __user * buffer,
-			     unsigned long count, void *data)
-{
-	char buf[64];
-	int val;
-
-	if (count > 64)
-		return -EINVAL;
-
-	if (copy_from_user(buf, buffer, count))
-		return -EFAULT;
-
-	val = simple_strtoul(buf, NULL, 10);
-
-	auto_kill_process_flag = val;
-
-	return count;
-}
-#endif
-
-static int register_proc_skbmgr(void)
-{
-	struct proc_dir_entry *p;
-
-	p = create_proc_entry("skbmgr_hot_list_len", 0644, init_net.proc_net);
-	if (!p) 
-		return 0;
-
-	p->read_proc = hot_list_len_read;
-	p->write_proc = hot_list_len_write;
-
-	p = create_proc_read_entry("skbmgr_info", 0, init_net.proc_net, skbmgr_info_read, NULL);
-	if (!p) 
-		return 0;
-
-	p = create_proc_entry("skbmgr_limit", 0644, init_net.proc_net);
-	if (!p) 
-		return 0;
-
-	p->read_proc = limit_read;
-	p->write_proc = limit_write;
-
-#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
-	p = create_proc_entry("auto_clear_cache", 0644, init_net.proc_net);
-	if (!p) 
-		return 0;
-
-	p->read_proc = auto_clear_cache_read;
-	p->write_proc = auto_clear_cache_write;
-
-	p = create_proc_entry("auto_kill_process", 0644, init_net.proc_net);
-	if (!p) 
-		return 0;
-
-	p->read_proc = auto_kill_process_read;
-	p->write_proc = auto_kill_process_write;
-#endif
-	return 1;
-}
-
-void unregister_proc_skbmgr(void)
-{
-	remove_proc_entry("skbmgr_hot_list_len", init_net.proc_net);
-	remove_proc_entry("skbmgr_info", init_net.proc_net);
-	remove_proc_entry("skbmgr_limit", init_net.proc_net);
-	remove_proc_entry("skbmgr_driver_max_skb", init_net.proc_net);
-#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
-	remove_proc_entry("auto_clear_cache", init_net.proc_net);
-	remove_proc_entry("auto_kill_process", init_net.proc_net);
-#endif
-}
-EXPORT_SYMBOL(unregister_proc_skbmgr);
-#endif
-
-#endif
-
 void __init skb_init(void)
 {
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-	int i;
-
-	atomic_set(&skbmgr_alloc_no, 0);
-
-
-	for (i=0; i<SKBMGR_MAX_QUEUE; i++) {
-		skb_queue_head_init(&skbmgr_pool[i].list);
-	}
-
-	for (i=0; i<SKBMGR_MAX_QUEUE; i++) {
-		skb_queue_head_init(&skbmgr_4k_pool[i].list);
-	}
-
-#if defined(TC3262_GMAC_SG_MODE) || defined(TC3262_PTM_SG_MODE)
-	for (i=0; i<NR_CPUS; i++) {
-		skb_queue_head_init(&skbmgr_sg_pool[i].list);
-	}
-#elif defined(CONFIG_RAETH_SKB_RECYCLE_2K)
-	skb_queue_head_init(&rx0_recycle);
-#endif
-
-#ifdef CONFIG_PROC_FS
-	register_proc_skbmgr();
-#endif
-#endif
-
 	skbuff_head_cache = kmem_cache_create("skbuff_head_cache",
-					      sizeof(struct sk_buff),
-					      0,
-					      SLAB_HWCACHE_ALIGN|SLAB_PANIC,
-					      NULL);
+						sizeof(struct sk_buff),
+						0,
+						SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+						NULL);
 	skbuff_fclone_cache = kmem_cache_create("skbuff_fclone_cache",
 						(2*sizeof(struct sk_buff)) +
 						sizeof(atomic_t),
@@ -4014,10 +2864,10 @@ void __init skb_init(void)
 						NULL);
 #if defined(CONFIG_IMQ) || defined(CONFIG_IMQ_MODULE)
 	skbuff_cb_store_cache = kmem_cache_create("skbuff_cb_store_cache",
-						  sizeof(struct skb_cb_table),
-						  0,
-						  SLAB_HWCACHE_ALIGN|SLAB_PANIC,
-						  NULL);
+						sizeof(struct skb_cb_table),
+						0,
+						SLAB_HWCACHE_ALIGN|SLAB_PANIC,
+						NULL);
 #endif
 }
 

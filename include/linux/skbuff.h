@@ -2404,19 +2404,6 @@ static inline int skb_is_gso_v6(const struct sk_buff *skb)
 	return skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6;
 }
 
-#if defined(CONFIG_RAETH_SKB_RECYCLE_2K)
-struct sk_buff *skbmgr_alloc_skb2k(void);
-int skbmgr_recycling_callback(struct sk_buff *skb);
-
-static inline struct sk_buff *skbmgr_dev_alloc_skb2k(void)
-{
-        struct sk_buff *skb = skbmgr_alloc_skb2k();
-        if (likely(skb))
-                skb_reserve(skb, NET_SKB_PAD);
-        return skb;
-}
-#endif
-
 extern void __skb_warn_lro_forwarding(const struct sk_buff *skb);
 
 static inline bool skb_warn_if_lro(const struct sk_buff *skb)
@@ -2441,8 +2428,7 @@ static inline void skb_forward_csum(struct sk_buff *skb)
 
 bool skb_partial_csum_set(struct sk_buff *skb, u16 start, u16 off);
 
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-
+#if defined(CONFIG_MIPS_TC3262)
 struct sk_buff *skbmgr_alloc_skb2k(void);
 int skbmgr_recycling_callback(struct sk_buff *skb);
 
@@ -2453,33 +2439,8 @@ static inline struct sk_buff *skbmgr_dev_alloc_skb2k(void)
 		skb_reserve(skb, NET_SKB_PAD);
 	return skb;
 }
-struct sk_buff *skbmgr_alloc_skb4k(void);
-int skbmgr_4k_recycling_callback(struct sk_buff *skb);
-
-static inline struct sk_buff *skbmgr_dev_alloc_skb4k(void)
-{
-	struct sk_buff *skb = skbmgr_alloc_skb4k();
-	if (likely(skb))
-		skb_reserve(skb, NET_SKB_PAD);
-	return skb;
-}
 #endif
 
 
-
-#if defined(TC3262_GMAC_SG_MODE)|| defined(TC3262_PTM_SG_MODE)
-
-struct sk_buff *skbmgr_alloc_skb128(void);
-int skbmgr_sg_recycling_callback(struct sk_buff *skb);
-
-static inline struct sk_buff *skbmgr_dev_alloc_skb128(void)
-{
-	struct sk_buff *skb = skbmgr_alloc_skb128();
-	if (likely(skb))
-		skb_reserve(skb, NET_SKB_PAD);
-	return skb;
-}
-
-#endif
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */
