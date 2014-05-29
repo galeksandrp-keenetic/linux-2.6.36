@@ -374,6 +374,16 @@ struct sk_buff {
 	__be16			protocol;
 
 	void			(*destructor)(struct sk_buff *skb);
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262) || defined(CONFIG_RAETH_SKB_RECYCLE_2K)
+	int				(*skb_recycling_callback)(struct sk_buff *skb);
+	int				skb_recycling_ind;
+#endif
+#if defined(CONFIG_TCSUPPORT_HWNAT)
+	struct pktflow_t	*pktflow_p;
+#endif
+#if defined(CONFIG_TCSUPPORT_RA_HWNAT)
+	char foe[8];
+#endif
 #if defined(CONFIG_NF_CONNTRACK) || defined(CONFIG_NF_CONNTRACK_MODULE)
 	struct nf_conntrack	*nfct;
 	struct sk_buff		*nfct_reasm;
@@ -433,6 +443,107 @@ struct sk_buff {
 //	};
 
 	__u16			vlan_tci;
+#if !defined(CONFIG_TCSUPPORT_CT) 
+#ifdef CONFIG_PORT_BINDING
+#define MASK_ORIGIN_DEV   		0x1 	/* flag for port bind set origin dev name */
+#define MASK_OUT_DEV   			0x2 	/* flag for port bind set origin dev name */
+#define	IFNAMSIZ				16
+	__u32		portbind_mark;
+	char		orig_dev_name[IFNAMSIZ];
+#endif
+#endif
+#if defined(CONFIG_TCSUPPORT_VLAN_TAG) || defined(CONFIG_TCSUPPORT_CT_VLAN_TAG)
+	__u16		vlan_tags[2];
+#define		VLAN_PACKET				(1<<0)
+#define		VLAN_2TAGS_PACKET		(1<<1)
+#define		ROUTING_MODE_PACKET		(1<<2)
+#define		VLAN_TAG_FROM_INDEV		(1<<3)	
+#define		VLAN_TAG_INSERT_FLAG	(1<<4)
+#define		VLAN_TAG_CHECK_FLAG		(1<<5)
+#define		VLAN_TAG_FROM_WAN		(1<<6)
+	__u32	vlan_tag_flag;
+#endif
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	__u16	pon_vlan_tpid[4];//index = 0 mean inner tag,4 mean outer tag
+	__u16	pon_vlan_tci[4];
+	__u8	pon_tag_num;
+#define PON_PKT_FROM_CPE		(1<<0)
+#define PON_PKT_FROM_LAN		(1<<1)
+#define PON_PKT_FROM_WLAN		(1<<2)
+#define PON_PKT_FROM_WAN		(1<<3)
+#define PON_PKT_FROM_USB		(1<<4)
+#define PON_PKT_FROM_IGMP		(1<<5)
+#define PON_PKT_INSERT_FLAG		(1<<6)
+#define PON_PKT_ROUTING_FLAG	(1<<7)
+#define PON_PKT_SEND_TO_WAN		(1<<8)
+#define PON_VLAN_RX_CALL_HOOK	(1<<9)
+#define PON_VLAN_TX_CALL_HOOK	(1<<10)
+#define PON_USER_GROUP_FLAG		(1<<11)
+
+	__u32	pon_vlan_flag;
+
+	struct net_device * original_dev;
+#endif
+#if defined(CONFIG_TCSUPPORT_PON_MAC_FILTER)
+#define PKT_FROM_LAN		(1<<0)
+#define PKT_FROM_WAN		(1<<1)
+#define PKT_SEND_TO_WAN		(1<<2)
+#define PKT_FILTER_FLAG		(1<<3)
+#define PON_MAC_FILTER_RX_CALL_HOOK		(1<<4)
+#define PON_MAC_FILTER_TX_CALL_HOOK		(1<<5)
+	__u32 pon_mac_filter_flag;
+#endif
+#if defined(CONFIG_TCSUPPORT_PON_VLAN) || defined(CONFIG_TCSUPPORT_PON_MAC_FILTER) || (defined(CONFIG_TCSUPPORT_GPON_MAPPING) && defined(CONFIG_TCSUPPORT_GPON_DOWNSTREAM_MAPPING))
+	__u8 ppe_info_flag;
+	__u16 ppe_magic;
+	__u8 ppe_ai;
+	__u16 ppe_foe_entry;
+#endif
+#if 1//def CONFIG_QOS
+#define QOS_DEFAULT_MARK 			0x00000008
+#define QOS_FILTER_MARK 			0x000000f0
+#define QOS_NODROP_MARK				0x00000001
+/* no queue marked packets to default queue */
+#define QOS_PRIORITY_DEFAULT 		0x00000080	
+#define QOS_DOT1P_MARK				0x00000f00
+#define QOS_RULE_INDEX_MARK			0x0000f002
+#define QOS_RTP_MARK				0x00000004
+#define LANIF_MASK					0xf0000000
+	
+	
+#define MULTICAST_MASK 		0xf0000
+#define SKBUF_COPYTOLAN				(1 << 26)
+#define SKBUF_TCCONSOLE				(1 << 27)
+	/* the last bit is used as route policy mask */
+#define ROUTE_POLICY_MASK			(1 << 24)
+	//#define QOS_WANIF_MARK			0xff000
+	//#define QOS_DSCP_MARK 			0x3f00000
+#endif
+
+#if !defined(CONFIG_TCSUPPORT_CT)
+#if defined(CONFIG_TCSUPPORT_BRIDGE_FASTPATH)
+#define FB_WAN_ENABLE 	(1<<0)
+#define FB_FLOOD_PKT 	(1<<1)
+		__u8	fb_flags;
+		__u8	sc_mac_learned;
+#endif
+#endif
+#ifdef CONFIG_TCSUPPORT_CPU_MT7510
+		__u8	ipsec_pt_flag;
+#endif
+
+#if (defined(CONFIG_TCSUPPORT_WAN_GPON) || defined (CONFIG_TCSUPPORT_WAN_EPON))
+#define QOS_TSID_MARK					0x1f
+#define QOS_TSE_MARK					0x20
+#define DS_PKT_FORM_WAN				0x80
+#define DS_PKT_MAPPING_MARK			0x30
+#define DS_PKT_MAPPING_TO_ONE			0x10
+#define DS_PKT_MAPPING_TO_MULTI		0x20
+#define DS_QUEUE_ID_MARK				0x07
+	    __u16 gem_port ;  //gpon mapping gem port id, or new pbit for EPON Classification(only use low 4 bits)
+	    __u8 pon_mark ;   //upstream use for tse/tsid, downstream use for gpon ds mapping pkt_from_wan/pkt_down_mapping_flag/down queue id.
+	    __u8 v_if ;		//virtual interface. (GPON MAC bridge or EPON LLID)
+#endif /* (defined(CONFIG_TCSUPPORT_WAN_GPON) || defined (CONFIG_TCSUPPORT_WAN_EPON)) */
 
 	sk_buff_data_t		transport_header;
 	sk_buff_data_t		network_header;
@@ -1463,8 +1574,31 @@ static inline int pskb_network_may_pull(struct sk_buff *skb, unsigned int len)
  * get_rps_cpus() for example only access one 64 bytes aligned block :
  * NET_IP_ALIGN(2) + ethernet_header(14) + IP_header(20/40) + ports(8)
  */
+#ifdef CONFIG_RALINK_SOC
+
 #ifndef NET_SKB_PAD
+#if defined (CONFIG_PPPOPPTP) || defined (CONFIG_PPPOL2TP)
+#define NET_SKB_PAD		96
+#define NET_SKB_PAD_ORIG	max(32, L1_CACHE_BYTES)
+#else
+#define NET_SKB_PAD		max(32, L1_CACHE_BYTES)
+#define NET_SKB_PAD_ORIG	NET_SKB_PAD
+#endif
+#endif
+
+#elif defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
+
+#ifndef NET_SKB_PAD
+#define NET_SKB_PAD		32
+#else
+#define NET_SKB_PAD		16
+#endif
+#define NET_SKB_PAD_ORIG	NET_SKB_PAD
+#else
+
 #define NET_SKB_PAD	max(32, L1_CACHE_BYTES)
+#define NET_SKB_PAD_ORIG	NET_SKB_PAD
+
 #endif
 
 extern int ___pskb_trim(struct sk_buff *skb, unsigned int len);
@@ -1635,13 +1769,13 @@ static inline int __skb_cow(struct sk_buff *skb, unsigned int headroom,
 {
 	int delta = 0;
 
-	if (headroom < NET_SKB_PAD)
-		headroom = NET_SKB_PAD;
+	if (headroom < NET_SKB_PAD_ORIG)
+		headroom = NET_SKB_PAD_ORIG;
 	if (headroom > skb_headroom(skb))
 		delta = headroom - skb_headroom(skb);
 
 	if (delta || cloned)
-		return pskb_expand_head(skb, ALIGN(delta, NET_SKB_PAD), 0,
+		return pskb_expand_head(skb, ALIGN(delta, NET_SKB_PAD_ORIG), 0,
 					GFP_ATOMIC);
 	return 0;
 }
@@ -2143,6 +2277,46 @@ static inline void __nf_copy(struct sk_buff *dst, const struct sk_buff *src)
 	dst->nf_bridge  = src->nf_bridge;
 	nf_bridge_get(src->nf_bridge);
 #endif
+#if !defined(CONFIG_TCSUPPORT_CT) 
+#ifdef CONFIG_PORT_BINDING
+	dst->portbind_mark = src->portbind_mark;
+	memcpy(dst->orig_dev_name, src->orig_dev_name, IFNAMSIZ);
+#endif
+#endif
+#if defined(CONFIG_TCSUPPORT_VLAN_TAG) || defined(CONFIG_TCSUPPORT_CT_VLAN_TAG)
+	dst->vlan_tags[0] = src->vlan_tags[0];
+	dst->vlan_tags[1] = src->vlan_tags[1];
+	dst->vlan_tag_flag = src->vlan_tag_flag;
+#endif
+#ifdef CONFIG_TCSUPPORT_PON_VLAN
+	dst->pon_vlan_tpid[0] = src->pon_vlan_tpid[0];
+	dst->pon_vlan_tpid[1] = src->pon_vlan_tpid[1];
+	dst->pon_vlan_tpid[2] = src->pon_vlan_tpid[2];
+	dst->pon_vlan_tpid[3] = src->pon_vlan_tpid[3];
+	
+	dst->pon_vlan_tci[0] = src->pon_vlan_tci[0];
+	dst->pon_vlan_tci[1] = src->pon_vlan_tci[1];
+	dst->pon_vlan_tci[2] = src->pon_vlan_tci[2];
+	dst->pon_vlan_tci[3] = src->pon_vlan_tci[3];
+
+	dst->pon_tag_num = src->pon_tag_num;
+	dst->pon_vlan_flag = src->pon_vlan_flag;
+	dst->original_dev = src->original_dev;
+#endif
+#ifdef CONFIG_TCSUPPORT_PON_MAC_FILTER
+	dst->pon_mac_filter_flag = src->pon_mac_filter_flag;
+#endif
+#if defined(CONFIG_TCSUPPORT_PON_VLAN) || defined(CONFIG_TCSUPPORT_PON_MAC_FILTER) || (defined(CONFIG_TCSUPPORT_GPON_MAPPING) && defined(CONFIG_TCSUPPORT_GPON_DOWNSTREAM_MAPPING))
+	dst->ppe_info_flag = src->ppe_info_flag;
+	dst->ppe_magic = src->ppe_magic;
+	dst->ppe_ai = src->ppe_ai;
+	dst->ppe_foe_entry = src->ppe_foe_entry;
+#endif
+#if (defined(CONFIG_TCSUPPORT_WAN_GPON) || defined (CONFIG_TCSUPPORT_WAN_EPON))
+	dst->gem_port = src->gem_port;
+	dst->pon_mark = src->pon_mark;
+	dst->v_if = src->v_if;
+#endif
 }
 
 static inline void nf_copy(struct sk_buff *dst, const struct sk_buff *src)
@@ -2230,6 +2404,19 @@ static inline int skb_is_gso_v6(const struct sk_buff *skb)
 	return skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6;
 }
 
+#if defined(CONFIG_RAETH_SKB_RECYCLE_2K)
+struct sk_buff *skbmgr_alloc_skb2k(void);
+int skbmgr_recycling_callback(struct sk_buff *skb);
+
+static inline struct sk_buff *skbmgr_dev_alloc_skb2k(void)
+{
+        struct sk_buff *skb = skbmgr_alloc_skb2k();
+        if (likely(skb))
+                skb_reserve(skb, NET_SKB_PAD);
+        return skb;
+}
+#endif
+
 extern void __skb_warn_lro_forwarding(const struct sk_buff *skb);
 
 static inline bool skb_warn_if_lro(const struct sk_buff *skb)
@@ -2253,5 +2440,46 @@ static inline void skb_forward_csum(struct sk_buff *skb)
 }
 
 bool skb_partial_csum_set(struct sk_buff *skb, u16 start, u16 off);
+
+#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
+
+struct sk_buff *skbmgr_alloc_skb2k(void);
+int skbmgr_recycling_callback(struct sk_buff *skb);
+
+static inline struct sk_buff *skbmgr_dev_alloc_skb2k(void)
+{
+	struct sk_buff *skb = skbmgr_alloc_skb2k();
+	if (likely(skb))
+		skb_reserve(skb, NET_SKB_PAD);
+	return skb;
+}
+struct sk_buff *skbmgr_alloc_skb4k(void);
+int skbmgr_4k_recycling_callback(struct sk_buff *skb);
+
+static inline struct sk_buff *skbmgr_dev_alloc_skb4k(void)
+{
+	struct sk_buff *skb = skbmgr_alloc_skb4k();
+	if (likely(skb))
+		skb_reserve(skb, NET_SKB_PAD);
+	return skb;
+}
+#endif
+
+
+
+#if defined(TC3262_GMAC_SG_MODE)|| defined(TC3262_PTM_SG_MODE)
+
+struct sk_buff *skbmgr_alloc_skb128(void);
+int skbmgr_sg_recycling_callback(struct sk_buff *skb);
+
+static inline struct sk_buff *skbmgr_dev_alloc_skb128(void)
+{
+	struct sk_buff *skb = skbmgr_alloc_skb128();
+	if (likely(skb))
+		skb_reserve(skb, NET_SKB_PAD);
+	return skb;
+}
+
+#endif
 #endif	/* __KERNEL__ */
 #endif	/* _LINUX_SKBUFF_H */
