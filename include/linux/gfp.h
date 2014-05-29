@@ -66,11 +66,7 @@ struct vm_area_struct;
  */
 #define __GFP_NOTRACK_FALSE_POSITIVE (__GFP_NOTRACK)
 
-#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
-#define __GFP_BITS_SHIFT 25	/* Room for 25 __GFP_FOO bits */
-#else
 #define __GFP_BITS_SHIFT 22	/* Room for 22 __GFP_FOO bits */
-#endif
 #define __GFP_BITS_MASK ((__force gfp_t)((1 << __GFP_BITS_SHIFT) - 1))
 
 /* This equals 0, but use constants in case they ever change */
@@ -101,17 +97,6 @@ struct vm_area_struct;
 #else
 #define __GFP_SKIP_PKTFLOW	((__force gfp_t)0x0u)
 #define GFP_SKIP_PKTFLOW	__GFP_SKIP_PKTFLOW
-#endif
-
-#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
-#define __GFP_TCMC	((__force gfp_t)0x800000u)/* Memory control flag,used by skbmgr_alloc_skb2k,jlliu */
-#define __GFP_TC_CRITICAL	((__force gfp_t)0x1000000u)/* Memory critical flag,used by skbmgr_alloc_skb2k_tc_critical */
-/* if you forget to add the bitmask here kernel will crash, period */
-#define GFP_LEVEL_MASK (__GFP_WAIT|__GFP_HIGH|__GFP_IO|__GFP_FS| \
-			__GFP_COLD|__GFP_NOWARN|__GFP_REPEAT| \
-			__GFP_NOFAIL|__GFP_NORETRY|__GFP_COMP| \
-			__GFP_NOMEMALLOC|__GFP_HARDWALL|__GFP_THISNODE|__GFP_TCMC|__GFP_TC_CRITICAL| \
-			__GFP_SKIP_PKTFLOW)
 #endif
 
 /* This mask makes up all the page movable related flags */

@@ -35,11 +35,6 @@
 int sysctl_panic_on_oom;
 int sysctl_oom_kill_allocating_task;
 int sysctl_oom_dump_tasks = 1;
-#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
-#ifdef CONFIG_PROC_FS
-extern int auto_kill_process_flag;
-#endif
-#endif
 
 static DEFINE_SPINLOCK(zone_scan_lock);
 
@@ -535,11 +530,6 @@ static int oom_kill_task(struct task_struct *p, struct mem_cgroup *mem)
 }
 #undef K
 
-#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
-#ifdef CONFIG_PROC_FS	
-extern void drop_pagecache_sb(struct super_block *sb, void *unused);
-#endif
-#endif
 static int oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
 #ifdef CONFIG_TCSUPPORT_OOM_RB_NEXT
 			    unsigned long points, struct mem_cgroup *mem,
@@ -557,17 +547,6 @@ static int oom_kill_process(struct task_struct *p, gfp_t gfp_mask, int order,
 	unsigned long victim_points = 0;
 #else
 	unsigned int victim_points = 0;
-#endif
-#if defined(CONFIG_TCSUPPORT_MEMORY_CONTROL) || defined(CONFIG_TCSUPPORT_CT)
-#ifdef CONFIG_PROC_FS	
-	//when out of memory,no need to kill process
-		if(auto_kill_process_flag)
-		{
-			printk("\r\noom_kill_process:no need to kill process when out of memory and drop cache!");
-			iterate_supers(drop_pagecache_sb, NULL);
-			return 0;
-		}
-#endif
 #endif
 
 	if (printk_ratelimit())
