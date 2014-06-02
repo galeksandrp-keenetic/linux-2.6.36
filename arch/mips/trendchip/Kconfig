@@ -3,4 +3,8 @@ config SOFTFLOAT_LIB
   bool "Compile softfloat library"
   help
   
+config PCIE_CONCURENNCY
+  bool "Enable 2 PCIe port"
+  help
+  
 endif
