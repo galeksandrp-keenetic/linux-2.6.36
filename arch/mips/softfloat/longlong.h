@@ -210,7 +210,7 @@ UDItype __umulsidi3 (USItype, USItype);
 	     "rI" ((USItype) (bl)))
 #define umul_ppmm(xh, xl, a, b) \
 {register USItype __t0, __t1, __t2;					\
-  __asm__ ("%@ Inlined umul_ppmm\n"					\
+    __asm__ ("%@ Inlined umul_ppmm\n"					\
 	   "	mov	%2, %5, lsr #16\n"				\
 	   "	mov	%0, %6, lsr #16\n"				\
 	   "	bic	%3, %5, %2, lsl #16\n"				\
@@ -558,12 +558,12 @@ UDItype __umulsidi3 (USItype, USItype);
 #endif /* __m88000__ */
 
 #if defined (__mips__) && W_TYPE_SIZE == 32
-#define umul_ppmm(w1, w0, u, v) \
-  __asm__ ("multu %2,%3"						\
-	   : "=l" ((USItype) (w0)),					\
-	     "=h" ((USItype) (w1))					\
-	   : "d" ((USItype) (u)),					\
-	     "d" ((USItype) (v)))
+#define umul_ppmm(w1, w0, u, v)						\
+  do {									\
+    UDItype __x = (UDItype) (USItype) (u) * (USItype) (v);		\
+    (w1) = (USItype) (__x >> 32);					\
+    (w0) = (USItype) (__x);						\
+  } while (0)
 #define UMUL_TIME 10
 #define UDIV_TIME 100
 #endif /* __mips__ */
@@ -598,9 +598,9 @@ UDItype __umulsidi3 (USItype, USItype);
 #define count_trailing_zeros(count,x) \
   do {									\
     __asm__ ("ffsd     %2,%0"						\
-            : "=r" ((USItype) (count))					\
-            : "0" ((USItype) 0),					\
-              "r" ((USItype) (x)));					\
+	    : "=r" ((USItype) (count))					\
+	    : "0" ((USItype) 0),					\
+	      "r" ((USItype) (x)));					\
   } while (0)
 #endif /* __ns32000__ */
 
@@ -922,8 +922,8 @@ UDItype __umulsidi3 (USItype, USItype);
 #define count_leading_zeros(count, x) \
   do {                                                                  \
   __asm__ ("scan %1,1,%0"                                               \
-           : "=r" ((USItype) (count))                                   \
-           : "r" ((USItype) (x)));					\
+	   : "=r" ((USItype) (count))                                   \
+	   : "r" ((USItype) (x)));					\
   } while (0)
 /* Early sparclites return 63 for an argument of 0, but they warn that future
    implementations might change this.  Therefore, leave COUNT_LEADING_ZEROS_0
@@ -1023,26 +1023,26 @@ UDItype __umulsidi3 (USItype, USItype);
    	   "bcs,a,pn %%xcc, 1f\n\t"					\
    	   "add %0, 1, %0\n"						\
 	   "1:"								\
-	   : "=r" ((UDItype)(sh)),				      	\
+	     : "=r" ((UDItype)(sh)),				      	\
 	     "=&r" ((UDItype)(sl))				      	\
-	   : "%rJ" ((UDItype)(ah)),				     	\
-	     "rI" ((UDItype)(bh)),				      	\
-	     "%rJ" ((UDItype)(al)),				     	\
-	     "rI" ((UDItype)(bl))				       	\
+	     : "%rJ" ((UDItype)(ah)),				     	\
+	       "rI" ((UDItype)(bh)),				      	\
+	       "%rJ" ((UDItype)(al)),				     	\
+	       "rI" ((UDItype)(bl))				       	\
 	   __CLOBBER_CC)
 
-#define sub_ddmmss(sh, sl, ah, al, bh, bl) 				\
+#define sub_ddmmss(sh, sl, ah, al, bh, bl)				\
   __asm__ ("subcc %r4,%5,%1\n\t"					\
    	   "sub %r2,%3,%0\n\t"						\
    	   "bcs,a,pn %%xcc, 1f\n\t"					\
    	   "sub %0, 1, %0\n\t"						\
 	   "1:"								\
-	   : "=r" ((UDItype)(sh)),				      	\
+	     : "=r" ((UDItype)(sh)),				      	\
 	     "=&r" ((UDItype)(sl))				      	\
 	   : "rJ" ((UDItype)(ah)),				     	\
-	     "rI" ((UDItype)(bh)),				      	\
+	       "rI" ((UDItype)(bh)),				      	\
 	     "rJ" ((UDItype)(al)),				     	\
-	     "rI" ((UDItype)(bl))				       	\
+	       "rI" ((UDItype)(bl))				       	\
 	   __CLOBBER_CC)
 
 #define umul_ppmm(wh, wl, u, v)						\
