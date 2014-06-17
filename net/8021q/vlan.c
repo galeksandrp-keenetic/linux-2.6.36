@@ -57,6 +57,14 @@ static struct packet_type vlan_packet_type __read_mostly = {
 	.func = vlan_skb_recv, /* VLAN receive method */
 };
 
+#if defined (CONFIG_RAETH_HW_VLAN_TX)
+int (*add_hw_vlan_vid)(u16 vlan_id) = NULL;
+int (*del_hw_vlan_vid)(u16 vlan_id) = NULL;
+EXPORT_SYMBOL(add_hw_vlan_vid);
+EXPORT_SYMBOL(del_hw_vlan_vid);
+#endif
+
+
 #ifdef CONFIG_TCSUPPORT_PON_VLAN
 static struct packet_type QinQ_88a8_packet_type = {
 	.type = cpu_to_be16(ETH_P_QinQ_88a8),
@@ -172,6 +180,10 @@ void unregister_vlan_dev(struct net_device *dev, struct list_head *head)
 	if (vlan_id && (real_dev->features & NETIF_F_HW_VLAN_FILTER))
 		ops->ndo_vlan_rx_kill_vid(real_dev, vlan_id);
 
+#if defined (CONFIG_RAETH_HW_VLAN_TX)
+	if (rcu_dereference(del_hw_vlan_vid))
+		del_hw_vlan_vid(vlan_id);
+#endif
 	grp->nr_vlans--;
 
 	vlan_group_set_device(grp, vlan_id, NULL);
@@ -340,7 +352,7 @@ static int register_vlan_device(struct net_device *real_dev, u16 vlan_id)
 	new_dev->mtu = real_dev->mtu;
 
 #if defined (CONFIG_RAETH_TSO)
-#if defined(CONFIG_RALINK_MT7620)                                                                                
+#if defined(CONFIG_RALINK_MT7620)
 	if( (*(volatile u32 *)(0xB000000C) & 0xf) >= 0x5) {
 		new_dev->features = real_dev->features;
 	}
@@ -359,7 +371,13 @@ static int register_vlan_device(struct net_device *real_dev, u16 vlan_id)
 	err = register_vlan_dev(new_dev);
 	if (err < 0)
 		goto out_free_newdev;
+#if defined (CONFIG_RAETH_HW_VLAN_TX)
+	if (rcu_dereference(add_hw_vlan_vid))
+		err = add_hw_vlan_vid(vlan_id);
 
+	if (err < 0)
+		goto out_free_newdev;
+#endif
 	return 0;
 
 out_free_newdev:
