@@ -26,13 +26,13 @@ choice
 
 endchoice
 
-config RAETH_SKB_RECYCLE_2K
-        bool "SKB Recycling"
-        depends on RAETH
+#config RAETH_SKB_RECYCLE_2K
+#        bool "SKB Recycling"
+#        depends on RAETH
 
-config RAETH_SPECIAL_TAG
-        bool "Ralink Special Tag (0x810x)"
-        depends on RAETH && RT_3052_ESW
+#config RAETH_SPECIAL_TAG
+#        bool "Ralink Special Tag (0x810x)"
+#        depends on RAETH && RT_3052_ESW
 
 config RAETH_JUMBOFRAME
         bool "Jumbo Frame up to 4K bytes"
@@ -43,10 +43,10 @@ config RAETH_CHECKSUM_OFFLOAD
 	default y
         depends on RAETH && !RALINK_RT2880
 
-config RAETH_SW_FC
-        bool "When TX ring is full, inform kernel stop transmit and stop RX handler"
-	default n
-        depends on RAETH
+#config RAETH_SW_FC
+#        bool "When TX ring is full, inform kernel stop transmit and stop RX handler"
+#	default n
+#        depends on RAETH
 
 config 32B_DESC
         bool "32bytes TX/RX description"
@@ -74,7 +74,7 @@ config RAETH_HW_VLAN_RX
 
 config RAETH_TSO
         bool "TSOV4 (Tcp Segmentaton Offload)"
-	depends on RAETH_HW_VLAN_TX && (RALINK_RT6855 || MIPS_RT63365 || MIPS_MT7510 ||RALINK_MT7621)
+	depends on RAETH_HW_VLAN_TX && (RALINK_RT6855 || MIPS_RT63365 || MIPS_MT7510 || RALINK_MT7620 || RALINK_MT7621)
 
 config RAETH_TSOV6
         bool "TSOV6 (Tcp Segmentaton Offload)"
@@ -143,25 +143,25 @@ config  RT_3052_ESW
 endchoice
 
 
-config LAN_WAN_SUPPORT
-        bool "LAN/WAN Partition"
-        depends on RAETH_ROUTER || RT_3052_ESW
+#config LAN_WAN_SUPPORT
+#        bool "LAN/WAN Partition"
+#        depends on RAETH_ROUTER || RT_3052_ESW
 
-choice
-        prompt "Switch Board Layout Type"
-        depends on LAN_WAN_SUPPORT || P5_RGMII_TO_MAC_MODE ||  GE1_RGMII_FORCE_1000 || GE2_RGMII_FORCE_1000
-	default WAN_AT_P0
+#choice
+#        prompt "Switch Board Layout Type"
+#        depends on LAN_WAN_SUPPORT || P5_RGMII_TO_MAC_MODE ||  GE1_RGMII_FORCE_1000 || GE2_RGMII_FORCE_1000
+#	default WAN_AT_P0
 
-	config  WAN_AT_P4
-	        bool "LLLL/W"
-		
-	config  WAN_AT_P0
-	        bool "W/LLLL"
-endchoice
+#	config  WAN_AT_P4
+#	        bool "LLLL/W"
+#		
+#	config  WAN_AT_P0
+#	        bool "W/LLLL"
+#endchoice
 
-config	RALINK_VISTA_BASIC
-	bool 'Vista Basic Logo for IC+ 175C'
-        depends on LAN_WAN_SUPPORT && (RALINK_RT2880 || RALINK_RT3883)
+#config	RALINK_VISTA_BASIC
+#	bool 'Vista Basic Logo for IC+ 175C'
+#        depends on LAN_WAN_SUPPORT && (RALINK_RT2880 || RALINK_RT3883)
 
 config	ESW_DOUBLE_VLAN_TAG
 	bool
