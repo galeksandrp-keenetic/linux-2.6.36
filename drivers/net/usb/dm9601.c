@@ -614,13 +614,13 @@ static void dm9620_set_multicast(struct net_device *net)
          struct usbnet *dev = netdev_priv(net);
 	 int i;
  
-#if 1
+#ifdef DEBUG
 	 printk("[dm96] Set mac addr %pM\n", addr->sa_data);  // %x:%x:...
 	 printk("[dm96] ");
 	 for (i=0; i<net->addr_len; i++)
 	 printk("[%02x] ", addr->sa_data[i]);
 	 printk("\n");
- #endif
+#endif
  
          if (!is_valid_ether_addr(addr->sa_data)) {
                  dev_err(&net->dev, "not setting invalid mac address %pM\n",
@@ -687,6 +687,7 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
 
 	printk("[dm962] Linux Driver = %s\n", LNX_DM9620_VER_STR);
 //JJ1
+#ifdef DEBUG
 	if ( (ret= dm_read_reg(dev, 0x29, &tmp)) >=0)
 		printk("++++++[dm962]+++++ dm_read_reg() 0x29 0x%02x\n",tmp);
 	else
@@ -720,6 +721,7 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
 		printk("++++++[dm962]+++++  [Analysis.2] 0xF2, D[2] %d %s\n", (tmp>>2)&1, (tmp&(1<<2))? "Err: TX Buffer full": "OK" );
 		printk("++++++[dm962]+++++  [Analysis.2] 0xF2, D[1] %d %s\n", (tmp>>1)&1, (tmp&(1<<1))? "Warn: TX buffer Almost full": "OK" );
 		printk("++++++[dm962]+++++  [Analysis.2] 0xF2, D[0] %d %s\n", (tmp>>0)&1, (tmp&(1<<0))? "Status: TX buffer has pkts": "Status: TX buffer 0 pkts" );
+#endif
 
 	/* reset */
 	dm_write_reg(dev, DM_NET_CTRL, 1);
@@ -740,7 +742,7 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
 		goto out;
 	}
 
-#if 1
+#ifdef DEBUG
 	 printk("[dm96] Chk mac addr %pM\n", dev->net->dev_addr);  // %x:%x...
 	 printk("[dm96] ");
 	 for (i=0; i<ETH_ALEN; i++)
@@ -966,10 +968,14 @@ struct sk_buff *TxExpend(struct dm96xx_priv* priv, u8 ts, struct sk_buff *skb, g
 		dev_kfree_skb_any(skb);
 		skb = skb2;
 		if (!skb){
+#ifdef DEBUG
 			printk("[dm96-TxRound].%d expend copy fail, for head, tail= %d, %d\n", priv->flg_txdbg++, newheadroom, newtailroom);
+#endif
 			return NULL;
 		}
+#ifdef DEBUG
 		printk("[dm96-TxRound].%d expend copy OK, for head, tail= %d, %d\n", priv->flg_txdbg++, newheadroom, newtailroom);
+#endif
     }
     return skb;
 }
@@ -1019,9 +1025,11 @@ static struct sk_buff *dm9620_tx_fixup(struct usbnet *dev, struct sk_buff *skb,
      if (TS & TX_LEN_O) newtailroom++;
      if (TS & TX_LEN_F) newtailroom += 2;
      
+#ifdef DEBUG
      if (TS & TX_LEN_O) printk("[dm96-TxRound].%d for LEN_ODD tail_room +1, rslt add %d\n", priv->flg_txdbg, newtailroom);
      if (TS & TX_LEN_F) printk("[dm96-TxRound].%d for LEN_PLOAD tail_room +2, rslt add %d\n", priv->flg_txdbg, newtailroom);
      if (TS & TX_LEN_F) printk("[dm96-TxRound].%d for LEN_PLOAD data_len +2, len from %d to %d\n", priv->flg_txdbg, len-2, len);
+#endif
      if (TS & (TX_LEN_O|TX_LEN_F)) priv->flg_txdbg++;
 
 	__skb_push(skb, newheadroom); //2 bytes,for data[0],data[1]
