@@ -55,5 +55,56 @@ config DWC_OTG_DEBUG
         bool "Enable debug mode"
         depends on DWC_OTG
 
-endmenu
+#########
+# USBnet
+#########
 
+config USB_WDM
+	tristate "USB Wireless Device Management support"
+	depends on USB
+	help
+	  This driver supports the WMC Device Management functionality
+	  of cell phones compliant to the CDC WMC specification. You can use
+	  AT commands over this device.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cdc-wdm.
+
+config USB_NET_CDC_NCM
+	tristate "CDC NCM support"
+	depends on USB_USBNET
+	default y
+	help
+	  This driver provides support for CDC NCM (Network Control Model
+	  Device USB Class Specification). The CDC NCM specification is
+	  available from <http://www.usb.org/>.
+
+	  Say "y" to link the driver statically, or "m" to build a
+	  dynamically linked module.
+
+	  This driver should work with at least the following devices:
+	    * ST-Ericsson M700 LTE FDD/TDD Mobile Broadband Modem (ref. design)
+	    * ST-Ericsson M5730 HSPA+ Mobile Broadband Modem (reference design)
+	    * ST-Ericsson M570 HSPA+ Mobile Broadband Modem (reference design)
+	    * ST-Ericsson M343 HSPA Mobile Broadband Modem (reference design)
+	    * Ericsson F5521gw Mobile Broadband Module
+
+config USB_NET_CDC_MBIM
+	tristate "CDC MBIM support"
+	depends on USB_USBNET
+	select USB_WDM
+	select USB_NET_CDC_NCM
+	help
+	  This driver provides support for CDC MBIM (Mobile Broadband
+	  Interface Model) devices. The CDC MBIM specification is
+	  available from <http://www.usb.org/>.
+
+	  MBIM devices require configuration using the management
+	  protocol defined by the MBIM specification.  This driver
+	  provides unfiltered access to the MBIM control channel
+	  through the associated /dev/cdc-wdmx character device.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called cdc_mbim.
+
+endmenu
