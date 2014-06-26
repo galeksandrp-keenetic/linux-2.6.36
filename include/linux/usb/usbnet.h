@@ -3,6 +3,8 @@
  *
  * Copyright (C) 2000-2005 by David Brownell <dbrownell@users.sourceforge.net>
  * Copyright (C) 2003-2005 David Hollis <dhollis@davehollis.com>
+ * Copyright (C) 2011 by McMCC (NDM Systems)
+ * Copyright (C) 2014 NDM Systems (afom@ndmsystems.com)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -97,6 +99,16 @@ struct driver_info {
 
 #define FLAG_LINK_INTR	0x0800		/* updates link (carrier) status */
 
+#define FLAG_POINTTOPOINT 0x1000	/* possibly use "usb%d" names */
+
+/*
+ * Indicates to usbnet, that USB driver accumulates multiple IP packets.
+ * Affects statistic (counters) and short packet handling.
+ */
+#define FLAG_MULTI_PACKET	0x2000
+#define FLAG_RX_ASSEMBLE	0x4000	/* rx packets may span >1 frames */
+#define FLAG_NOARP		0x8000	/* device can't do ARP */
+
 	/* init device ... can sleep, or cause probe() failure */
 	int	(*bind)(struct usbnet *, struct usb_interface *);
 
@@ -132,6 +144,10 @@ struct driver_info {
 	 * having 'subminidrivers' that need to do extra initialization
 	 * right after minidriver have initialized hardware. */
 	int	(*early_init)(struct usbnet *dev);
+
+	/* called by minidriver when link state changes, state: 0=disconnect,
+	 * 1=connect */
+	void	(*link_change)(struct usbnet *dev, int state);
 
 	/* called by minidriver when receiving indication */
 	void	(*indication)(struct usbnet *dev, void *ind, int indlen);
@@ -215,5 +231,7 @@ extern u32 usbnet_get_msglevel(struct net_device *);
 extern void usbnet_set_msglevel(struct net_device *, u32);
 extern void usbnet_get_drvinfo(struct net_device *, struct ethtool_drvinfo *);
 extern int usbnet_nway_reset(struct net_device *net);
+
+extern int (*is_wimax_devname_hook)(u16 vendor_id, u16 product_id);
 
 #endif /* __LINUX_USB_USBNET_H */

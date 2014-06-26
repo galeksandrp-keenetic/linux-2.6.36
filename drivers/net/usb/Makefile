@@ -26,3 +26,6 @@ obj-$(CONFIG_USB_CDC_PHONET)	+= cdc-phonet.o
 obj-$(CONFIG_USB_IPHETH)	+= ipheth.o
 obj-$(CONFIG_USB_SIERRA_NET)	+= sierra_net.o
 
+ifeq ($(CONFIG_DWC_OTG_HOST_ONLY),y)
+	EXTRA_CFLAGS   += -DDWC_HOST_ONLY
+endif

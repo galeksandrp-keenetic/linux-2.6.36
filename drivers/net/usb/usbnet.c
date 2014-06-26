@@ -2,6 +2,8 @@
  * USB Network driver infrastructure
  * Copyright (C) 2000-2005 by David Brownell
  * Copyright (C) 2003-2005 David Hollis <dhollis@davehollis.com>
+ * Copyright (C) 2011 by McMCC (NDM Systems)
+ * Copyright (C) 2014 NDM Systems (afom@ndmsystems.com)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,12 +45,10 @@
 #include <linux/mii.h>
 #include <linux/usb.h>
 #include <linux/usb/usbnet.h>
-#include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/pm_runtime.h>
 
 #define DRIVER_VERSION		"22-Aug-2005"
-
 
 /*-------------------------------------------------------------------------*/
 
@@ -231,6 +231,7 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 		return;
 	}
 
+	skb->dev = dev->net;
 	skb->protocol = eth_type_trans (skb, dev->net);
 	dev->net->stats.rx_packets++;
 	dev->net->stats.rx_bytes += skb->len;
@@ -330,7 +331,9 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 		usb_free_urb (urb);
 		return -ENOMEM;
 	}
+#ifndef DWC_HOST_ONLY
 	skb_reserve (skb, NET_IP_ALIGN);
+#endif
 
 	entry = (struct skb_data *) skb->cb;
 	entry->urb = urb;
@@ -344,9 +347,9 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 	spin_lock_irqsave (&dev->rxq.lock, lockflags);
 
 	if (netif_running (dev->net) &&
-	    netif_device_present (dev->net) &&
-	    !test_bit (EVENT_RX_HALT, &dev->flags) &&
-	    !test_bit (EVENT_DEV_ASLEEP, &dev->flags)) {
+			netif_device_present (dev->net) &&
+			!test_bit (EVENT_RX_HALT, &dev->flags) &&
+			!test_bit (EVENT_DEV_ASLEEP, &dev->flags)) {
 		switch (retval = usb_submit_urb (urb, GFP_ATOMIC)) {
 		case -EPIPE:
 			usbnet_defer_kevent (dev, EVENT_RX_HALT);
@@ -635,6 +638,10 @@ int usbnet_stop (struct net_device *net)
 	struct usbnet		*dev = netdev_priv(net);
 	struct driver_info	*info = dev->driver_info;
 	int			retval;
+	DECLARE_WAIT_QUEUE_HEAD_ONSTACK (unlink_wakeup);
+	DECLARE_WAITQUEUE (wait, current);
+	/* Get rid of warning */
+	(void) wait;
 
 	netif_stop_queue (net);
 
@@ -762,6 +769,9 @@ EXPORT_SYMBOL_GPL(usbnet_open);
  * they'll probably want to use this base set.
  */
 
+#if defined(CONFIG_MII) || defined(CONFIG_MII_MODULE)
+#define HAVE_MII
+
 int usbnet_get_settings (struct net_device *net, struct ethtool_cmd *cmd)
 {
 	struct usbnet *dev = netdev_priv(net);
@@ -820,6 +830,8 @@ int usbnet_nway_reset(struct net_device *net)
 }
 EXPORT_SYMBOL_GPL(usbnet_nway_reset);
 
+#endif	/* HAVE_MII */
+
 void usbnet_get_drvinfo (struct net_device *net, struct ethtool_drvinfo *info)
 {
 	struct usbnet *dev = netdev_priv(net);
@@ -850,10 +862,12 @@ EXPORT_SYMBOL_GPL(usbnet_set_msglevel);
 
 /* drivers may override default ethtool_ops in their bind() routine */
 static const struct ethtool_ops usbnet_ethtool_ops = {
+#ifdef	HAVE_MII
 	.get_settings		= usbnet_get_settings,
 	.set_settings		= usbnet_set_settings,
 	.get_link		= usbnet_get_link,
 	.nway_reset		= usbnet_nway_reset,
+#endif
 	.get_drvinfo		= usbnet_get_drvinfo,
 	.get_msglevel		= usbnet_get_msglevel,
 	.set_msglevel		= usbnet_set_msglevel,
@@ -1037,7 +1051,10 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 	struct skb_data		*entry;
 	struct driver_info	*info = dev->driver_info;
 	unsigned long		flags;
-	int retval;
+	int retval = NET_XMIT_SUCCESS;
+#ifdef DWC_HOST_ONLY
+	u8 *new_addr;
+#endif
 
 	// some devices want funky USB-level framing, for
 	// win32 driver (usually) and/or hardware quirks
@@ -1060,6 +1077,12 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 	entry->dev = dev;
 	entry->state = tx_start;
 	entry->length = length;
+
+#ifdef DWC_HOST_ONLY
+	new_addr = skb->data - 2;
+	memcpy(new_addr,skb->data,skb->len);
+	skb->data = new_addr;
+#endif
 
 	usb_fill_bulk_urb (urb, dev->udev, dev->out,
 			skb->data, skb->len, tx_complete, skb);
@@ -1208,6 +1231,17 @@ static void usbnet_bh (unsigned long param)
  *
  *-------------------------------------------------------------------------*/
 
+/* Structs fake usb class driver for mdev, McMCC, 21092010 */
+static const struct file_operations fake_fops = {
+	.owner =    THIS_MODULE,
+};
+
+static struct usb_class_driver fake_usb_class = {
+	.name =        "usbeth%d",
+	.fops =         &fake_fops,
+	.minor_base =   0,
+};
+
 // precondition: never called in_interrupt
 
 void usbnet_disconnect (struct usb_interface *intf)
@@ -1220,6 +1254,8 @@ void usbnet_disconnect (struct usb_interface *intf)
 	usb_set_intfdata(intf, NULL);
 	if (!dev)
 		return;
+	/* Deregister dev for mdev, McMCC, 21092010 */
+	usb_deregister_dev(intf, &fake_usb_class);
 
 	xdev = interface_to_usbdev (intf);
 
@@ -1229,6 +1265,8 @@ void usbnet_disconnect (struct usb_interface *intf)
 		   dev->driver_info->description);
 
 	net = dev->net;
+	/* Remove dev from devfs, McMCC, 21092010 */
+	//devfs_remove("usb%s", net->name);
 	unregister_netdev (net);
 
 	/* we don't hold rtnl here ... */
@@ -1236,6 +1274,9 @@ void usbnet_disconnect (struct usb_interface *intf)
 
 	if (dev->driver_info->unbind)
 		dev->driver_info->unbind (dev, intf);
+
+	usb_kill_urb(dev->interrupt);
+	usb_free_urb(dev->interrupt);
 
 	free_netdev(net);
 	usb_put_dev (xdev);
@@ -1332,6 +1373,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	init_timer (&dev->delay);
 	mutex_init (&dev->phy_mutex);
 
+	SET_MODULE_OWNER (net);
 	dev->net = net;
 	strcpy (net->name, "usb%d");
 	memcpy (net->dev_addr, node_id, sizeof node_id);
@@ -1364,17 +1406,25 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		if ((dev->driver_info->flags & FLAG_ETHER) != 0 &&
 		    (net->dev_addr [0] & 0x02) == 0) {
 			if( (is_wimax_devname = rcu_dereference(is_wimax_devname_hook)) &&
-			    is_wimax_devname(le16_to_cpu(xdev->descriptor.idVendor), le16_to_cpu(xdev->descriptor.idProduct)) )
+			    is_wimax_devname(le16_to_cpu(xdev->descriptor.idVendor),
+					le16_to_cpu(xdev->descriptor.idProduct)) ) {
 				strcpy (net->name, "wimax%d");
-			else
+				fake_usb_class.name = "usbwimax%d";
+			} else {
 				strcpy (net->name, "eth%d");
+				fake_usb_class.name = "usbeth%d";
+			}
 		}
 		/* WLAN devices should always be named "wlan%d" */
-		if ((dev->driver_info->flags & FLAG_WLAN) != 0)
+		if ((dev->driver_info->flags & FLAG_WLAN) != 0) {
 			strcpy(net->name, "wlan%d");
+			SET_NETDEV_DEVTYPE(net, &wlan_type);
+		}
 		/* WWAN devices should always be named "wwan%d" */
-		if ((dev->driver_info->flags & FLAG_WWAN) != 0)
+		if ((dev->driver_info->flags & FLAG_WWAN) != 0) {
 			strcpy(net->name, "wwan%d");
+			SET_NETDEV_DEVTYPE(net, &wwan_type);
+		}
 
 		/* maybe the remote can't receive an Ethernet MTU */
 		if (net->mtu > (dev->hard_mtu - net->hard_header_len))
@@ -1401,11 +1451,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		dev->rx_urb_size = dev->hard_mtu;
 	dev->maxpacket = usb_maxpacket (dev->udev, dev->out, 1);
 
-	if ((dev->driver_info->flags & FLAG_WLAN) != 0)
-		SET_NETDEV_DEVTYPE(net, &wlan_type);
-	if ((dev->driver_info->flags & FLAG_WWAN) != 0)
-		SET_NETDEV_DEVTYPE(net, &wwan_type);
-
+	SET_NETDEV_DEV(net, &udev->dev);
 	status = register_netdev (net);
 	if (status)
 		goto out3;
@@ -1423,6 +1469,11 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 
 	if (dev->driver_info->flags & FLAG_LINK_INTR)
 		netif_carrier_off(net);
+
+	/* Register dev as class for mdev, McMCC, 21092010 */
+	usb_register_dev(udev, &fake_usb_class);
+	/*devfs_mk_cdev(MKDEV(USB_MAJOR, udev->minor), S_IFCHR | S_IRUGO | S_IWUGO, 
+			"usb%s", net->name); */
 
 	return 0;
 
