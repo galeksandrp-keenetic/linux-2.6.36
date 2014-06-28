@@ -36,7 +36,7 @@ static int __init tc3162_mtd_init(void)
 		tmpVal |= 0x80070f00;
 		regWrite32(0xbfb00038,tmpVal);
 		//VPint(0xbfb00038) |= 0x80070F00;
-		printk("tc3162: flash device 0x%08x at 0x%08x\n", 0x1000000, 0x1c000000);
+		printk(KERN_INFO "tc3162: flash device 0x%08x at 0x%08x\n", 0x1000000, 0x1c000000);
 		tc3162_map.virt = ioremap_nocache(0x1c000000, 0x1000000);
 		tc3162_map.phys = 0x1c000000;
 		tc3162_map.size = 0x1000000;
@@ -49,17 +49,17 @@ static int __init tc3162_mtd_init(void)
 #endif //CONFIG_TCSUPPORT_ADDR_MAPPING
 		/*enable addr bigger than 4M support.*/
 		VPint(0xbfb00038) |= 0x80000000;
-		printk("tc3162: flash device 0x%08x at 0x%08x\n", 0x1000000, 0x10000000);
+		printk(KERN_INFO "tc3162: flash device 0x%08x at 0x%08x\n", 0x1000000, 0x10000000);
 		tc3162_map.virt = ioremap_nocache(0x10000000, 0x1000000);
 		tc3162_map.phys = 0x10000000;
 		tc3162_map.size = 0x1000000;
 		ioremap_nocache(WINDOW_ADDR, WINDOW_SIZE);
 	}else{
-		printk("tc3162: flash device 0x%08x at 0x%08x\n", WINDOW_SIZE, WINDOW_ADDR);
+		printk(KERN_INFO "tc3162: flash device 0x%08x at 0x%08x\n", WINDOW_SIZE, WINDOW_ADDR);
 		tc3162_map.virt = ioremap_nocache(WINDOW_ADDR, WINDOW_SIZE);
 	}
 	if (!tc3162_map.virt) {
-   		printk("tc3162: Failed to ioremap\n");
+		printk(KERN_ERR "tc3162: Failed to ioremap\n");
 		return -EIO;
 	}
 
@@ -74,7 +74,7 @@ static int __init tc3162_mtd_init(void)
 
 	tc3162_mtd_info->owner = THIS_MODULE;
 	if (add_mtd_device(tc3162_mtd_info)) {
-		printk("Failed to add tc3262 flash device\n");
+		printk(KERN_INFO "Failed to add tc3262 flash device\n");
 		map_destroy(tc3162_mtd_info);
 		tc3162_mtd_info = 0;
 		iounmap((void *)tc3162_map.virt);

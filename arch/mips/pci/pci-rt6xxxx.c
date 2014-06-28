@@ -358,7 +358,7 @@ static __init int rt6xxxx_pci_init(void)
 {
 	unsigned long val = 0;
 
-	printk("Start PCIe register access for RT685x/RT6336x\n");
+	printk(KERN_INFO "Start PCIe register access for RT685x/RT6336x\n");
 #ifndef CONFIG_PCIE_CONCURENNCY
 	/* PCI Control Register: Port1(bit22) disable */
 	*((unsigned long *)(0xbfb00088)) &= ~(1<<22);

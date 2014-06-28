@@ -127,7 +127,7 @@ static int tc3162wdog_open(struct inode *inode, struct file *file)
 	timer_WatchDogConfigure(ENABLE, ENABLE);
 
 	watchdog_enabled=1;
-	printk("TC3162 hardware watchdog initialized\n");
+	printk(KERN_INFO "TC3162 hardware watchdog initialized\n");
 	return 0;
 }
 
@@ -144,7 +144,7 @@ static int tc3162wdog_release(struct inode *inode, struct file *file)
 		timer_WatchDogConfigure(DISABLE, DISABLE);
 
 		watchdog_enabled = 0;
-		printk("TC3162 hardware watchdog stopped\n");
+		printk(KERN_INFO "TC3162 hardware watchdog stopped\n");
 	}
 	return 0;
 }
@@ -244,7 +244,7 @@ static int __init tc3162_watchdog_init(void)
 	}
 
 	misc_register(&tc3162wdog_miscdev);
-	printk("TC3162 hardware watchdog module loaded.\n");
+	printk(KERN_INFO "TC3162 hardware watchdog module loaded.\n");
 	return 0;
 }
 

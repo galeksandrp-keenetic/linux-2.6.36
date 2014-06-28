@@ -110,7 +110,7 @@ void flash_init(void)
 #ifdef CONFIG_TCSUPPORT_ADDR_MAPPING
 		if(isMT751020){
 			flash_base = 0xbc000000;
-			printk("%s: flash_base: 0x%08lx \n",__func__, flash_base);
+			printk(KERN_INFO "%s: flash_base: 0x%08lx \n",__func__, flash_base);
 		}
 		else if (isTC3162U || isRT63260 || isRT65168 || isTC3182 || isRT63165 || isRT63365)
 #else
@@ -119,7 +119,7 @@ void flash_init(void)
 			flash_base = 0xb0000000;
 		else
 			flash_base = 0xbfc00000;
-		printk("%s: flash_base: 0x%08lx \n",__func__, flash_base);
+		printk(KERN_INFO "%s: flash_base: 0x%08lx \n",__func__, flash_base);
 	}
 }
 
@@ -293,7 +293,7 @@ void __init prom_init(void)
 	memsize = (1 << row) * (1 << col) * 4 * 2;
 #endif
 
-	printk("%s prom init\n", get_system_type());
+	printk(KERN_INFO "%s prom init\n", get_system_type());
 
 	tc3162_component_setup();
 

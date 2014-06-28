@@ -314,7 +314,7 @@ void mips_mt_set_cpuoptions(void)
 	unsigned int nconfig7 = oconfig7;
 #if defined(CONFIG_MIPS_TC3262) || defined(CONFIG_MIPS_TC3162)
 	if (mt_opt_es >= 0) {
-		printk("34K sync es set to %d.\n", mt_opt_es);
+		printk(KERN_INFO "34K sync es set to %d.\n", mt_opt_es);
 		if (mt_opt_es)
 			nconfig7 |= (1 << 8);
 		else
@@ -322,10 +322,10 @@ void mips_mt_set_cpuoptions(void)
 	}
 #endif
 	if (mt_opt_norps) {
-		printk("\"norps\" option deprectated: use \"rpsctl=\"\n");
+		printk(KERN_INFO "\"norps\" option deprectated: use \"rpsctl=\"\n");
 	}
 	if (mt_opt_rpsctl >= 0) {
-		printk("34K return prediction stack override set to %d.\n",
+		printk(KERN_INFO "34K return prediction stack override set to %d.\n",
 			mt_opt_rpsctl);
 		if (mt_opt_rpsctl)
 			nconfig7 |= (1 << 2);
@@ -333,32 +333,32 @@ void mips_mt_set_cpuoptions(void)
 			nconfig7 &= ~(1 << 2);
 	}
 	if (mt_opt_nblsu >= 0) {
-		printk("34K ALU/LSU sync override set to %d.\n", mt_opt_nblsu);
+		printk(KERN_INFO "34K ALU/LSU sync override set to %d.\n", mt_opt_nblsu);
 		if (mt_opt_nblsu)
 			nconfig7 |= (1 << 5);
 		else
 			nconfig7 &= ~(1 << 5);
 	}
 	if (mt_opt_forceconfig7) {
-		printk("CP0.Config7 forced to 0x%08x.\n", mt_opt_config7);
+		printk(KERN_INFO "CP0.Config7 forced to 0x%08x.\n", mt_opt_config7);
 		nconfig7 = mt_opt_config7;
 	}
 	if (oconfig7 != nconfig7) {
 		__asm__ __volatile("sync");
 		write_c0_config7(nconfig7);
 		ehb();
-		printk("Config7: 0x%08x\n", read_c0_config7());
+		printk(KERN_INFO "Config7: 0x%08x\n", read_c0_config7());
 	}
 
 	/* Report Cache management debug options */
 	if (mt_protiflush)
-		printk("I-cache flushes single-threaded\n");
+		printk(KERN_INFO "I-cache flushes single-threaded\n");
 	if (mt_protdflush)
-		printk("D-cache flushes single-threaded\n");
+		printk(KERN_INFO "D-cache flushes single-threaded\n");
 	if (mt_n_iflushes != 1)
-		printk("I-Cache Flushes Repeated %d times\n", mt_n_iflushes);
+		printk(KERN_INFO "I-Cache Flushes Repeated %d times\n", mt_n_iflushes);
 	if (mt_n_dflushes != 1)
-		printk("D-Cache Flushes Repeated %d times\n", mt_n_dflushes);
+		printk(KERN_INFO "D-Cache Flushes Repeated %d times\n", mt_n_dflushes);
 
 	if (itc_base != 0) {
 		/*
@@ -396,7 +396,7 @@ void mips_mt_set_cpuoptions(void)
 		cache_op(Index_Store_Tag_D, INDEX_0);
 		write_c0_ecc(ectlval);
 		ehb();
-		printk("Mapped %ld ITC cells starting at 0x%08x\n",
+		printk(KERN_INFO "Mapped %ld ITC cells starting at 0x%08x\n",
 			((itcblkgrn & 0x7fe00000) >> 20), itc_base);
 	}
 }

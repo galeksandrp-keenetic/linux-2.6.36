@@ -1183,7 +1183,7 @@ static int __init spiflash_probe_init(void)
 	}
 #endif
 	register_mtd_chip_driver(&spiflash_chipdrv);
-	printk("TC3262 SPI driver loaded\n");
+	printk(KERN_INFO "TC3262 SPI driver loaded\n");
 	return 0;
 }
 

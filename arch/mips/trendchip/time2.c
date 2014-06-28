@@ -438,7 +438,7 @@ void __init plat_time_init(void)
 
 	est_freq = estimate_cpu_frequency ();
 
-	printk("CPU frequency %d.%02d MHz\n", est_freq/1000000,
+	printk(KERN_INFO "CPU frequency %d.%02d MHz\n", est_freq/1000000,
 	       (est_freq%1000000)*100/1000000);
 
     cpu_khz = est_freq / 1000;
@@ -456,7 +456,7 @@ void __init plat_time_init(void)
 
 		cputmr_hpt_timer_init();
 		
-		printk(" Using %u.%03u MHz high precision timer.\n",
+		printk(KERN_INFO " Using %u.%03u MHz high precision timer.\n",
 		   ((mips_hpt_frequency + 500) / 1000) / 1000,
 		   ((mips_hpt_frequency + 500) / 1000) % 1000);
 	}

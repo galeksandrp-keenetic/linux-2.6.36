@@ -1129,7 +1129,7 @@ static void __cpuinit probe_pcache(void)
 	       (c->icache.flags & MIPS_CACHE_ALIASES) ?  "I-cache aliases" : "no aliases",
 	       way_string[c->icache.ways], c->icache.linesz);
 #else
-	printk("Primary instruction cache %ldkB, %s, %s, linesize %d bytes.\n",
+	printk(KERN_INFO "Primary instruction cache %ldkB, %s, %s, linesize %d bytes.\n",
 	       icache_size >> 10,
 	       c->icache.flags & MIPS_CACHE_VTAG ? "VIVT" : "VIPT",
 	       way_string[c->icache.ways], c->icache.linesz);

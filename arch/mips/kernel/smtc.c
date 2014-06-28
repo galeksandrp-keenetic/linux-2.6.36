@@ -276,7 +276,7 @@ static void smtc_configure_tlb(void)
 		smtc_status |= SMTC_TLB_SHARED;
 		local_flush_tlb_all();
 
-		printk("TLB of %d entry pairs shared by %d VPEs\n",
+		printk(KERN_INFO "TLB of %d entry pairs shared by %d VPEs\n",
 			tlbsiz, vpes);
 	    } else {
 		printk("WARNING: TLB Not Sharable on SMTC Boot!\n");
@@ -323,7 +323,7 @@ int __init smtc_build_cpu_map(int start_cpu_slot)
 #endif
 
 	/* One of those TC's is the one booting, and not a secondary... */
-	printk("%i available secondary CPU TC(s)\n", i - 1);
+	printk(KERN_INFO "%i available secondary CPU TC(s)\n", i - 1);
 
 	return i;
 }
@@ -409,14 +409,14 @@ void smtc_prepare_cpus(int cpus)
 	/* Report on boot-time options */
 	mips_mt_set_cpuoptions();
 	if (vpelimit > 0)
-		printk("Limit of %d VPEs set\n", vpelimit);
+		printk(KERN_INFO "Limit of %d VPEs set\n", vpelimit);
 	if (tclimit > 0)
-		printk("Limit of %d TCs set\n", tclimit);
+		printk(KERN_INFO "Limit of %d TCs set\n", tclimit);
 	if (nostlb) {
-		printk("Shared TLB Use Inhibited - UNSAFE for Multi-VPE Operation\n");
+		printk(KERN_INFO "Shared TLB Use Inhibited - UNSAFE for Multi-VPE Operation\n");
 	}
 	if (asidmask)
-		printk("ASID mask value override to 0x%x\n", asidmask);
+		printk(KERN_INFO "ASID mask value override to 0x%x\n", asidmask);
 
 	/* Temporary */
 #ifdef CONFIG_SMTC_IDLE_HOOK_DEBUG
@@ -485,7 +485,7 @@ void smtc_prepare_cpus(int cpus)
 #endif
 		if (vpe != 0)
 			printk(", ");
-		printk("VPE %d: TC", vpe);
+		printk(KERN_INFO "VPE %d: TC", vpe);
 		for (i = 0; i < tcpervpe[vpe]; i++) {
 			/*
 			 * TC 0 is bound to VPE 0 at reset,
@@ -583,7 +583,7 @@ void smtc_prepare_cpus(int cpus)
 	if (pipi == NULL)
 		panic("kmalloc of IPI message buffers failed\n");
 	else
-		printk("IPI buffer pool of %d buffers\n", nipi);
+		printk(KERN_INFO "IPI buffer pool of %d buffers\n", nipi);
 	for (i = 0; i < nipi; i++) {
 		smtc_ipi_nq(&freeIPIq, pipi);
 		pipi++;
@@ -654,7 +654,7 @@ void smtc_smp_finish(void)
 	if (cpu > 0 && (cpu_data[cpu].vpe_id != cpu_data[cpu - 1].vpe_id))
 		write_c0_compare(read_c0_count() + mips_hpt_frequency/HZ);
 
-	printk("TC %d going on-line as CPU %d\n",
+	printk(KERN_INFO "TC %d going on-line as CPU %d\n",
 		cpu_data[smp_processor_id()].tc_id, smp_processor_id());
 }
 
