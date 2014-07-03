@@ -1,12 +1,14 @@
 
-menu "Ralink Module"
+menu "Atel Modules"
 
 config USBNET_ATEL_LTE
         tristate "Atel LTE CDC USB modem driver"
         depends on USB_USBNET
+		default m
 
 config USBNET_ATEL_LTE_SERVICE
         tristate "Service/debug module for Atel LTE modem"
         depends on USBNET_ATEL_LTE
+		default n
 
 endmenu
