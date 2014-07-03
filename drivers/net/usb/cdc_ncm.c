@@ -504,14 +504,12 @@ advance:
 		len -= temp;
 	}
 
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,22)
 	/* some buggy devices have an IAD but no CDC Union */
 	if (!ctx->union_desc && intf->intf_assoc && intf->intf_assoc->bInterfaceCount == 2) {
 		ctx->control = intf;
 		ctx->data = usb_ifnum_to_if(dev->udev, intf->cur_altsetting->desc.bInterfaceNumber + 1);
 		dev_dbg(&intf->dev, "CDC Union missing - got slave from IAD\n");
 	}
-#endif
 
 	/* check if we got everything */
 	if ((ctx->control == NULL) || (ctx->data == NULL) ||
@@ -1329,9 +1327,7 @@ static struct usb_driver cdc_ncm_driver = {
 	.disconnect = cdc_ncm_disconnect,
 	.suspend = usbnet_suspend,
 	.resume = usbnet_resume,
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,22)
 	.reset_resume =	usbnet_resume,
-#endif
 	.supports_autosuspend = 1,
 	//.disable_hub_initiated_lpm = 1,
 };

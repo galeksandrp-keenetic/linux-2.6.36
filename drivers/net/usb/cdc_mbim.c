@@ -187,18 +187,6 @@ error:
 	return NULL;
 }
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,33)
-static inline struct sk_buff *netdev_alloc_skb_ip_align(struct net_device *dev,
-		unsigned int length)
-{
-	struct sk_buff *skb = netdev_alloc_skb(dev, length + NET_IP_ALIGN);
-
-	if (NET_IP_ALIGN && skb)
-		skb_reserve(skb, NET_IP_ALIGN);
-	return skb;
-}
-#endif
-
 static struct sk_buff *cdc_mbim_process_dgram(struct usbnet *dev, u8 *buf, size_t len, u16 tci)
 {
 	__be16 proto = htons(ETH_P_802_3);
@@ -425,9 +413,7 @@ static struct usb_driver cdc_mbim_driver = {
 	.disconnect = usbnet_disconnect,
 	.suspend = cdc_mbim_suspend,
 	.resume = cdc_mbim_resume,
-#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,22)
 	.reset_resume =	cdc_mbim_resume,
-#endif
 	.supports_autosuspend = 1,
 	//.disable_hub_initiated_lpm = 1,
 };

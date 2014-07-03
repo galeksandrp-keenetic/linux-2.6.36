@@ -13,17 +13,6 @@
 
 //#include <uapi/linux/usb/cdc-wdm.h>
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26)
-/* "Telephone Control Model Functional Descriptor" from CDC WMC spec 6.3..3 */
-struct usb_cdc_dmm_desc {
-	__u8	bFunctionLength;
-	__u8	bDescriptorType;
-	__u8	bDescriptorSubtype;
-	__u16	bcdVersion;
-	__le16	wMaxCommand;
-} __attribute__ ((packed));
-#endif
-
 
 extern struct usb_driver *usb_cdc_wdm_register(struct usb_interface *intf,
 					struct usb_endpoint_descriptor *ep,
@@ -45,18 +34,6 @@ static inline int usb_translate_errors(int error_code)
 		return -EIO;
 	}
 }
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,26)
-static inline const char *dev_name(const struct device *dev)
-{
-#if 0
-	/* Use the init name until the kobject becomes available */
-	if (dev->init_name)
-		return dev->init_name;
-#endif
-	return kobject_name(&dev->kobj);
-}
-#endif
 
 /*
  * Prevent the compiler from merging or refetching accesses.  The compiler

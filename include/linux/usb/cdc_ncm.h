@@ -93,17 +93,6 @@
 				       (x)->desc.bInterfaceProtocol == USB_CDC_PROTO_NONE)
 #define cdc_ncm_data_intf_is_mbim(x)  ((x)->desc.bInterfaceProtocol == USB_CDC_MBIM_PROTO_NTB)
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35)
-/* "NCM Control Model Functional Descriptor" */
-struct usb_cdc_ncm_desc {
-	__u8	bLength;
-	__u8	bDescriptorType;
-	__u8	bDescriptorSubType;
-
-	__le16	bcdNcmVersion;
-	__u8	bmNetworkCapabilities;
-} __attribute__ ((packed));
-#endif
 
 /* "MBIM Control Model Functional Descriptor" */
 struct usb_cdc_mbim_desc {
@@ -165,23 +154,6 @@ struct usb_cdc_ncm_ntb_parameters {
 #define USB_CDC_NCM_NTH16_SIGN		0x484D434E /* NCMH */
 #define USB_CDC_NCM_NTH32_SIGN		0x686D636E /* ncmh */
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,35)
-struct usb_cdc_ncm_nth16 {
-	__le32	dwSignature;
-	__le16	wHeaderLength;
-	__le16	wSequence;
-	__le16	wBlockLength;
-	__le16	wFpIndex;
-} __attribute__ ((packed));
-
-struct usb_cdc_ncm_nth32 {
-	__le32	dwSignature;
-	__le16	wHeaderLength;
-	__le16	wSequence;
-	__le32	dwBlockLength;
-	__le32	dwFpIndex;
-} __attribute__ ((packed));
-#endif
 
 /*
  * CDC NCM datagram pointers, CDC NCM subclass 3.3
@@ -209,26 +181,6 @@ struct usb_cdc_ncm_dpe32 {
 	__le32	dwDatagramIndex;
 	__le32	dwDatagramLength;
 } __attribute__((__packed__));
-#endif
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,35)
-/* 16-bit NCM Datagram Pointer Table */
-struct usb_cdc_ncm_ndp16 {
-	__le32	dwSignature;
-	__le16	wLength;
-	__le16	wNextFpIndex;
-	struct	usb_cdc_ncm_dpe16 data[0];
-} __attribute__ ((packed));
-
-/* 32-bit NCM Datagram Pointer Table */
-struct usb_cdc_ncm_ndp32 {
-	__le32	dwSignature;
-	__le16	wLength;
-	__le16	wReserved6;
-	__le32	dwNextFpIndex;
-	__le32	dwReserved12;
-	struct	usb_cdc_ncm_dpe32 data[0];
-} __attribute__ ((packed));
 #endif
 
 /* CDC NCM subclass 3.2.1 and 3.2.2 */
