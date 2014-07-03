@@ -183,6 +183,8 @@ struct cdc_state {
 
 extern int usbnet_generic_cdc_bind(struct usbnet *, struct usb_interface *);
 extern void usbnet_cdc_unbind(struct usbnet *, struct usb_interface *);
+extern void usbnet_cdc_status(struct usbnet *, struct urb *);
+extern int usbnet_cdc_bind(struct usbnet *, struct usb_interface *);
 
 /* CDC and RNDIS support the same host-chosen packet filters for IN transfers */
 #define	DEFAULT_FILTER	(USB_CDC_PACKET_TYPE_BROADCAST \
