@@ -186,7 +186,7 @@ static int huawei_cdc_ncm_check_connect(struct usbnet *usbnet_dev)
 
 static const struct driver_info huawei_cdc_ncm_info = {
 	.description = "Huawei CDC NCM device",
-	.flags = FLAG_NO_SETINT | FLAG_MULTI_PACKET | FLAG_WWAN,
+	.flags = FLAG_NO_SETINT | FLAG_MULTI_PACKET | FLAG_ETHER,
 	.bind = huawei_cdc_ncm_bind,
 	.unbind = huawei_cdc_ncm_unbind,
 	.check_connect = huawei_cdc_ncm_check_connect,
