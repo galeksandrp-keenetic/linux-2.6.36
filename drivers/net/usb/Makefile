@@ -27,6 +27,7 @@ obj-$(CONFIG_USB_IPHETH)	+= ipheth.o
 obj-$(CONFIG_USB_SIERRA_NET)	+= sierra_net.o
 obj-$(CONFIG_USB_NET_CDC_NCM)	+= cdc_ncm.o
 obj-$(CONFIG_USB_NET_CDC_MBIM)	+= cdc_mbim.o
+obj-$(CONFIG_USB_NET_HUAWEI_CDC_NCM)	+= huawei_cdc_ncm.o
 
 ifeq ($(CONFIG_DWC_OTG_HOST_ONLY),y)
 	EXTRA_CFLAGS   += -DDWC_HOST_ONLY
