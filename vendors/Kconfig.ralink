@@ -30,6 +30,16 @@ if RT539X_AP
 source "drivers/net/wireless/rt5392_ap/Kconfig"
 endif
 
+menuconfig RT359X_AP
+	bool "RT359X PCI Wi-Fi Driver"
+	select WIRELESS_EXT
+	select WEXT_SPY
+	select WEXT_PRIV
+	
+
+if RT359X_AP
+source "drivers/net/wireless/rt3592_ap/Kconfig"
+endif
 
 
 #######
