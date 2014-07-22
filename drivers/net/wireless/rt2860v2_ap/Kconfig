@@ -131,11 +131,11 @@ config  RT2860V2_AP_80211N_DRAFT3
 	bool "802.11n Draft3"
 	depends on RT2860V2_AP
 
-#config  RT2860V2_AP_RTMP_INTERNAL_TX_ALC
-#        bool "TSSI Compensation"
-#        depends on RT2860V2_AP
-#        depends on RALINK_RT3350 || RALINK_RT3352 || RALINK_RT5350 || RALINK_MT7620 || RALINK_RT6352
-#	default n
+config  RT2860V2_AP_RTMP_INTERNAL_TX_ALC
+	bool "TSSI Compensation"
+	depends on RT2860V2_AP
+	depends on RALINK_RT3350 || RALINK_RT3352 || RALINK_RT5350 || RALINK_MT7620 || RALINK_RT6352
+	default n
 
 config  RT2860V2_ADJ_PWR_CONSUMPTION_SUPPORT
         bool "Adjust Power Consumption Support"
