@@ -188,3 +188,8 @@ config  RT2860V2_AP_RTMP_TEMPERATURE_COMPENSATION
 #config  RT2860V2_SNMP
 #	bool "Net-SNMP Support"
 #	depends on RT2860V2_AP
+
+config RT2860V2_AP_DBG
+	bool "Debug support for AP mode"
+	default n
+	depends on RT2860V2_AP

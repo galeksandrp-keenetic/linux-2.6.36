@@ -48,6 +48,15 @@ config  RT3593_AP_NETIF_BLOCK
 	help
 	Support Net interface block while Tx-Sw queue full
 
+config  RT3593_AP_DFS
+	bool "DFS"
+	depends on RT3593_AP
+	select RALINK_TIMER_DFS
+
+config  RT3593_AP_CARRIER
+	bool "Carrier Detect"
+	depends on RT3593_AP
+
 config  RT3593_AP_VIDEO_TURBINE
 	bool "Video Turbine support"
 	depends on RT3593_AP
