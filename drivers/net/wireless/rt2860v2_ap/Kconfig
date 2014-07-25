@@ -135,6 +135,7 @@ config  RT2860V2_AP_RTMP_INTERNAL_TX_ALC
 	bool "TSSI Compensation"
 	depends on RT2860V2_AP
 	depends on RALINK_RT3350 || RALINK_RT3352 || RALINK_RT5350 || RALINK_MT7620 || RALINK_RT6352
+	depends on INTERNAL_PA_INTERNAL_LNA || INTERNAL_PA_EXTERNAL_LNA
 	default n
 
 config  RT2860V2_ADJ_PWR_CONSUMPTION_SUPPORT
@@ -160,17 +161,10 @@ choice
 	bool "External PA and External LNA"		
 endchoice
 
-config  RT2860V2_AP_RTMP_INTERNAL_TX_ALC
-        bool "TSSI Compensation"
-        depends on RT2860V2_AP
-        depends on RALINK_RT3350 || RALINK_RT3352 || RALINK_RT5350 || RALINK_MT7620 || RALINK_RT6352
-        depends on INTERNAL_PA_INTERNAL_LNA || INTERNAL_PA_EXTERNAL_LNA
-	default n
-
 config  RT2860V2_AP_RTMP_TEMPERATURE_COMPENSATION
-        bool "Temperature Compensation"
-        depends on RT2860V2_AP
-        depends on RALINK_MT7620 || RALINK_RT6352
+	bool "Temperature Compensation"
+	depends on RT2860V2_AP
+	depends on RALINK_MT7620 || RALINK_RT6352
 	default n
 
 #config  RT2860V2_80211R_FT
