@@ -44,7 +44,7 @@
     Steven Liu  2007-07-04      Initial version
 */
 
-#include <linux/config.h>
+//#include <linux/config.h>
 #include <linux/version.h>
 #include <linux/module.h>
 #include <linux/types.h>
@@ -53,7 +53,7 @@
 #include <linux/timer.h>
 #include <asm/system.h>
 #include <asm/uaccess.h>
-#include <asm/rt2880/surfboardint.h>
+#include <asm/mach-ralink/surfboardint.h>
 #include <linux/interrupt.h>
 #include "rt_timer.h"
 
