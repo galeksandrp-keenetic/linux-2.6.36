@@ -146,7 +146,7 @@ static int rt3xxx_ehci_probe(struct platform_device *pdev)
 #ifdef CONFIG_USB_GADGET_RT
 #warning	"*********************************************************"
 #warning	"*    EHCI will yield USB port0 to device controller!    *"
-#warning	"*********************************************************""
+#warning	"*********************************************************"
 #else
 	// change port0 to host mode
 	rt_set_host();
