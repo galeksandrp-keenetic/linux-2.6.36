@@ -53,6 +53,8 @@ int (*ra_sw_nat_hook_clean_table) (void) = NULL;
 #endif
 int (*ra_sw_nat_hook_foeentry) (void * inputvalue,int operation) = NULL;
 void (*ra_sw_nat_hook_pse_stats) (struct psepkt_stats* pf,int port) = NULL;
+void (*ra_sw_nat_hook_release_dstport) (uint32_t port) = NULL;
+void (*ra_sw_nat_hook_acquire_dstport) (uint32_t port, char *name) = NULL;
 
 
 
@@ -70,3 +72,5 @@ EXPORT_SYMBOL(ra_sw_nat_hook_clean_table);
 #endif
 EXPORT_SYMBOL(ra_sw_nat_hook_foeentry);
 EXPORT_SYMBOL(ra_sw_nat_hook_pse_stats);
+EXPORT_SYMBOL(ra_sw_nat_hook_release_dstport);
+EXPORT_SYMBOL(ra_sw_nat_hook_acquire_dstport);

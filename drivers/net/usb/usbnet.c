@@ -48,6 +48,11 @@
 #include <linux/kernel.h>
 #include <linux/pm_runtime.h>
 
+#if defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)
+#include <../net/nat/hw_nat/ra_nat.h>
+#include <linux/foe_hook.h>
+#endif
+
 #define DRIVER_VERSION		"22-Aug-2005"
 
 /*-------------------------------------------------------------------------*/
@@ -239,10 +244,27 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 	netif_dbg(dev, rx_status, dev->net, "< rx, len %zu, type 0x%x\n",
 		  skb->len + sizeof (struct ethhdr), skb->protocol);
 	memset (skb->cb, 0, sizeof (struct skb_data));
+
+#if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
+	FOE_MAGIC_TAG(skb) = FOE_MAGIC_PCI;
+	FOE_AI(skb) = UN_HIT;
+	if (ra_sw_nat_hook_rx) {
+		if (ra_sw_nat_hook_rx(skb)) {
+			status = netif_rx (skb);
+			if (status != NET_RX_SUCCESS)
+				netif_dbg(dev, rx_err, dev->net, "netif_rx status %d\n", status);
+		}
+	} else {
+		status = netif_rx (skb);
+		if (status != NET_RX_SUCCESS)
+			netif_dbg(dev, rx_err, dev->net, "netif_rx status %d\n", status);
+	}
+#else
 	status = netif_rx (skb);
 	if (status != NET_RX_SUCCESS)
 		netif_dbg(dev, rx_err, dev->net,
 			  "netif_rx status %d\n", status);
+#endif
 }
 EXPORT_SYMBOL_GPL(usbnet_skb_return);
 
@@ -325,13 +347,20 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 	unsigned long		lockflags;
 	size_t			size = dev->rx_urb_size;
 
+#if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
+	if ((skb = alloc_skb (size + NET_IP_ALIGN + FOE_INFO_LEN, flags)) == NULL) {
+#else
 	if ((skb = alloc_skb (size + NET_IP_ALIGN, flags)) == NULL) {
+#endif
 		netif_dbg(dev, rx_err, dev->net, "no rx skb\n");
 		usbnet_defer_kevent (dev, EVENT_RX_MEMORY);
 		usb_free_urb (urb);
 		return -ENOMEM;
 	}
-#ifndef DWC_HOST_ONLY
+#if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
+	skb_reserve (skb, NET_IP_ALIGN + FOE_INFO_LEN);
+#else
+//#ifndef DWC_HOST_ONLY
 	skb_reserve (skb, NET_IP_ALIGN);
 #endif
 
@@ -1072,6 +1101,15 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 		goto drop;
 	}
 
+#if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
+	/* add tx hook point*/
+	if(ra_sw_nat_hook_tx) {
+		skb->data += 4; //pointer to DA
+		ra_sw_nat_hook_tx(skb, 1);
+		skb->data -= 4;
+	}
+#endif
+
 	entry = (struct skb_data *) skb->cb;
 	entry->urb = urb;
 	entry->dev = dev;
@@ -1254,6 +1292,11 @@ void usbnet_disconnect (struct usb_interface *intf)
 	usb_set_intfdata(intf, NULL);
 	if (!dev)
 		return;
+
+#if defined (CONFIG_RA_HW_NAT_NIC_USB)
+	if (ra_sw_nat_hook_release_dstport)
+		ra_sw_nat_hook_release_dstport(DP_USB);
+#endif
 	/* Deregister dev for mdev, McMCC, 21092010 */
 	usb_deregister_dev(intf, &fake_usb_class);
 
@@ -1473,7 +1516,12 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	/* Register dev as class for mdev, McMCC, 21092010 */
 	usb_register_dev(udev, &fake_usb_class);
 	/*devfs_mk_cdev(MKDEV(USB_MAJOR, udev->minor), S_IFCHR | S_IRUGO | S_IWUGO, 
-			"usb%s", net->name); */
+		"usb%s", net->name); */
+#if defined (CONFIG_RA_HW_NAT_NIC_USB)
+	if (ra_sw_nat_hook_acquire_dstport) {
+		ra_sw_nat_hook_acquire_dstport(DP_USB, net->name);
+	}
+#endif
 
 	return 0;
 

@@ -112,4 +112,6 @@ extern int (*ra_sw_nat_hook_drop_packet) (struct sk_buff * skb);
 extern int (*ra_sw_nat_hook_clean_table) (void);
 #endif
 extern void (*ra_sw_nat_hook_pse_stats) (struct psepkt_stats* pf,int port);
+extern void (*ra_sw_nat_hook_release_dstport) (uint32_t port);
+extern void (*ra_sw_nat_hook_acquire_dstport) (uint32_t port, char *name);
 #endif

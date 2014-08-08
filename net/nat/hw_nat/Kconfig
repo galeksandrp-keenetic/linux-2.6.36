@@ -342,10 +342,10 @@ config  RA_HW_NAT_WIFI
 	default y if (RT2860V2_AP || RT5392_AP)
 	depends on RA_HW_NAT
 
-#config  RA_HW_NAT_NIC_USB
-#	bool "PCIe Ethernet NIC/USB Acceleration"
-#	depends on RA_HW_NAT
-#
+config  RA_HW_NAT_NIC_USB
+	bool "PCIe Ethernet NIC/USB Acceleration"
+	depends on RA_HW_NAT
+
 #config  RA_HW_NAT_PPTP_L2TP
 #	bool "PPTP_L2TP Acceleration"
 #	depends on RA_HW_NAT && HNAT_V2 && RALINK_MT7620
