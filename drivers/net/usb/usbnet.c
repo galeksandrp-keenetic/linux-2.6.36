@@ -1293,7 +1293,7 @@ void usbnet_disconnect (struct usb_interface *intf)
 	if (!dev)
 		return;
 
-#if defined (CONFIG_RA_HW_NAT_NIC_USB)
+#if defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)
 	if (ra_sw_nat_hook_release_dstport)
 		ra_sw_nat_hook_release_dstport(DP_USB);
 #endif
@@ -1517,7 +1517,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	usb_register_dev(udev, &fake_usb_class);
 	/*devfs_mk_cdev(MKDEV(USB_MAJOR, udev->minor), S_IFCHR | S_IRUGO | S_IWUGO, 
 		"usb%s", net->name); */
-#if defined (CONFIG_RA_HW_NAT_NIC_USB)
+#if defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)
 	if (ra_sw_nat_hook_acquire_dstport) {
 		ra_sw_nat_hook_acquire_dstport(DP_USB, net->name);
 	}
