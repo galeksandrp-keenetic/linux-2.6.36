@@ -281,6 +281,33 @@ int get_ethernet_addr(char *ethernet_addr)
 	return 0;
 }
 
+static void prom_cpu_id_name(void)
+{
+	uint8_t id[10], *name;
+	memset(id, 0, sizeof(id));
+	strncpy(id, (char *)RALINK_SYSCTL_BASE, 6);
+
+	if(strlen(id) > 0) {
+
+		if(!strncmp(id, "RT6352", 6)) { /* Remark Ralink to Mediatek, RT6352 -> MT7620 */
+			strncpy(id, "MT7620", 6);
+		}
+
+		if(!strncmp(id, "MT7620", 6)) {
+
+			u32 reg = (*((volatile u32 *)(0xB000000C)));
+
+			if((reg & 0xf) >= 0x5) {
+				id[6] = 'H';
+				id[7] = '\0';
+			}
+		}
+
+		name = id;
+		printk(" %s CPU Detected!\n", name);
+	}
+}
+
 void prom_init_sysclk(void)
 {
 #if defined (CONFIG_RALINK_MT7621)
@@ -718,6 +745,7 @@ __init void prom_init(void)
 #endif
 
 	prom_init_cmdline();
+	prom_cpu_id_name();
 	prom_init_sysclk();
 
 	set_io_port_base(KSEG1);
