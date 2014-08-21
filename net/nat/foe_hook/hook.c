@@ -76,3 +76,4 @@ EXPORT_SYMBOL(ra_sw_nat_hook_foeentry);
 EXPORT_SYMBOL(ra_sw_nat_hook_pse_stats);
 EXPORT_SYMBOL(ra_sw_nat_hook_release_dstport);
 EXPORT_SYMBOL(ra_sw_nat_hook_acquire_dstport);
+EXPORT_SYMBOL(ra_sw_nat_hook_get_stats);
