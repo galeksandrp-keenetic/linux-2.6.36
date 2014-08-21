@@ -114,4 +114,5 @@ extern int (*ra_sw_nat_hook_clean_table) (void);
 extern void (*ra_sw_nat_hook_pse_stats) (struct psepkt_stats* pf,int port);
 extern void (*ra_sw_nat_hook_release_dstport) (uint32_t port);
 extern void (*ra_sw_nat_hook_acquire_dstport) (uint32_t port, char *name);
+extern int (*ra_sw_nat_hook_get_stats) (char *ifname, struct rtnl_link_stats64 *out_stats);
 #endif

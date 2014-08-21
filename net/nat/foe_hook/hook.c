@@ -33,6 +33,7 @@
 #include <linux/kernel.h>
 #include <linux/types.h>
 #include <linux/skbuff.h>
+#include <linux/if_link.h>
 #include <linux/foe_hook.h>
 
 int (*ra_sw_nat_hook_rx) (struct sk_buff * skb) = NULL;
