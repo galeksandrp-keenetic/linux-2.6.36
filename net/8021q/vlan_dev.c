@@ -27,6 +27,9 @@
 #include <linux/etherdevice.h>
 #include <linux/ethtool.h>
 #include <net/arp.h>
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include <linux/foe_hook.h>
+#endif
 
 #include "vlan.h"
 #include "vlanproc.h"
@@ -971,12 +974,30 @@ static u32 vlan_ethtool_get_flags(struct net_device *dev)
 
 static struct rtnl_link_stats64 *vlan_dev_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
 {
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	struct rtnl_link_stats64 hw_nat_stats;
+	memset(&hw_nat_stats, 0, sizeof(hw_nat_stats));
+	if (ra_sw_nat_hook_get_stats)
+		if (!ra_sw_nat_hook_get_stats(dev->name, &hw_nat_stats)) {
+			struct netdev_queue *txq = netdev_get_tx_queue(dev, 0);
+			spin_lock_bh(&txq->_xmit_lock);
+			txq->tx_bytes += hw_nat_stats.tx_bytes;
+			txq->tx_packets += hw_nat_stats.tx_packets;
+			spin_unlock_bh(&txq->_xmit_lock);
+		}
+#endif
+
 	dev_txq_stats_fold(dev, stats);
 
 	if (vlan_dev_info(dev)->vlan_rx_stats) {
 		struct vlan_rx_stats *p, accum = {0};
 		int i;
 
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+		p = per_cpu_ptr(vlan_dev_info(dev)->vlan_rx_stats, 0);
+		p->rx_packets += hw_nat_stats.rx_packets;
+		p->rx_bytes += hw_nat_stats.rx_bytes;
+#endif
 		for_each_possible_cpu(i) {
 			u64 rxpackets, rxbytes, rxmulticast;
 			unsigned int start;
