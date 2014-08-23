@@ -292,12 +292,12 @@ static void usblp_bulk_read(struct urb *urb)
 	struct usblp *usblp = urb->context;
 	int status = urb->status;
 
-	if (usblp->present && usblp->used) {
-		if (status)
-			printk(KERN_WARNING "usblp%d: "
-			    "nonzero read bulk status received: %d\n",
-			    usblp->minor, status);
-	}
+//	if (usblp->present && usblp->used) {
+//		if (status)
+//			printk(KERN_WARNING "usblp%d: "
+//			    "nonzero read bulk status received: %d\n",
+//			    usblp->minor, status);
+//	}
 	spin_lock(&usblp->lock);
 	if (status < 0)
 		usblp->rstatus = status;
@@ -315,12 +315,12 @@ static void usblp_bulk_write(struct urb *urb)
 	struct usblp *usblp = urb->context;
 	int status = urb->status;
 
-	if (usblp->present && usblp->used) {
-		if (status)
-			printk(KERN_WARNING "usblp%d: "
-			    "nonzero write bulk status received: %d\n",
-			    usblp->minor, status);
-	}
+//	if (usblp->present && usblp->used) {
+//		if (status)
+//			printk(KERN_WARNING "usblp%d: "
+//			    "nonzero write bulk status received: %d\n",
+//			    usblp->minor, status);
+//	}
 	spin_lock(&usblp->lock);
 	if (status < 0)
 		usblp->wstatus = status;
