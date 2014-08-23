@@ -1192,13 +1192,13 @@ int init_rt2880pci(void)
 #elif defined(CONFIG_RALINK_RT6855) || defined(CONFIG_RALINK_MT7620) || defined(CONFIG_RALINK_MT7628)
 	//RALINK_PCI_PCICFG_ADDR = 0;
 	//RALINK_PCI_PCICFG_ADDR |= (1<<20); //DEV0 = 0; DEV1 = 1
-	printk("start PCIe register access\n");
+	printk(KERN_INFO "start PCIe register access\n");
 	RALINK_PCI_PCICFG_ADDR &= ~(1<<1); //de-assert PERST
 	//printk("RALINK_PCI_PCICFG_ADDR= %x\n", RALINK_PCI_PCICFG_ADDR);
 	//RALINK_RSTCTRL = (RALINK_RSTCTRL | RALINK_PCIE1_RST);
 	//printk("RALINK_RSTCTRL= %x\n", RALINK_RSTCTRL);
 #elif defined(CONFIG_RALINK_MT7621)
-	printk("start MT7621 PCIe register access\n");
+	printk(KERN_INFO "start MT7621 PCIe register access\n");
 #if defined GPIO_PERST /* add GPIO control instead of PERST_N */
 #if defined (CONFIG_PCIE_PORT0)
 	val = 0x1<<GPIO_PCIE_PORT0;
@@ -1221,8 +1221,8 @@ int init_rt2880pci(void)
 #endif
 	mdelay(500);
 
-	printk("RALINK_RSTCTRL = %x\n", RALINK_RSTCTRL);
-	printk("RALINK_CLKCFG1 = %x\n", RALINK_CLKCFG1);
+	//printk("RALINK_RSTCTRL = %x\n", RALINK_RSTCTRL);
+	//printk("RALINK_CLKCFG1 = %x\n", RALINK_CLKCFG1);
 
 #ifdef CONFIG_RALINK_RT3883
 	printk("\n*************** Ralink PCIe RC mode *************\n");
@@ -1280,7 +1280,7 @@ int init_rt2880pci(void)
 		}
 	}
 #elif defined(CONFIG_RALINK_MT7620)
-	printk("\n*************** MT7620 PCIe RC mode *************\n");
+	printk(KERN_INFO "*************** MT7620 PCIe RC mode *************\n");
 	mdelay(500);
 	if(( RALINK_PCI0_STATUS & 0x1) == 0)
 	{
@@ -1288,7 +1288,7 @@ int init_rt2880pci(void)
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE0_CLK_EN);
 		PPLL_DRV = (PPLL_DRV & ~LC_CKDRVPD_);
 		PPLL_DRV = (PPLL_DRV | PDRV_SW_SET);
-		printk("PCIE0 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE0 no card, disable it(RST&CLK)\n");
 		pcie0_disable=1;
 	}
 #elif defined (CONFIG_RALINK_MT7621)
@@ -1297,7 +1297,7 @@ int init_rt2880pci(void)
 #if defined (CONFIG_PCIE_PORT0)
 	if(( RALINK_PCI0_STATUS & 0x1) == 0)
 	{
-		printk("PCIE0 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE0 no card, disable it(RST&CLK)\n");
 		ASSERT_SYSRST_PCIE(RALINK_PCIE0_RST);
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE0_CLK_EN);
 		pcie_link_status &= ~(1<<0);
@@ -1599,7 +1599,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 	printk("PCI-to-PCI bridge1 0x%02x = %08x\n", i<<2, (unsigned int)val);
 	}
 #endif
-	printk("init_rt2880pci done\n");
+	// printk("init_rt2880pci done\n");
 	register_pci_controller(&rt2880_controller);
 	return 0;
 
