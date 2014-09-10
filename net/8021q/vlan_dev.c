@@ -980,10 +980,8 @@ static struct rtnl_link_stats64 *vlan_dev_get_stats64(struct net_device *dev, st
 	if (ra_sw_nat_hook_get_stats)
 		if (!ra_sw_nat_hook_get_stats(dev->name, &hw_nat_stats)) {
 			struct netdev_queue *txq = netdev_get_tx_queue(dev, 0);
-			spin_lock_bh(&txq->_xmit_lock);
 			txq->tx_bytes += hw_nat_stats.tx_bytes;
 			txq->tx_packets += hw_nat_stats.tx_packets;
-			spin_unlock_bh(&txq->_xmit_lock);
 		}
 #endif
 
