@@ -51,6 +51,9 @@
 #include <linux/mtd/partitions.h>
 #endif
 
+#if defined (CONFIG_MTD_ANY_RALINK)
+#define CONFIG_MTK_MTD_NAND	1
+#endif
 /* Define default oob placement schemes for large and small page devices */
 static struct nand_ecclayout nand_oob_8 = {
 	.eccbytes = 3,
@@ -95,8 +98,20 @@ static struct nand_ecclayout nand_oob_128 = {
 		 .length = 78}}
 };
 
+#if defined (CONFIG_MTK_MTD_NAND)
+extern void nand_enable_clock(void);
+extern void nand_disable_clock(void);
+#endif
+
+#define PMT_POOL_SIZE (2)
+
+#if defined (CONFIG_MTK_MTD_NAND)
 int nand_get_device(struct nand_chip *chip, struct mtd_info *mtd,
 			   int new_state);
+#else
+static int nand_get_device(struct nand_chip *chip, struct mtd_info *mtd,
+			   int new_state);
+#endif
 
 static int nand_do_write_oob(struct mtd_info *mtd, loff_t to,
 			     struct mtd_oob_ops *ops);
@@ -142,7 +157,11 @@ static int check_offs_len(struct mtd_info *mtd,
  *
  * Deselect, release chip lock and wake up anyone waiting on the device
  */
+#if defined (CONFIG_MTK_MTD_NAND)
 void nand_release_device(struct mtd_info *mtd)
+#else
+static void nand_release_device(struct mtd_info *mtd)
+#endif
 {
 	struct nand_chip *chip = mtd->priv;
 
@@ -155,6 +174,9 @@ void nand_release_device(struct mtd_info *mtd)
 	chip->state = FL_READY;
 	wake_up(&chip->controller->wq);
 	spin_unlock(&chip->controller->lock);
+#if defined (CONFIG_MTK_MTD_NAND)
+    nand_disable_clock();
+#endif
 }
 
 /**
@@ -778,7 +800,11 @@ static void panic_nand_get_device(struct nand_chip *chip,
  *
  * Get the device and lock it for exclusive access
  */
+#if defined (CONFIG_MTK_MTD_NAND)
 int
+#else
+static int
+#endif
 nand_get_device(struct nand_chip *chip, struct mtd_info *mtd, int new_state)
 {
 	spinlock_t *lock = &chip->controller->lock;
@@ -794,6 +820,9 @@ nand_get_device(struct nand_chip *chip, struct mtd_info *mtd, int new_state)
 	if (chip->controller->active == chip && chip->state == FL_READY) {
 		chip->state = new_state;
 		spin_unlock(lock);
+#if defined (CONFIG_MTK_MTD_NAND)
+            nand_enable_clock();
+#endif
 		return 0;
 	}
 	if (new_state == FL_PM_SUSPENDED) {
@@ -1474,6 +1503,9 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
 		if (realpage != chip->pagebuf || oob) {
 			bufpoi = aligned ? buf : chip->buffers->databuf;
 
+#if defined (CONFIG_MTK_MTD_NAND)
+            ret = chip->read_page(mtd, chip, bufpoi, page);
+#else
 			if (likely(sndcmd)) {
 				chip->cmdfunc(mtd, NAND_CMD_READ0, 0x00, page);
 				sndcmd = 0;
@@ -1488,6 +1520,7 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
 			else
 				ret = chip->ecc.read_page(mtd, chip, bufpoi,
 							  page);
+#endif
 			if (ret < 0)
 				break;
 
@@ -1761,6 +1794,14 @@ static int nand_do_read_oob(struct mtd_info *mtd, loff_t from,
 	int len;
 	uint8_t *buf = ops->oobbuf;
 
+#if defined (CONFIG_MTK_MTD_NAND) && defined(MTK_NAND_BMT)
+	// variable we need for checksum
+	u8 oob_checksum = 0;
+	u8 i, j;
+	bool empty = true;
+	struct nand_oobfree *free_entry;
+#endif
+    
 	DEBUG(MTD_DEBUG_LEVEL3, "%s: from = 0x%08Lx, len = %i\n",
 			__func__, (unsigned long long)from, readlen);
 
@@ -1793,6 +1834,25 @@ static int nand_do_read_oob(struct mtd_info *mtd, loff_t from,
 
 	while(1) {
 		sndcmd = chip->ecc.read_oob(mtd, chip, page, sndcmd);
+
+#if defined (CONFIG_MTK_MTD_NAND) && defined(MTK_NAND_BMT)
+        oob_checksum = 0;
+        for (i = 0; 
+                i < MTD_MAX_OOBFREE_ENTRIES && chip->ecc.layout->oobfree[i].length;
+                i++)
+        {
+            free_entry = (struct nand_oobfree*)(chip->ecc.layout->oobfree) + i;
+            for (j = 0; j < free_entry->length; j++)
+            {
+                oob_checksum ^= chip->oob_poi[free_entry->offset + j];
+                if (chip->oob_poi[free_entry->offset + j] != 0xFF)
+                    empty = false;
+            }
+        }
+
+        if (!empty && (oob_checksum != chip->oob_poi[free_entry->offset + free_entry->length]))
+            return -EIO;
+#endif
 
 		len = min(len, readlen);
 		buf = nand_transfer_oob(chip, buf, ops, len);
@@ -2579,10 +2639,13 @@ int nand_erase_nand(struct mtd_info *mtd, struct erase_info *instr,
 		    (page + pages_per_block))
 			chip->pagebuf = -1;
 
+#if defined (CONFIG_MTK_MTD_NAND)
+		status = chip->erase(mtd, page & chip->pagemask);
+#else
 		chip->erase_cmd(mtd, page & chip->pagemask);
 
 		status = chip->waitfunc(mtd, chip);
-
+#endif
 		/*
 		 * See if operation failed and additional status checks are
 		 * available
@@ -3056,6 +3119,53 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
 	return 0;
 }
 
+static void nand_panic_wait(struct mtd_info *mtd)
+{
+	struct nand_chip *chip = mtd->priv;
+	int i;
+
+	if (chip->state != FL_READY)
+		for (i = 0; i < 40; i++) {
+			if (chip->dev_ready(mtd))
+				break;
+			mdelay(10);
+		}
+	chip->state = FL_READY;
+}
+
+static int nand_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
+			    size_t *retlen, const u_char *buf)
+{
+	struct nand_chip *chip = mtd->priv;
+	int ret;
+
+	/* Do not allow reads past end of device */
+	if ((to + len) > mtd->size)
+		return -EINVAL;
+	if (!len)
+		return 0;
+
+#if defined (CONFIG_MTK_MTD_NAND)
+	nand_enable_clock();
+#endif
+
+	nand_panic_wait(mtd);
+
+	chip->ops.len = len;
+	chip->ops.datbuf = (uint8_t *)buf;
+	chip->ops.oobbuf = NULL;
+
+	ret = nand_do_write_ops(mtd, to, &chip->ops);
+
+	*retlen = chip->ops.retlen;
+
+#if defined (CONFIG_MTK_MTD_NAND)
+	nand_disable_clock();
+#endif
+    
+    return ret;
+}
+
 
 /**
  * nand_scan_tail - [NAND Interface] Scan for the NAND device
@@ -3366,6 +3476,11 @@ static void __exit nand_base_exit(void)
 {
 	led_trigger_unregister_simple(nand_led_trigger);
 }
+
+#if defined (CONFIG_MTD_ANY_RALINK)
+#undef CONFIG_MTK_MTD_NAND
+#endif
+
 
 module_init(nand_base_init);
 module_exit(nand_base_exit);

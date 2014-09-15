@@ -57,12 +57,14 @@
 #define sysRegRead(phys) (*(volatile unsigned int *)PHYS_TO_K1(phys))
 #define sysRegWrite(phys, val)  ((*(volatile unsigned int *)PHYS_TO_K1(phys)) = (val))
 
+#if !defined (CONFIG_RALINK_MT7621)
 #if defined (CONFIG_RALINK_MT7620) || defined(CONFIG_RALINK_RT5350) \
 		|| defined(CONFIG_RALINK_RT3052) || defined(CONFIG_RALINK_RT3352)
 #define TESTSTAT1     RALINK_SYSCTL_BASE + 0x18
 #define TESTSTAT2     RALINK_SYSCTL_BASE + 0x1C
 #else
 #error Need define TESTSTAT
+#endif
 #endif
 
 #if defined(CONFIG_SERIAL_CONSOLE) || defined(CONFIG_PROM_CONSOLE)
@@ -91,6 +93,7 @@ extern void mips_timer_setup(struct irqaction *irq);
 
 static void __init set_reset_flag(void)
 {
+#if !defined (CONFIG_RALINK_MT7621)
 	unsigned int value;
 
 	value = sysRegRead(TESTSTAT1);
@@ -101,6 +104,7 @@ static void __init set_reset_flag(void)
 		printk(KERN_INFO "SoC status: hard reset\n");
 		sysRegWrite(TESTSTAT1, 0x01);
 	}
+#endif
 }
 
 int coherentio = -1;    /* no DMA cache coherency (may be set by user) */

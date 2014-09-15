@@ -531,4 +531,10 @@ config MTD_NAND_JZ4740
 	help
 		Enables support for NAND Flash on JZ4740 SoC based boards.
 
+config MTK_MTD_NAND
+	tristate "Support for MTK SoC NAND controller"
+	depends on RALINK_MT7621
+	help
+		Enables support for NAND Flash on MT7621 SoC based boards.
+
 endif # MTD_NAND

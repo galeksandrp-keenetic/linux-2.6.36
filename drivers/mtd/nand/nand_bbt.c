@@ -58,6 +58,11 @@
 #include <linux/bitops.h>
 #include <linux/delay.h>
 #include <linux/vmalloc.h>
+#include "nand_def.h"
+
+#if defined(SKIP_BAD_BLOCK)
+extern int check_block_remap(struct mtd_info *mtd, int block);
+#endif
 
 /**
  * check_pattern - [GENERIC] check if a pattern is in the buffer
@@ -1263,10 +1268,23 @@ int nand_isbad_bbt(struct mtd_info *mtd, loff_t offs, int allowbbt)
 	struct nand_chip *this = mtd->priv;
 	int block;
 	uint8_t res;
-
+#if defined(SKIP_BAD_BLOCK)
+	int mapped_block;
+#endif
 	/* Get block number * 2 */
 	block = (int)(offs >> (this->bbt_erase_shift - 1));
+#if defined(SKIP_BAD_BLOCK)
+	mapped_block = block;
+	mapped_block = check_block_remap(mtd, block >> 1);
+	if (mapped_block == -1)
+	{
+		return NAND_STATUS_FAIL;
+	}
+	mapped_block = mapped_block << 1;
+	res = (this->bbt[mapped_block >> 3] >> (mapped_block & 0x06)) & 0x03;
+#else
 	res = (this->bbt[block >> 3] >> (block & 0x06)) & 0x03;
+#endif
 
 	DEBUG(MTD_DEBUG_LEVEL2, "nand_isbad_bbt(): bbt info for offs 0x%08x: (block %d) 0x%02x\n",
 	      (unsigned int)offs, block >> 1, res);
@@ -1281,6 +1299,26 @@ int nand_isbad_bbt(struct mtd_info *mtd, loff_t offs, int allowbbt)
 	}
 	return 1;
 }
+
+void nand_bbt_set(struct mtd_info *mtd, int page, int flag)
+{
+	struct nand_chip *this = mtd->priv;
+	int block;
+
+	block = (int)(page >> (this->bbt_erase_shift - this->page_shift - 1));
+	this->bbt[block >> 3] &= ~(0x03 << (block & 0x6));
+	this->bbt[block >> 3] |= (flag & 0x3) << (block & 0x6);
+}
+
+int nand_bbt_get(struct mtd_info *mtd, int page)
+{
+	struct nand_chip *this = mtd->priv;
+	int block;
+
+	block = (int)(page >> (this->bbt_erase_shift - this->page_shift - 1));
+	return (this->bbt[block >> 3] >> (block & 0x06)) & 0x03;
+}
+
 
 EXPORT_SYMBOL(nand_scan_bbt);
 EXPORT_SYMBOL(nand_default_bbt);

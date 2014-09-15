@@ -394,7 +394,10 @@ struct nand_chip {
 	int		(*errstat)(struct mtd_info *mtd, struct nand_chip *this, int state, int status, int page);
 	int		(*write_page)(struct mtd_info *mtd, struct nand_chip *chip,
 				      const uint8_t *buf, int page, int cached, int raw);
-
+	#if defined (CONFIG_MTK_MTD_NAND)|| defined (CONFIG_MTD_ANY_RALINK)
+		int     (*read_page)(struct mtd_info *mtd, struct nand_chip *chip, u8 *buf, int page);
+		int     (*erase)(struct mtd_info *mtd, int page);
+	#endif
 	int		chip_delay;
 	unsigned int	options;
 
