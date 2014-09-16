@@ -3421,7 +3421,8 @@ loop:
 	if (hub->hdev->parent ||
 			!hcd->driver->port_handed_over ||
 			!(hcd->driver->port_handed_over)(hcd, port1))
-		dev_err(hub_dev, "unable to enumerate USB device on port %d\n",
+		if (status != -ENOTCONN && status != -ENODEV)
+			dev_err(hub_dev, "unable to enumerate USB device on port %d\n",
 				port1);
  
 done:
