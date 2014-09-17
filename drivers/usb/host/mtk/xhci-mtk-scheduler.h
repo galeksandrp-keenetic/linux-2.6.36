@@ -68,11 +68,6 @@ struct sch_ep
 	mtk_u32 *ep;		//address of usb_endpoint pointer
 };
 
-static struct sch_ep **ss_out_eps[MAX_EP_NUM];
-static struct sch_ep **ss_in_eps[MAX_EP_NUM];
-static struct sch_ep **hs_eps[MAX_EP_NUM];	//including tt isoc
-static struct sch_ep **tt_intr_eps[MAX_EP_NUM];
-
 int mtk_xhci_scheduler_init(void);
 int mtk_xhci_scheduler_add_ep(int dev_speed, int is_in, int isTT, int ep_type, int maxp, int interval, int burst
 	, int mult, mtk_u32 *ep, mtk_u32 *ep_ctx, struct sch_ep *sch_ep);
