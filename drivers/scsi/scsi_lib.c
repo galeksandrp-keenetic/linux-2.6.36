@@ -240,8 +240,13 @@ int scsi_execute(struct scsi_device *sdev, const unsigned char *cmd,
 	 * is invalid.  Prevent the garbage from being misinterpreted
 	 * and prevent security leaks by zeroing out the excess data.
 	 */
-	if (unlikely(req->resid_len > 0 && req->resid_len <= bufflen))
+	if (unlikely(req->resid_len > 0 && req->resid_len <= bufflen)) {
 		memset(buffer + (bufflen - req->resid_len), 0, req->resid_len);
+		req->errors = 0;
+#ifdef DEBUG
+		printk(KERN_WARNING "%s: USB mass-storage fix\n", __func__);
+#endif
+	}
 
 	if (resid)
 		*resid = req->resid_len;
