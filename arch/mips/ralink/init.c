@@ -304,7 +304,7 @@ static void prom_cpu_id_name(void)
 		}
 
 		name = id;
-		printk(" %s CPU Detected!\n", name);
+		printk(KERN_INFO "%s CPU detected\n", name);
 	}
 }
 
