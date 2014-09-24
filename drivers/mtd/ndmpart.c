@@ -80,38 +80,46 @@ struct mtd_partition ndm_parts[] = {
 	}
 };
 
-
 static int create_mtd_partitions(struct mtd_info *master,
 				 struct mtd_partition **pparts,
 				 unsigned long origin)
 {
 	unsigned int offset,flash_size;
 	size_t len;
-	size_t i,delete=0;
+	size_t i, delete = 0;
 	__le32 magic;
 
 	flash_size = master->size;
-	
+
 	printk(KERN_INFO "Current flash size = 0x%x\n",flash_size);
-	
-	/* U-Boot */	
+
+	/* U-Boot */
 	ndm_parts[0].offset = 0;
-	if (master->type == MTD_NANDFLASH) 
+	if (master->type == MTD_NANDFLASH)
+#if defined(CONFIG_RALINK_MT7621)
+		ndm_parts[0].size = (master->erasesize << 2);
+#else
 		ndm_parts[0].size = (master->erasesize);
+#endif
 	else
 		ndm_parts[0].size = (3*master->erasesize);
 
 	/* U-Config */
 	ndm_parts[1].offset = ndm_parts[0].size;
+#if defined(CONFIG_RALINK_MT7621)
+	if (master->type == MTD_NANDFLASH)
+		ndm_parts[1].size = (master->erasesize << 2);
+	else
+#endif
 	ndm_parts[1].size = master->erasesize;
 
 	/* RF-EEPROM */
 	ndm_parts[2].offset = ndm_parts[1].offset + ndm_parts[1].size;
-	
+
 	for (offset = ndm_parts[1].offset; offset < flash_size;
 		offset += master->erasesize) {
 		
-		master->read(master, offset, sizeof(magic), 
+		master->read(master, offset, sizeof(magic),
 						&len, (uint8_t *)&magic);
 		if (magic == KERNEL_MAGIC){
 			printk(KERN_INFO "Found kernel at offset 0x%x\n",offset);
@@ -131,30 +139,45 @@ static int create_mtd_partitions(struct mtd_info *master,
 	
 	/* Backup */
 	ndm_parts[8].size = flash_size - ndm_parts[8].offset;
-	
+
 	/* Delete Storage if flash size less then 8M */
 	if (flash_size < 0x800000) {
 		delete = 1;
 		for (i = 7; i < ARRAY_SIZE(ndm_parts); i++){
 			ndm_parts[i]=ndm_parts[i+1];
 		}
+#if defined(CONFIG_RALINK_MT7621)
+		if (master->type == MTD_NANDFLASH)
+			ndm_parts[6].offset = flash_size - (master->erasesize << 1);
+		else
+#endif
 		ndm_parts[6].offset = flash_size - master->erasesize;
 	} else {
 		ndm_parts[7].offset = flash_size - ndm_parts[7].size;
+#if defined(CONFIG_RALINK_MT7621)
+		if (master->type == MTD_NANDFLASH)
+			ndm_parts[6].offset = ndm_parts[7].offset - (master->erasesize << 1);
+		else
+#endif
 		ndm_parts[6].offset = ndm_parts[7].offset - master->erasesize;
 	}
-	
+
 	/* Config */
+#if defined(CONFIG_RALINK_MT7621)
+	if (master->type == MTD_NANDFLASH)
+		ndm_parts[6].size = (master->erasesize << 1);
+	else
+#endif
 	ndm_parts[6].size = master->erasesize;
-	
+
 	/* Firmware */
 	ndm_parts[5].size = ndm_parts[6].offset - ndm_parts[5].offset;
-	
+
 	/* RootFS */
 	ndm_parts[4].size = ndm_parts[6].offset - ndm_parts[4].offset;
-	
-	
-	
+
+
+
 	*pparts = ndm_parts;
 	return (ARRAY_SIZE(ndm_parts) - delete);
 }

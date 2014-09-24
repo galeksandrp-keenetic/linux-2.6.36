@@ -233,6 +233,10 @@ choice
         depends on RAETH_GMAC2
         default GE2_RGMII_AN
 
+config  GE_RGMII_FORCE_RTL8370M
+        bool "RGMII RTL8370M Giga Switch"
+        depends on RAETH_GMAC2
+
 config  GE2_MII_FORCE_100
         bool "MII_FORCE_100 (10/100M Switch)"
         depends on RAETH_GMAC2

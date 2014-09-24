@@ -13,6 +13,7 @@
 ******************************************************************************/
 #include "nand_def.h"
 #if defined(__KERNEL_NAND__)
+#include <linux/kernel.h>
 #include <linux/slab.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -79,12 +80,12 @@
 #endif
 
 #include "bmt.h"
-#if defined(__KERNEL_NAND__)
+#if 0 /* defined(__KERNEL_NAND__) */
 #include "partition.h"
 #endif
 //#include <asm/system.h>
 
-#ifdef PMT
+#if 0 /* def PMT */
 #include "partition_define.h"
 #endif
 //#include <mach/mt_boot.h>
@@ -101,7 +102,6 @@ unsigned int CFG_BLOCKSIZE;
 #endif
 
 #if defined(SKIP_BAD_BLOCK)
-#define FILE_SYSTEM_START_ADDRESS       IMAGE1_SIZE
 static int shift_on_bbt = 0;
 extern void nand_bbt_set(struct mtd_info *mtd, int page, int flag);
 extern int nand_bbt_get(struct mtd_info *mtd, int page);
@@ -262,10 +262,15 @@ static u8 g_running_dma = 0;
 static u32 g_dump_count = 0;
 #endif
 #if defined (__KERNEL_NAND__)
-extern struct mtd_partition g_pasStatic_Partition[];
-int part_num = NUM_PARTITIONS;
+#if defined (CONFIG_JFFS2_FS)
+#define NAND_JFFS2_WORKAROUND 1
 #endif
-#ifdef PMT
+static const char *part_probes[] __initdata = { "ndmpart", NULL };
+//extern struct mtd_partition g_pasStatic_Partition[];
+static struct mtd_partition *mtd_parts;
+int part_num = 0;
+#endif
+#if 0 /* def PMT */
 extern void part_init_pmt(struct mtd_info *mtd, u8 * buf);
 extern struct mtd_partition g_exist_Partition[];
 #endif
@@ -2240,11 +2245,11 @@ static int get_start_end_block(struct mtd_info *mtd, int block, int *start_blk, 
 			}
 		}
 		// skip All partition entry
-		else if (g_pasStatic_Partition[i].size == MTDPART_SIZ_FULL)
+		else if (mtd_parts[i].size == MTDPART_SIZ_FULL)
 		{
 			continue;
 		}
-                *end_blk = *start_blk + (g_pasStatic_Partition[i].size >> chip->phys_erase_shift) - 1;
+                *end_blk = *start_blk + (mtd_parts[i].size >> chip->phys_erase_shift) - 1;
                 if ((block >= *start_blk) && (block <= *end_blk))
                         break;
                 *start_blk = *end_blk + 1;
@@ -2440,7 +2445,7 @@ static int is_skip_bad_block(struct mtd_info *mtd, int page)
 	struct nand_chip *chip = mtd->priv;
 
 	count ++;
-	if ((page << chip->page_shift) >= FILE_SYSTEM_START_ADDRESS)
+	if ((page << chip->page_shift) >= chip->chipsize)
 	{
 		return 0;
 	}
@@ -4492,40 +4497,22 @@ int mtk_nand_probe()
     }
 #endif
 
-#ifdef PMT
+#if 0 /* def PMT */
     nand_chip->chipsize -= (PMT_POOL_SIZE) << nand_chip->phys_erase_shift;
-    mtd->size = nand_chip->chipsize;	
+    mtd->size = nand_chip->chipsize;
     part_init_pmt(mtd, (u8 *) & g_exist_Partition[0]);
-#if defined (__KERNEL_NAND__)	
-	err = add_mtd_partitions(mtd, g_exist_Partition, part_num);	
+#if defined (__KERNEL_NAND__)
+	err = add_mtd_partitions(mtd, g_exist_Partition, part_num);
 	//err = mtd_device_register(mtd, g_exist_Partition, part_num);
-#endif	
+#endif
 #else
 #if defined (__KERNEL_NAND__)
-	/* modify partition table */
-	g_pasStatic_Partition[1].size = LARGE_MTD_BOOT_PART_SIZE;
-    g_pasStatic_Partition[2].size = LARGE_MTD_CONFIG_PART_SIZE;
-    g_pasStatic_Partition[3].size = LARGE_MTD_FACTORY_PART_SIZE;
-#ifdef CONFIG_RT2880_ROOTFS_IN_FLASH
-	//g_pasStatic_Partition[4].size = CONFIG_MTD_KERNEL_PART_SIZ;
-	g_pasStatic_Partition[5].size = IMAGE1_SIZE - (LARGE_MTD_BOOT_PART_SIZE + LARGE_MTD_CONFIG_PART_SIZE \
-			                    + LARGE_MTD_FACTORY_PART_SIZE + CONFIG_MTD_KERNEL_PART_SIZ);
-#ifdef CONFIG_ROOTFS_IN_FLASH_NO_PADDING
-#error "No code to handle this case in MTK NAND Driver.."	
-#endif
-#else	//CONFIG_RT2880_ROOTFS_IN_RAM
-	g_pasStatic_Partition[4].size = IMAGE1_SIZE - (LARGE_MTD_BOOT_PART_SIZE + LARGE_MTD_CONFIG_PART_SIZE \
-			                    + LARGE_MTD_FACTORY_PART_SIZE);
-#endif
-#ifdef CONFIG_DUAL_IMAGE
-	g_pasStatic_Partition[5].size = g_pasStatic_Partition[4].size;
-	g_pasStatic_Partition[5].offset = IMAGE1_SIZE + (LARGE_MTD_BOOT_PART_SIZE + LARGE_MTD_CONFIG_PART_SIZE \
-			                    + LARGE_MTD_FACTORY_PART_SIZE);
-#ifdef CONFIG_RT2880_ROOTFS_IN_FLASH
-#error "No cpde to handle this case in MTK NAND Driver..."
-#endif		
-#endif
-	err = add_mtd_partitions(mtd, g_pasStatic_Partition, part_num);
+	part_num = parse_mtd_partitions(mtd, part_probes, &mtd_parts, 0);
+	err = -1;
+	if(part_num > 0)
+		err = add_mtd_partitions(mtd, mtd_parts, part_num);
+	else
+		printk("No partitions found on a flash.");
 	//err = mtd_device_register(mtd, g_pasStatic_Partition, part_num);
 #endif
 #endif
