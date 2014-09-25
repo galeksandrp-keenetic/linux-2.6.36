@@ -498,7 +498,25 @@ static int dm9620_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 {
 	struct usbnet *dev = netdev_priv(net);
 
-	return generic_mii_ioctl(&dev->mii, if_mii(rq), cmd, NULL);
+	switch(cmd)
+	{
+		// Metanoia private ioctl support
+		case SIOCDEVPRIVATE:
+			dm_write_reg(dev, DM_GPR_DATA, 0);  // GPIO (SMI_D) Low
+			break;
+		case SIOCDEVPRIVATE+1:
+			dm_write_reg(dev, DM_GPR_DATA, (1<<3));  // GPIO (SMI_D) High
+			break;
+		case SIOCDEVPRIVATE+2:
+			printk("[JJ7.DEF] WR to %s\n", rq->ifr_name);
+			break;
+
+		default:
+			// Original
+			return generic_mii_ioctl(&dev->mii, if_mii(rq), cmd, NULL);
+	}
+
+	return 0;
 }
 
 
@@ -803,7 +821,8 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
   kfree (tmpwPtr2); 
 	
 	/* power up phy */
-	dm_write_reg(dev, DM_GPR_CTRL, 1);
+	dm_write_reg(dev, DM_GPR_CTRL, 1
+			| (1<<3));					/* Enable MT2311 reset line control via DM96xx GEPIO[3] */
 	dm_write_reg(dev, DM_GPR_DATA, 0);
 
 	/* Init tx/rx checksum */
