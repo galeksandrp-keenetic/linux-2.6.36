@@ -139,25 +139,11 @@ config  RT_3052_ESW
         bool "Ralink Embedded Switch"
         depends on RALINK_RT3052 || RALINK_RT3352 || RALINK_RT5350 || RALINK_RT6855 || MIPS_RT63365 || MIPS_MT7510 || RALINK_MT7620
 
+config  GE1_RGMII_NONE
+        bool "NONE (NO CONNECT)"
+        depends on (RALINK_MT7621)
 
 endchoice
-
-
-#config LAN_WAN_SUPPORT
-#        bool "LAN/WAN Partition"
-#        depends on RAETH_ROUTER || RT_3052_ESW
-
-#choice
-#        prompt "Switch Board Layout Type"
-#        depends on LAN_WAN_SUPPORT || P5_RGMII_TO_MAC_MODE ||  GE1_RGMII_FORCE_1000 || GE2_RGMII_FORCE_1000
-#	default WAN_AT_P0
-
-#	config  WAN_AT_P4
-#	        bool "LLLL/W"
-#		
-#	config  WAN_AT_P0
-#	        bool "W/LLLL"
-#endchoice
 
 #config	RALINK_VISTA_BASIC
 #	bool 'Vista Basic Logo for IC+ 175C'
@@ -258,7 +244,46 @@ config  GE2_RGMII_AN
         bool "RGMII_AN (GigaPhy)"
         depends on RAETH_GMAC2
 
+config  GE2_INTERNAL_GPHY
+        bool "Internal GigaPHY"
+        depends on RAETH_GMAC2
+	select LAN_WAN_SUPPORT
+
 endchoice
+
+
+config LAN_WAN_SUPPORT
+        bool "LAN/WAN Partition"
+        depends on GE2_INTERNAL_GPHY
+
+choice
+        prompt "Switch Board Layout Type"
+        depends on LAN_WAN_SUPPORT
+	default WAN_AT_P4
+
+	config  WAN_AT_P4
+	bool "LLLL/W - P4"
+
+	config  WAN_AT_P0
+	bool "W/LLLL - P0"
+
+endchoice
+
+config  GE_RGMII_INTERNAL_P0_AN
+        bool
+        depends on GE2_INTERNAL_GPHY
+        default y if WAN_AT_P0
+
+config  GE_RGMII_INTERNAL_P4_AN
+        bool
+        depends on GE2_INTERNAL_GPHY
+        default y if WAN_AT_P4
+
+config  MAC_TO_GIGAPHY_MODE_ADDR2
+        hex
+        default 0 if GE_RGMII_INTERNAL_P0_AN
+        default 4 if GE_RGMII_INTERNAL_P4_AN
+        depends on GE_RGMII_INTERNAL_P0_AN || GE_RGMII_INTERNAL_P4_AN
 
 config  MAC_TO_GIGAPHY_MODE_ADDR2
         hex "GE2 Phy Address"
