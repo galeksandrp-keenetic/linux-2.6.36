@@ -134,6 +134,7 @@ struct __mc_fdb_entry
 
 extern void brioctl_set(int (*ioctl_hook)(struct net *, unsigned int, void __user *));
 extern int (*br_should_route_hook)(struct sk_buff *skb);
+extern void ubrioctl_set(int (*ioctl_hook)(struct net *, unsigned int, void __user *));
 
 #endif
 
