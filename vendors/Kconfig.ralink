@@ -9,13 +9,10 @@ config  RALINK_HWCRYPTO
 #############
 # Wireless
 #############
-menuconfig RT2860V2_AP
+menuconfig RT2860V2
 	bool "RT2860v2 Wi-Fi Driver"
-	select WIRELESS_EXT
-	select WEXT_SPY
-	select WEXT_PRIV
 
-if RT2860V2_AP
+if RT2860V2
 source "drivers/net/wireless/rt2860v2_ap/Kconfig"
 endif
 
