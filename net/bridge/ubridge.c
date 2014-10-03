@@ -30,7 +30,7 @@ static int cur_port = BR_MAX_PORTS - 1;
 static LIST_HEAD(ubr_list);
 
 struct ubr_private {
-	struct net_device		*master_dev;
+	struct net_device		*slave_dev;
 	struct net_device_stats	stats;
 	struct list_head		list;
 	struct net_device		*dev;
@@ -48,7 +48,7 @@ static struct sk_buff *ubr_handle_frame(struct sk_buff *skb)
 //	printk(KERN_ERR"handler(id=%d/0x%x): port_no=%d %d bytes\n",p->port_id,skb->protocol,p->port_no,skb->len);
 
 	list_for_each_entry_safe(ubr, tmp, &ubr_list, list) {
-		if (skb->dev == ubr->master_dev) {
+		if (skb->dev == ubr->slave_dev) {
 			skb->dev = ubr->dev;
 			skb->pkt_type = PACKET_HOST;
 			ubr->dev->last_rx = jiffies;
@@ -67,36 +67,36 @@ static struct sk_buff *ubr_handle_frame(struct sk_buff *skb)
 }
 
 
-static int ubr_open(struct net_device *tx_dev)
+static int ubr_open(struct net_device *master_dev)
 {
-	netif_start_queue(tx_dev);
+	netif_start_queue(master_dev);
 	return 0;
 }
 
-static int ubr_stop(struct net_device *tx_dev)
+static int ubr_stop(struct net_device *master_dev)
 {
-	struct ubr_private *tx_info = netdev_priv(tx_dev);
-	struct net_device *master_dev = tx_info->master_dev;
-	netif_stop_queue(tx_dev);
-	if (netif_carrier_ok(tx_dev)) {
-		netif_carrier_off(tx_dev);
+	struct ubr_private *master_info = netdev_priv(master_dev);
+	struct net_device *slave_dev = master_info->slave_dev;
+	netif_stop_queue(master_dev);
+	if (netif_carrier_ok(master_dev)) {
 		netif_carrier_off(master_dev);
+		netif_carrier_off(slave_dev);
 	}
 	return 0;
 }
 
-static int ubr_xmit(struct sk_buff *skb, struct net_device *tx_dev)
+static int ubr_xmit(struct sk_buff *skb, struct net_device *master_dev)
 {
-	struct ubr_private *ubr_tx = netdev_priv(tx_dev);
-	struct net_device *master_dev = ubr_tx->master_dev;
+	struct ubr_private *master_info = netdev_priv(master_dev);
+	struct net_device *slave_dev = master_info->slave_dev;
 	
-	if (!master_dev)
+	if (!slave_dev)
 		return -ENOTCONN;
 	
-	ubr_tx->stats.tx_packets++;
-	ubr_tx->stats.tx_bytes += skb->len;
+	master_info->stats.tx_packets++;
+	master_info->stats.tx_bytes += skb->len;
 
-	skb->dev = master_dev;
+	skb->dev = slave_dev;
 	dev_queue_xmit(skb);
 
 	return 0;
@@ -123,17 +123,19 @@ static int ubr_deregister(struct net_device *dev)
 	struct ubr_private *ubr = netdev_priv(dev);
 	struct net_bridge_port *p;
 
+	rtnl_lock();
 	dev_close(dev);
 
 	if (!list_empty(&ubr->list))
 		list_del_init(&ubr->list);
 
-	if (ubr->master_dev) {
-		p = br_port_get_rcu(ubr->master_dev);
-		rcu_assign_pointer(ubr->master_dev->rx_handler_data, NULL);
+	if (ubr->slave_dev) {
+		p = br_port_get_rcu(ubr->slave_dev);
+		rcu_assign_pointer(ubr->slave_dev->rx_handler_data, NULL);
 		kobject_del(&p->kobj);
 	}
 	unregister_netdevice(dev);
+	rtnl_unlock();
 	return 0;
 }
 
@@ -142,14 +144,12 @@ static int ubr_free_master(struct net *net, const char *name)
 	struct net_device *dev;
 	int ret = 0;
 
-	rtnl_lock();
 	dev = __dev_get_by_name(net, name);
 	if (dev == NULL)
 		ret =  -ENXIO; 	/* Could not find device */
 	else
 		ret = ubr_deregister(dev);
 
-	rtnl_unlock();
 	return ret;
 }
 
@@ -200,16 +200,14 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 	struct net_bridge_port *p;
 	int err = -ENODEV;
 
-	rtnl_lock();
 	dev1 = __dev_get_by_index(&init_net, ifindex);
-	rtnl_unlock();
 
 	if (!dev1)
 		goto out;
 
 	memcpy(master_dev->dev_addr, dev1->dev_addr, ETH_ALEN);		// TBD ???
 	ubr0 = netdev_priv(master_dev);
-	ubr0->master_dev = dev1;
+	ubr0->slave_dev = dev1;
 
 	p = kzalloc(sizeof(*p), GFP_KERNEL);
 	if (p == NULL)
@@ -232,14 +230,12 @@ static int ubr_detach(struct net_device *master_dev, int ifindex)
 	struct ubr_private *ubr0;
 	int err = -ENODEV;
 
-	rtnl_lock();
 	dev1 = __dev_get_by_index(&init_net, ifindex);
-	rtnl_unlock();
 
 	if (!dev1)
 		goto out;
 	ubr0 = netdev_priv(master_dev);
-	ubr0->master_dev = NULL;
+	ubr0->slave_dev = NULL;
 
 	rcu_assign_pointer(dev1->rx_handler_data, NULL);
 	err = 0;
@@ -271,9 +267,13 @@ static int ubr_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	switch (cmd) {
 	case SIOCBRADDIF:
+//		printk("Add if\n");
+//		return 0;
 		return ubr_atto_master(dev, rq->ifr_ifindex);
 
 	case SIOCBRDELIF:
+//		printk("Del if\n");
+//		return 0;
 		return ubr_detach(dev, rq->ifr_ifindex);
 
 	}
@@ -284,7 +284,7 @@ static int __init ubridge_init(void)
 {
 	rcu_assign_pointer(ubr_handle_frame_hook, ubr_handle_frame);
 	ubrioctl_set(ubr_ioctl_deviceless_stub);
-	printk(KERN_INFO "ubridge: %s, %s\n", DRV_DESCRIPTION, DRV_VERSION);	
+	printk(KERN_INFO "ubridge: %s, %s\n", DRV_DESCRIPTION, DRV_VERSION);
 	return 0;
 }
 
