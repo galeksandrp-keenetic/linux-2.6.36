@@ -1480,7 +1480,7 @@ sg_add(struct device *cl_dev, struct class_interface *cl_intf)
 	} else
 		printk(KERN_WARNING "sg_add: sg_sys Invalid\n");
 
-	sdev_printk(KERN_NOTICE, scsidp,
+	sdev_printk(KERN_INFO, scsidp,
 		    "Attached scsi generic sg%d type %d\n", sdp->index,
 		    scsidp->type);
 
