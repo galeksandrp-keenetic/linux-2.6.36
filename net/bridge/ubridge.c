@@ -45,7 +45,7 @@ static struct sk_buff *ubr_handle_frame(struct sk_buff *skb)
 {
 	struct ubr_private *ubr, *tmp;
 
-//	printk(KERN_ERR"handler(id=%d/0x%x): port_no=%d %d bytes\n",p->port_id,skb->protocol,p->port_no,skb->len);
+//	printk(KERN_ERR"handler(proto=0x%x): %d bytes\n", skb->protocol, skb->len);
 
 	list_for_each_entry_safe(ubr, tmp, &ubr_list, list) {
 		if (skb->dev == ubr->slave_dev) {
@@ -121,7 +121,6 @@ static const struct net_device_ops ubr_netdev_ops =
 static int ubr_deregister(struct net_device *dev)
 {
 	struct ubr_private *ubr = netdev_priv(dev);
-	struct net_bridge_port *p;
 
 	rtnl_lock();
 	dev_close(dev);
@@ -130,8 +129,7 @@ static int ubr_deregister(struct net_device *dev)
 		list_del_init(&ubr->list);
 
 	if (ubr->slave_dev) {
-		p = br_port_get_rcu(ubr->slave_dev);
-		rcu_assign_pointer(ubr->slave_dev->rx_handler_data, NULL);
+		netdev_rx_handler_unregister(ubr->slave_dev);
 		kobject_del(&p->kobj);
 	}
 	unregister_netdevice(dev);
@@ -196,17 +194,18 @@ out:
 static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 {
 	struct net_device *dev1;
-	struct ubr_private *ubr0;
+	struct ubr_private *ubr0 = netdev_priv(master_dev);
 	struct net_bridge_port *p;
 	int err = -ENODEV;
 
-	dev1 = __dev_get_by_index(&init_net, ifindex);
+	if (ubr0->slave_dev != NULL)
+		return -EBUSY;
 
+	dev1 = __dev_get_by_index(&init_net, ifindex);
 	if (!dev1)
 		goto out;
 
 	memcpy(master_dev->dev_addr, dev1->dev_addr, ETH_ALEN);		// TBD ???
-	ubr0 = netdev_priv(master_dev);
 	ubr0->slave_dev = dev1;
 
 	p = kzalloc(sizeof(*p), GFP_KERNEL);
@@ -216,7 +215,11 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 	p->port_no = 0;
 	p->state = BR_STATE_DISABLED;
 	p->dev = dev1;
-	rcu_assign_pointer(dev1->rx_handler_data, p);
+	err = netdev_rx_handler_register(dev1, ubr_handle_frame, p);
+	if (err) {
+		kfree(p);
+		goto out;
+	}
 	netif_carrier_on(master_dev);
 	err = 0;
 
@@ -227,17 +230,18 @@ out:
 static int ubr_detach(struct net_device *master_dev, int ifindex)
 {
 	struct net_device *dev1;
-	struct ubr_private *ubr0;
+	struct ubr_private *ubr0 = netdev_priv(master_dev);
 	int err = -ENODEV;
 
 	dev1 = __dev_get_by_index(&init_net, ifindex);
-
 	if (!dev1)
 		goto out;
-	ubr0 = netdev_priv(master_dev);
+
+	if (ubr0->slave_dev != dev1)
+		goto out;
 	ubr0->slave_dev = NULL;
 
-	rcu_assign_pointer(dev1->rx_handler_data, NULL);
+	netdev_rx_handler_unregister(dev1);
 	err = 0;
 
 out:
