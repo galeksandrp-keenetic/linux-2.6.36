@@ -1,5 +1,5 @@
 #define DRV_NAME		"ubridge"
-#define DRV_VERSION		"0.2"
+#define DRV_VERSION		"0.3"
 #define DRV_DESCRIPTION	"Tiny bridge driver"
 #define DRV_COPYRIGHT	"(C) 2012 NDM Systems Inc. <ap@ndmsystems.com>"
 
@@ -77,11 +77,8 @@ static int ubr_stop(struct net_device *master_dev)
 {
 	struct ubr_private *master_info = netdev_priv(master_dev);
 	struct net_device *slave_dev = master_info->slave_dev;
+
 	netif_stop_queue(master_dev);
-	if (netif_carrier_ok(master_dev)) {
-		netif_carrier_off(master_dev);
-		netif_carrier_off(slave_dev);
-	}
 	return 0;
 }
 
@@ -130,7 +127,7 @@ static int ubr_deregister(struct net_device *dev)
 
 	if (ubr->slave_dev) {
 		netdev_rx_handler_unregister(ubr->slave_dev);
-		kobject_del(&p->kobj);
+		//kobject_del(&p->kobj);	// no need
 	}
 	unregister_netdevice(dev);
 	rtnl_unlock();
