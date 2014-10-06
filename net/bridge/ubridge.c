@@ -157,7 +157,7 @@ static int ubr_alloc_master(const char *name)
 {
 	struct net_device *dev;
 	struct ubr_private *ubr;
-	int err;
+	int err = 0;
 
 	dev = alloc_netdev(sizeof(struct ubr_private), name, ether_setup);
 	if (!dev)
@@ -190,7 +190,7 @@ static int ubr_alloc_master(const char *name)
 	rtnl_unlock();
 
 out:
-	return 0;
+	return err;
 }
 
 static int ubr_atto_master(struct net_device *master_dev, int ifindex)
