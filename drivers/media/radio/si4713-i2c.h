@@ -18,6 +18,7 @@
 #include <media/v4l2-subdev.h>
 #include <media/si4713.h>
 
+#define SI4711_PRODUCT_NUMBER		0x0B
 #define SI4713_PRODUCT_NUMBER		0x0D
 
 /* Command Timeouts */
@@ -233,5 +234,6 @@ struct si4713_device {
 	u32 antenna_capacitor;
 	u32 stereo;
 	u32 tune_rnl;
+	u32 features;
 };
 #endif /* ifndef SI4713_I2C_H */

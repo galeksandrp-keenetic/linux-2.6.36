@@ -43,6 +43,9 @@ MODULE_AUTHOR("Eduardo Valentin <eduardo.valentin@nokia.com>");
 MODULE_DESCRIPTION("I2C driver for Si4713 FM Radio Transmitter");
 MODULE_VERSION("0.0.1");
 
+#define SI471X_ID_MASK			0xff
+#define SI471X_HAS_RNL			(1 << 8)
+
 #define DEFAULT_RDS_PI			0x00
 #define DEFAULT_RDS_PTY			0x00
 #define DEFAULT_RDS_PS_NAME		""
@@ -438,11 +441,14 @@ static int si4713_checkrev(struct si4713_device *sdev)
 	if (rval < 0)
 		goto unlock;
 
-	if (resp[1] == SI4713_PRODUCT_NUMBER) {
+	if (resp[1] == (sdev->features & SI471X_ID_MASK)) {
 		v4l2_info(&sdev->sd, "chip found @ 0x%02x (%s)\n",
 				client->addr << 1, client->adapter->name);
 	} else {
-		v4l2_err(&sdev->sd, "Invalid product number\n");
+		v4l2_err(&sdev->sd, "Invalid product number: "
+				    "%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
+				    resp[0], resp[1], resp[2], resp[3],
+				    resp[4], resp[5], resp[6], resp[7]);
 		rval = -EINVAL;
 	}
 
@@ -1300,11 +1306,13 @@ static int si4713_setup(struct si4713_device *sdev)
 
 /*
  * si4713_initialize - Sets the device up with default configuration.
- * @sdev: si4713_device structure for the device we are communicating
+ * @id: i2c_device_id structure identifying the si471x device
  */
-static int si4713_initialize(struct si4713_device *sdev)
+static int si4713_initialize(struct si4713_device *sdev, const struct i2c_device_id *id)
 {
 	int rval;
+
+	sdev->features = (u32)id->driver_data;
 
 	rval = si4713_set_power_state(sdev, POWER_ON);
 	if (rval < 0)
@@ -1752,6 +1760,12 @@ long si4713_ioctl(struct v4l2_subdev *sd, unsigned int cmd, void *arg)
 	mutex_lock(&sdev->mutex);
 	switch (cmd) {
 	case SI4713_IOC_MEASURE_RNL:
+
+		if (!(sdev->features & SI471X_HAS_RNL)) {
+			rval = -EOPNOTSUPP;
+			break;
+		}
+
 		frequency = v4l2_to_si4713(rnl->frequency);
 
 		if (sdev->power_state) {
@@ -2001,7 +2015,7 @@ static int si4713_probe(struct i2c_client *client,
 		v4l2_warn(&sdev->sd, "IRQ not configured. Using timeouts.\n");
 	}
 
-	rval = si4713_initialize(sdev);
+	rval = si4713_initialize(sdev, id);
 	if (rval < 0) {
 		v4l2_err(&sdev->sd, "Failed to probe device information.\n");
 		goto free_irq;
@@ -2039,7 +2053,8 @@ static int si4713_remove(struct i2c_client *client)
 
 /* si4713_i2c_driver - i2c driver interface */
 static const struct i2c_device_id si4713_id[] = {
-	{ "si4713" , 0 },
+	{ "si4711" , SI4711_PRODUCT_NUMBER },
+	{ "si4713" , SI4713_PRODUCT_NUMBER | SI471X_HAS_RNL },
 	{ },
 };
 MODULE_DEVICE_TABLE(i2c, si4713_id);
