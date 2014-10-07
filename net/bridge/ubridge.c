@@ -31,7 +31,7 @@ static LIST_HEAD(ubr_list);
 
 struct ubr_private {
 	struct net_device		*slave_dev;
-	struct net_device_stats	stats;
+	struct br_cpu_netstats	stats;
 	struct list_head		list;
 	struct net_device		*dev;
 	uint16_t				portno;
@@ -75,9 +75,6 @@ static int ubr_open(struct net_device *master_dev)
 
 static int ubr_stop(struct net_device *master_dev)
 {
-	struct ubr_private *master_info = netdev_priv(master_dev);
-	struct net_device *slave_dev = master_info->slave_dev;
-
 	netif_stop_queue(master_dev);
 	return 0;
 }
@@ -99,10 +96,22 @@ static int ubr_xmit(struct sk_buff *skb, struct net_device *master_dev)
 	return 0;
 }
 
-static struct net_device_stats *ubr_getstats(struct net_device *dev)
+static struct rtnl_link_stats64 *ubr_get_stats64(struct net_device *dev,
+						struct rtnl_link_stats64 *stats)
 {
-	struct ubr_private *info = netdev_priv(dev);
-	return &info->stats;
+	struct ubr_private *ubr = netdev_priv(dev);
+	struct br_cpu_netstats *sum = &ubr->stats;
+
+	memset(stats, 0, sizeof (*stats));
+	if (unlikely(sum == NULL))
+		return NULL;
+
+	stats->tx_bytes   = sum->tx_bytes;
+	stats->tx_packets = sum->tx_packets;
+	stats->rx_bytes   = sum->rx_bytes;
+	stats->rx_packets = sum->rx_packets;
+
+	return stats;
 }
 
 static const struct net_device_ops ubr_netdev_ops =
@@ -110,8 +119,7 @@ static const struct net_device_ops ubr_netdev_ops =
 	.ndo_open = ubr_open,
 	.ndo_stop = ubr_stop,
 	.ndo_start_xmit = ubr_xmit,
-	.ndo_get_stats = ubr_getstats,
-	//.ndo_get_stats64 = ubr_get_stats64,
+	.ndo_get_stats64 = ubr_get_stats64,
 	.ndo_do_ioctl = ubr_dev_ioctl,
 };
 
