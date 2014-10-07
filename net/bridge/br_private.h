@@ -650,6 +650,4 @@ extern void br_sysfs_delbr(struct net_device *dev);
 extern int port_reverse;
 #endif
 
-extern struct sk_buff *(*ubr_handle_frame_hook)(struct sk_buff *skb);
-
 #endif

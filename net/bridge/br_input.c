@@ -30,9 +30,6 @@ extern int (*xpon_mode_get_hook)(void);
 extern int (*epon_sfu_mapping_hook)(struct sk_buff *skb, int port);
 #endif
 
-struct sk_buff *(*ubr_handle_frame_hook)(struct sk_buff *skb) = NULL;
-EXPORT_SYMBOL(ubr_handle_frame_hook);
-
 /* Bridge group multicast address 802.1d (pg 51). */
 const u8 br_group_address[ETH_ALEN] = { 0x01, 0x80, 0xc2, 0x00, 0x00, 0x00 };
 
@@ -248,13 +245,6 @@ __IMEM struct sk_buff *br_handle_frame(struct sk_buff *skb)
 
 	p = br_port_get_rcu(skb->dev);
 
-#ifdef CONFIG_UBRIDGE
-	if (unlikely(p->port_no == 0)) {
-		if (rcu_dereference(ubr_handle_frame_hook) != NULL)
-			return ubr_handle_frame_hook(skb);
-	}
-#endif
-
 #ifdef CONFIG_NDMS_IGMP_PASSTHROUGH
 	if (is_multicast_ether_addr(dest) && (mhook = rcu_dereference(br_igmp_frame_hook)))
 		mhook(p->dev, skb);
@@ -358,4 +348,3 @@ drop:
 	}
 	return NULL;
 }
-EXPORT_SYMBOL(br_handle_frame);

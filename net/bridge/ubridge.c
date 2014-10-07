@@ -268,13 +268,9 @@ static int ubr_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 {
 	switch (cmd) {
 	case SIOCBRADDIF:
-//		printk("Add if\n");
-//		return 0;
 		return ubr_atto_master(dev, rq->ifr_ifindex);
 
 	case SIOCBRDELIF:
-//		printk("Del if\n");
-//		return 0;
 		return ubr_detach(dev, rq->ifr_ifindex);
 
 	}
@@ -283,7 +279,6 @@ static int ubr_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 
 static int __init ubridge_init(void)
 {
-	rcu_assign_pointer(ubr_handle_frame_hook, ubr_handle_frame);
 	ubrioctl_set(ubr_ioctl_deviceless_stub);
 	printk(KERN_INFO "ubridge: %s, %s\n", DRV_DESCRIPTION, DRV_VERSION);
 	return 0;
@@ -299,7 +294,6 @@ static void __exit ubridge_exit(void)
 	}
 	rtnl_unlock();
 	ubrioctl_set(NULL);
-	rcu_assign_pointer(ubr_handle_frame_hook, NULL);
 
 	printk(KERN_INFO "ubridge: driver unloaded\n");
 }
