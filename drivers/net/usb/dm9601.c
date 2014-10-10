@@ -31,6 +31,13 @@
  * V2.42 - Work to V2.42 according to "DM9620 BulkOut ¸É¤B¤À¸Ñ.doc"
  * V2.43 - Special suport for DM9621A in the table 'products'
  * V2.45 - Fix the function TxStyle(), correct to be (len%2) from (len%1). 20131211.
+ * V2.51 - Suitable to DM9620/21 E3, there is no extra VID/PID list insided.
+ * V2.51d - Add MT2311 reset ioctl (NDM)
+ * V2.59 - EEPROM_Utility_support (Report EEPROM_LEN from 256 to 128), 20141008
+ * v2.59.1 - Add "DM962XA EXT MII" 
+ *           "DM962XA EXT MII" only PID, others by board circuit (0x0268,0x1268)
+ *           "DM962XA Fiber" only PID, others tb.492 (0x0267,0x1267)
+ *           Check reg[0].bit[7] and reply the modified bmcr & bmsr by refer to reg[0]&reg[1].
  */
 
 //#define DEBUG
@@ -86,6 +93,10 @@
 #define USB_CTRL	0xf4
 #define PHY_SPEC_CFG	20
 #define DM_TXRX_M       0x5C
+
+#define DMSC_WEP	0x10
+#define DMSC_ERPRW	0x02
+#define DMSC_ERRE	0x01
 
 #define MD96XX_EEPROM_MAGIC	0x9620
 #define DM_MAX_MCAST	64
@@ -324,83 +335,42 @@ out:
 	return ret;
 }
 
-
-static int dm_write_eeprom_word(struct usbnet *dev, int phy, u8 offset, u8 value)
+static void device_polling(struct usbnet *dev, u8 reg, u8 dmsc_bit,
+		u8 uexpected)
 {
-	int ret, i;
-	u8  reg,dloc,tmp_H,tmp_L;
-	__le16 eeword;
-
-	//devwarn(dev, " offset =0x%x value = 0x%x ", offset,value);
-	
-	/* hank: from offset to determin eeprom word register location,reg */
-	reg = (offset >> 1)&0xff;
-
-	/* hank:  high/low byte by odd/even of offset  */
-	dloc = (offset & 0x01)? DM_EE_PHY_H:DM_EE_PHY_L;
-
-	/* retrieve high and low byte from the corresponding reg*/
-	ret=dm_read_shared_word(dev,0,reg,&eeword);
-	//devwarn(dev, " reg =0x%x dloc = 0x%x eeword = 0x%4x", reg,dloc,eeword);
- 	//printk(" reg =0x%x dloc = 0x%x eeword = 0x%4x\n", reg,dloc,eeword);
-
-	tmp_H = (eeword & 0xff);
-	tmp_L = (eeword >> 8);
-
-	printk("tmp_L =0x%2x tmp_H =0x%2x eeword = 0x%4x\n", tmp_L,tmp_H,eeword);
-	/* determine new high and low byte */
-
-	if (offset & 0x01)  {
-		tmp_L = value;  }  else {
-	tmp_H = value;  }
-	
-	//printk("updated new: tmp_L =0x%2x tmp_H =0x%2x\n", tmp_L,tmp_H);
-
-	mutex_lock(&dev->phy_mutex);
-
-
-	/* hank: write low byte data first to eeprom reg */
-	// dm_write(dev, (offset & 0x01)? DM_EE_PHY_H:DM_EE_PHY_L, 1, &value);
-	dm_write(dev,DM_EE_PHY_L, 1, &tmp_H);
-	/* high byte will be zero */
-	//(offset & 0x01)? (value = eeword << 8):(value = eeword >> 8);
-
-	/* write the not modified 8 bits back to its origional high/low byte reg */ 
-	dm_write(dev,DM_EE_PHY_H, 1, &tmp_L);
-	if (ret < 0)
-		goto out;
-
-	/* hank : write word location to reg 0x0c  */
-	ret = dm_write_reg(dev, DM_SHARED_ADDR, reg);
-		
-	if (!phy) dm_write_reg(dev, DM_SHARED_CTRL, 0x10);
-	dm_write_reg(dev, DM_SHARED_CTRL, 0x12);
-	dm_write_reg(dev, DM_SHARED_CTRL, 0x10);
-
+	int i,ret;
+	u8 tmp= 0;
 	for (i = 0; i < DM_TIMEOUT; i++) {
-		u8 tmp;
-
 		udelay(1);
-		ret = dm_read_reg(dev, DM_SHARED_CTRL, &tmp);
-		if (ret < 0)
-			goto out;
-
-		/* ready */
-		if ((tmp & 1) == 0)
+		ret = dm_read_reg(dev, reg, &tmp);
+		if (ret < 0){
+			dm9620_err(dev,
+				"[dm962 read reg] (reg: 0x%02x) error!\n",
+				reg);
+			break;
+		}
+		if ((tmp & dmsc_bit) == uexpected) /* ready */
 			break;
 	}
+	if (i == DM_TIMEOUT)
+		dm9620_err(dev, "[dm962 time out] on polling bit:0x%x\n",
+				dmsc_bit);
+}
 
-	if (i == DM_TIMEOUT) {
-		dm9620_err(dev, "%s write timed out!", phy ? "phy" : "eeprom");
-		ret = -EIO;
-		goto out;
-	}
 
-	//dm_write_reg(dev, DM_SHARED_CTRL, 0x0);
+static void dm_write_eeprom_word(struct usbnet *dev, u8 offset, u8 *data)
+{
+	//offset= offset / 2;  /*dm9620_write_eeprom(dev, offset / 2, data);*/
+	mutex_lock(&dev->phy_mutex);
 
-out:
+	dm_write_reg(dev, DM_SHARED_ADDR, offset);
+	dm_write_reg(dev, DM_EE_PHY_H, data[1]);
+	dm_write_reg(dev, DM_EE_PHY_L, data[0]);
+	dm_write_reg(dev, DM_SHARED_CTRL, DMSC_WEP | DMSC_ERPRW);
+	device_polling(dev, DM_SHARED_CTRL, DMSC_ERRE, 0x00);
+	dm_write_reg(dev, DM_SHARED_CTRL, 0);
+
 	mutex_unlock(&dev->phy_mutex);
-	return ret;
 }
 
 static int dm_read_eeprom_word(struct usbnet *dev, u8 offset, void *value)
@@ -412,17 +382,37 @@ static int dm_read_eeprom_word(struct usbnet *dev, u8 offset, void *value)
 static int dm9620_set_eeprom(struct net_device *net,struct ethtool_eeprom *eeprom, u8 *data)
 {
 	struct usbnet *dev = netdev_priv(net);
-	
+	int offset = eeprom->offset;
+	int len = eeprom->len;
+	int done;
+
+#ifdef DEBUG
 	dm9620_print(dev, "EEPROM: magic value, magic = 0x%x offset =0x%x data = 0x%x ",eeprom->magic, eeprom->offset,*data);
+#endif
 	if (eeprom->magic != MD96XX_EEPROM_MAGIC) {
 		dm9620_print(dev, "EEPROM: magic value mismatch, magic = 0x%x",
 			eeprom->magic);	
 		return -EINVAL;
 	}
 
-		if(dm_write_eeprom_word(dev, 0, eeprom->offset, *data) < 0)  
-		return -EINVAL;
-	
+	while (len > 0) {
+		if (len & 1 || offset & 1) {
+			int which = offset & 1;
+			u8 tmp[2];
+			dm_read_eeprom_word(dev, offset / 2, tmp);
+			tmp[which] = *data;
+			dm_write_eeprom_word(dev, offset / 2, tmp);
+			mdelay(10);
+			done = 1;
+		} else {
+			dm_write_eeprom_word(dev, offset / 2, data);
+			done = 2;
+		}
+		data += done;
+		offset += done;
+		len -= done;
+	}
+
 	return 0;
 }
 
@@ -455,6 +445,33 @@ static int dm9620_mdio_read(struct net_device *netdev, int phy_id, int loc)
 	struct usbnet *dev = netdev_priv(netdev);
 
 	__le16 res;
+	u8 tmp;
+
+	// Support 'EXT MII'
+	// Since REG DM_NET_CTRL/DM_NET_STATUS is the final result,
+	// No matter internal PHY or EXT MII.
+	dm_read_reg(dev, DM_NET_CTRL, &tmp);
+	if (tmp & 0x80) //'EXT MII'
+	{
+		if (loc == 0) //bmcr
+		{
+			res = 0x0000;
+			if (tmp & 0x08) // duplex mode
+				res |= 0x100;
+			dm_read_reg(dev, 0x01, &tmp); //= DM_NET_STATUS
+			if (!(tmp & 0x80)) // speed 10/100
+				res |= 0x2000;
+			return le16_to_cpu(res);
+		}
+		if (loc == 1) //bmsr
+		{
+			res = 0x7849;
+			dm_read_reg(dev, 0x01, &tmp); //= DM_NET_STATUS
+			if (tmp & 0x40) // linl status
+				res = 0x784D;
+			return le16_to_cpu(res);
+		}
+	}
 
 	dm_read_shared_word(dev, phy_id, loc, &res);
 
@@ -1158,8 +1175,13 @@ static const struct usb_device_id products[] = {
 	 },
 	{
 	 USB_DEVICE(0x0a46, 0x0268),	/* ShanTou ST268 USB NIC */
+									/* Davicom 9620A EXT MII */
 	 .driver_info = (unsigned long)&dm9620_info,
 	 },
+	{
+	USB_DEVICE(0x0a46, 0x1268),     /* Davicom 9621A EXT MII */
+	.driver_info = (unsigned long)&dm9620_info,
+	},
 	{
 	 USB_DEVICE(0x0a46, 0x8515),	/* ADMtek ADM8515 USB NIC */
 	 .driver_info = (unsigned long)&dm9620_info,
@@ -1192,6 +1214,14 @@ static const struct usb_device_id products[] = {
    USB_DEVICE(0x0a46, 0x0269),     /* Davicom 9620A CDC */
    .driver_info = (unsigned long)&dm9620_info,
    },
+	{
+	USB_DEVICE(0x0a46, 0x0267),     /* Davicom 9620A Fiber */
+	.driver_info = (unsigned long)&dm9620_info,
+	},
+	{
+	USB_DEVICE(0x0a46, 0x1267),     /* Davicom 9621A Fiber */
+	.driver_info = (unsigned long)&dm9620_info,
+	},
    //+
    //VID.00
    //0.0000 0000 0000 
