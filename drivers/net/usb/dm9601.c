@@ -38,10 +38,12 @@
  *           "DM962XA EXT MII" only PID, others by board circuit (0x0268,0x1268)
  *           "DM962XA Fiber" only PID, others tb.492 (0x0267,0x1267)
  *           Check reg[0].bit[7] and reply the modified bmcr & bmsr by refer to reg[0]&reg[1].
+ * v2.59.2 - Add "DM962XA EXT MII"
+ *           correct the report of "ifconfig  eth1 up" ( loc==4: res= 0x05e1;  loc==5: res= 0x45e1;)
  */
 
 //#define DEBUG
-#define LNX_DM9620_VER_STR  "V2.45"
+#define LNX_DM9620_VER_STR  "V2.59.2a"
 
 
 #include <linux/module.h>
@@ -101,7 +103,7 @@
 #define MD96XX_EEPROM_MAGIC	0x9620
 #define DM_MAX_MCAST	64
 #define DM_MCAST_SIZE	8
-#define DM_EEPROM_LEN	256
+#define DM_EEPROM_LEN	128
 #define DM_TX_OVERHEAD	2	/* 2 byte header */
 #define DM_RX_OVERHEAD_9601	7	/* 3 byte header + 4 byte crc tail */
 #define DM_RX_OVERHEAD		8	/* 4 byte header + 4 byte crc tail */
@@ -471,6 +473,16 @@ static int dm9620_mdio_read(struct net_device *netdev, int phy_id, int loc)
 				res = 0x784D;
 			return le16_to_cpu(res);
 		}
+		if (loc == 4) //advertise
+		{
+			res = 0x05e1;
+			return le16_to_cpu(res);
+		}
+		if (loc == 5) //lpa
+		{
+			res = 0x45e1;
+ 			return le16_to_cpu(res);
+ 		}
 	}
 
 	dm_read_shared_word(dev, phy_id, loc, &res);
@@ -838,8 +850,8 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
   kfree (tmpwPtr2); 
 	
 	/* power up phy */
-	dm_write_reg(dev, DM_GPR_CTRL, 1
-			| (1<<3));					/* Enable MT2311 reset line control via DM96xx GEPIO[3] */
+	dm_write_reg(dev, DM_GPR_CTRL, /* 1		// TBD is it true for non-MT devices?
+			| */ (1<<3));					/* Enable MT2311 reset line control via DM96xx GEPIO[3] */
 	dm_write_reg(dev, DM_GPR_DATA, 0);
 
 	/* Init tx/rx checksum */
