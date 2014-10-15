@@ -67,7 +67,7 @@ struct mtd_partition ndm_parts[] = {
 		offset:			0
 	}, {
 		name:			"Storage", 		/* mtdblock7 */
-		size:			0x100000,
+		size:			0x50000,
 		offset:			0
 	}, {
 		name:			"Backup", 		/* mtdblock8 */
