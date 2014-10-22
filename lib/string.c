@@ -129,6 +129,8 @@ char *strncpy(char *dest, const char *src, size_t count)
 	return dest;
 }
 EXPORT_SYMBOL(strncpy);
+#else
+EXPORT_SYMBOL(strncpy);
 #endif
 
 #ifndef __HAVE_ARCH_STRLCPY
