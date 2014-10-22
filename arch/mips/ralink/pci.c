@@ -102,13 +102,13 @@ extern void chk_phy_pll(void);
 #endif
 
 #define ASSERT_SYSRST_PCIE(val)		do {	\
-						if (*(unsigned int *)(0xbe00000c) == 0x00030101)	\
+						if ((*(unsigned int *)(0xbe00000c)&0xFFFF) == 0x0101)	\
 							RALINK_RSTCTRL |= val;	\
 						else	\
 							RALINK_RSTCTRL &= ~val;	\
 					} while(0)
 #define DEASSERT_SYSRST_PCIE(val) 	do {	\
-						if (*(unsigned int *)(0xbe00000c) == 0x00030101)	\
+						if ((*(unsigned int *)(0xbe00000c)&0xFFFF) == 0x0101)	\
 							RALINK_RSTCTRL &= ~val;	\
 						else	\
 							RALINK_RSTCTRL |= val;	\
@@ -535,12 +535,16 @@ void __inline__ write_config(unsigned long bus, unsigned long dev, unsigned long
 }
 
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3,10,0)
+int __init pcibios_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+#else
 int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
+#endif
 {
   u16 cmd;
   u32 val;
   struct resource *res;
-  int i;
+  int i, irq = -1;
 #ifdef CONFIG_RALINK_RT2883	
   if (dev->bus->number > 1) {
     printk("bus>1\n");
@@ -698,7 +702,7 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 #endif
   }else if((dev->bus->number ==1) && (slot == 0x0)){
  	printk("bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
-	dev->irq = RALINK_INT_PCIE0;
+	irq = RALINK_INT_PCIE0;
 #if 0 //James want to go back
 	if(pcie0_disable!=1){
 		dev->irq = RALINK_INT_PCIE0;
@@ -764,15 +768,15 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	switch (pcie_link_status) {
 	case 2:
 	case 6:
-		dev->irq = RALINK_INT_PCIE1;
+		irq = RALINK_INT_PCIE1;
 		break;
 	case 4:
-		dev->irq = RALINK_INT_PCIE2;
+		irq = RALINK_INT_PCIE2;
 		break;
 	default:
-		dev->irq = RALINK_INT_PCIE0;
+		irq = RALINK_INT_PCIE0;
 	}
- 	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
+ 	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
 #if 0
 	for(i=0;i<16;i++){
 	read_config(1, 0, 0, i<<2, &val);
@@ -783,31 +787,31 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	switch (pcie_link_status) {
 	case 5:
 	case 6:
-		dev->irq = RALINK_INT_PCIE2;
+		irq = RALINK_INT_PCIE2;
 		break;
 	default:
-		dev->irq = RALINK_INT_PCIE1;
+		irq = RALINK_INT_PCIE1;
 	}
- 	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
+ 	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
   }else if((dev->bus->number ==2) && (slot == 0x1)){
 	switch (pcie_link_status) {
 	case 5:
 	case 6:
-		dev->irq = RALINK_INT_PCIE2;
+		irq = RALINK_INT_PCIE2;
 		break;
 	default:
-		dev->irq = RALINK_INT_PCIE1;
+		irq = RALINK_INT_PCIE1;
 	}
- 	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
+ 	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
   }else if((dev->bus->number ==3) && (slot == 0x0)){
-	dev->irq = RALINK_INT_PCIE2;
-	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
+	irq = RALINK_INT_PCIE2;
+	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
   }else if((dev->bus->number ==3) && (slot == 0x1)){
-	dev->irq = RALINK_INT_PCIE2;
-	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
+	irq = RALINK_INT_PCIE2;
+	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
   }else if((dev->bus->number ==3) && (slot == 0x2)){
-	dev->irq = RALINK_INT_PCIE2;
-	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, dev->irq);
+	irq = RALINK_INT_PCIE2;
+	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
   }else{
  	printk("bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
   	return 0;
@@ -860,7 +864,7 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 #endif
 
   for(i=0;i<6;i++){
-    res = &dev->resource[i];
+    res = (struct resource *) &dev->resource[i];
     DBG("res[%d]->start = %x\n", i, res->start);
     DBG("res[%d]->end = %x\n", i, res->end);
   }
@@ -879,15 +883,14 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
   	PCI_COMMAND_WAIT | PCI_COMMAND_PARITY;
 #endif
   pci_write_config_word(dev, PCI_COMMAND, cmd);
-  pci_write_config_byte(dev, PCI_INTERRUPT_LINE, dev->irq);
+  pci_write_config_byte(dev, PCI_INTERRUPT_LINE, irq);
   //pci_write_config_byte(dev, PCI_INTERRUPT_PIN, dev->irq);
-  return (dev->irq);
+  return irq;
 }
 
 #if defined (CONFIG_MT7621_ASIC)
 void set_pcie_phy(u32 *addr, int start_b, int bits, int val)
 {
-	
 	//printk("0x%p:", addr);
 	//printk(" %x", *addr);
 	*(unsigned int *)(addr) &= ~(((1<<bits) - 1)<<start_b);
@@ -1059,7 +1062,7 @@ int init_rt2880pci(void)
 	pcie_phy_init();
 	//chk_phy_pll();
 #elif defined (CONFIG_MT7621_ASIC)
-	if (*(unsigned int *)(0xbe00000c) == 0x00030101) // MT7621 E2
+	if ((*(unsigned int *)(0xbe00000c)&0xFFFF) == 0x0101) // MT7621 E2
 		bypass_pipe_rst();
 	set_phy_for_ssc();
 #endif
