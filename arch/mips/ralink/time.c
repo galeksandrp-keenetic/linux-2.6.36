@@ -41,7 +41,7 @@
 #include <linux/kernel_stat.h>
 #include <linux/sched.h>
 #include <linux/spinlock.h>
-
+#include <linux/module.h>
 #include <linux/jiffies.h>
 #include <linux/delay.h>
 
@@ -64,6 +64,8 @@
 #if defined(CONFIG_RALINK_MT7621) && defined(CONFIG_RALINK_SYSTICK)
 #include <asm/gic.h>		/* to turn off(mask) each VPE's local timer interrupt */
 #endif
+
+#include <linux/version.h>
 
 unsigned long surfboard_sysclk;	/* initialized by prom_init_sysclk() */
 
@@ -94,9 +96,12 @@ static struct clocksource ra_systick_clocksource = {
 int __init ra_systick_clocksource_init(void)
 {
 	ra_systick_clocksource.rating = 350;
-
-	clocksource_set_clock(&ra_systick_clocksource, 50000);
-	clocksource_register(&ra_systick_clocksource);
+#if LINUX_VERSION_CODE > KERNEL_VERSION(3,10,13)
+	clocksource_register_hz(&ra_systick_clocksource, 50000);
+#else
+    clocksource_set_clock(&ra_systick_clocksource, 50000);
+    clocksource_register(&ra_systick_clocksource);
+#endif    
 
 	return 0;
 }
@@ -188,9 +193,11 @@ void ra_systick_event_broadcast(const struct cpumask *mask)
 	(*((volatile u32 *)(RALINK_TESTSTAT))) = reg;
 	spin_unlock_irqrestore(&ra_teststat_lock, flags);
 
+#ifdef CONFIG_MIPS_MT_SMP
 	/* send IPI to other VPEs, using "ipi_call" GIC(60~63), MIPS int#2  */
 	for_each_cpu(i, mask)
 		gic_send_ipi(plat_ipi_call_int_xlate(i));
+#endif
 }
 #endif
 
