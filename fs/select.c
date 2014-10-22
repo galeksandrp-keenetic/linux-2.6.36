@@ -615,7 +615,8 @@ SYSCALL_DEFINE5(select, int, n, fd_set __user *, inp, fd_set __user *, outp,
 	ret = poll_select_copy_remaining(&end_time, tvp, 1, ret);
 
 	return ret;
-}
+} 
+EXPORT_SYMBOL(sys_select);
 
 #ifdef HAVE_SET_RESTORE_SIGMASK
 static long do_pselect(int n, fd_set __user *inp, fd_set __user *outp,

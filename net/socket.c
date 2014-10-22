@@ -2013,7 +2013,8 @@ out_put:
 	fput_light(sock->file, fput_needed);
 out:
 	return err;
-}
+} 
+EXPORT_SYMBOL(sys_sendmsg);
 
 static int __sys_recvmsg(struct socket *sock, struct msghdr __user *msg,
 			 struct msghdr *msg_sys, unsigned flags, int nosec)

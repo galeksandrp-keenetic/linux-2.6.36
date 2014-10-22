@@ -424,7 +424,8 @@ static long do_fcntl(int fd, unsigned int cmd, unsigned long arg,
 		break;
 	}
 	return err;
-}
+} 
+EXPORT_SYMBOL(sys_fcntl);
 
 SYSCALL_DEFINE3(fcntl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
 {	
