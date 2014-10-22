@@ -67,7 +67,7 @@ struct mtd_partition ndm_parts[] = {
 		offset:			0
 	}, {
 		name:			"Storage", 		/* mtdblock7 */
-#ifdef CONFIG_MTD_NDM_STORAGE_512K
+#ifdef CONFIG_MTD_NDM_STORAGE
         size:			0x80000,
 #else
 		size:			0x100000,
