@@ -107,17 +107,14 @@ static u_int32_t __hash_conntrack(const struct nf_conntrack_tuple *tuple,
 	u_int32_t h;
 
 #if defined (CONFIG_NAT_FCONE) /* Full Cone */
-        n = jhash((void *)tuple->dst.u3.all, sizeof(tuple->dst.u3.all),
-                   tuple->dst.u.all); // dst ip, dst port
         h = jhash((void *)tuple->dst.u3.all, sizeof(tuple->dst.u3.all),
-                   tuple->dst.protonum); //dst ip, & dst ip protocol
+                    (tuple->dst.u.all << 16) | tuple->dst.protonum); //dst ip & port & protocol
 #elif defined (CONFIG_NAT_RCONE) /* Restricted Cone */
         n = jhash((void *)tuple->src.u3.all, sizeof(tuple->src.u3.all), //src ip
-                   (tuple->src.l3num << 16) | tuple->dst.protonum);
+                   (tuple->src.l3num << 16));
         h = jhash((void *)tuple->dst.u3.all, sizeof(tuple->dst.u3.all), //dst ip & dst port
-                  (tuple->dst.u.all << 16) | tuple->dst.protonum);
-#else /* CONFIG_NAT_LINUX */
-
+                  (tuple->dst.u.all << 16) | tuple->dst.protonum | n);
+#else
 	/* The direction must be ignored, so we hash everything up to the
 	 * destination ports (which is a multiple of 4) and treat the last
 	 * three bytes manually.
