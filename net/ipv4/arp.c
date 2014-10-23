@@ -970,7 +970,15 @@ static void parp_redo(struct sk_buff *skb)
 static int arp_rcv(struct sk_buff *skb, struct net_device *dev,
 		   struct packet_type *pt, struct net_device *orig_dev)
 {
-	struct arphdr *arp;
+	const struct arphdr *arp;
+
+	if (dev->flags & IFF_NOARP ||
+	    skb->pkt_type == PACKET_OTHERHOST ||
+	    skb->pkt_type == PACKET_LOOPBACK)
+		goto freeskb;
+
+	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
+		goto out_of_mem;
 
 	/* ARP header, plus 2 device addresses, plus 2 IP addresses.  */
 	if (!pskb_may_pull(skb, arp_hdr_len(dev)))
@@ -978,14 +986,8 @@ static int arp_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	arp = arp_hdr(skb);
 	if (arp->ar_hln != dev->addr_len ||
-	    dev->flags & IFF_NOARP ||
-	    skb->pkt_type == PACKET_OTHERHOST ||
-	    skb->pkt_type == PACKET_LOOPBACK ||
 	    arp->ar_pln != 4)
 		goto freeskb;
-
-	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
-		goto out_of_mem;
 
 	memset(NEIGH_CB(skb), 0, sizeof(struct neighbour_cb));
 
