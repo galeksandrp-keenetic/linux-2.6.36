@@ -102,7 +102,7 @@ static void __init set_reset_flag(void)
 		printk(KERN_INFO "SoC status: soft reset\n");
 	} else {
 		printk(KERN_INFO "SoC status: hard reset\n");
-		sysRegWrite(TESTSTAT1, 0x01);
+		sysRegWrite(TESTSTAT2, 0x01);
 	}
 #endif
 }
