@@ -589,6 +589,23 @@ static int __xipram chip_ready(struct map_info *map, unsigned long addr)
 }
 
 /*
+ * Ralink Soc flash controller issue two CE and OE for single read action.
+ * In order to get correct status bit, we need to use rt_chip_ready instead.
+ * by Steven
+ */
+static int __xipram rt_chip_ready(struct map_info *map, unsigned long addr)
+{
+	map_word o, d, t;
+
+        o.x[0] = __raw_readl(map->virt + addr);
+	d.x[0]=o.x[0] & 0xFFFF; //get low 16bits
+	t.x[0]= (o.x[0] >> 16); //get high 16bits
+
+	return map_word_equal(map, d, t);
+}
+
+
+/*
  * Return true if the chip is ready and has the correct value.
  *
  * Ready is one of: read mode, query mode, erase-suspend-read mode (in any
@@ -1617,8 +1634,10 @@ static int __xipram do_erase_chip(struct map_info *map, struct flchip *chip)
 			chip->erase_suspended = 0;
 		}
 
-		if (chip_ready(map, adr))
+		if (rt_chip_ready(map, adr)) {
+			xip_enable(map, chip, adr);
 			break;
+		}
 
 		if (time_after(jiffies, timeo)) {
 			printk(KERN_WARNING "MTD %s(): software timeout\n",
@@ -1705,7 +1724,7 @@ static int __xipram do_erase_oneblock(struct map_info *map, struct flchip *chip,
 			chip->erase_suspended = 0;
 		}
 
-		if (chip_ready(map, adr)) {
+		if (rt_chip_ready(map, adr)) {
 			xip_enable(map, chip, adr);
 			break;
 		}
