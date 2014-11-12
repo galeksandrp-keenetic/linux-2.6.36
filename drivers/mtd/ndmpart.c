@@ -32,6 +32,7 @@
 #define SQUASHFS_MAGIC	0x73717368
 #endif
 #define NDMS_MAGIC    0x736D646E
+#define CONFIG_MAGIC cpu_to_be32(0x2e6e646d)
 
 #define KERNEL_MAGIC	be32_to_cpu(0x27051956)
 #define ROOTFS_MAGIC	SQUASHFS_MAGIC
@@ -164,6 +165,53 @@ static int create_mtd_partitions(struct mtd_info *master,
 		else
 #endif
 		ndm_parts[6].offset = ndm_parts[7].offset - master->erasesize;
+
+#ifdef CONFIG_MTD_NDM_SHRINK_STORAGE
+
+		offset = ndm_parts[6].offset - 0x80000;
+		master->read(master, offset, sizeof(magic),
+							&len, (uint8_t *)&magic);
+
+		if (magic == CONFIG_MAGIC) {
+			unsigned char *iobuf;
+			struct erase_info ei;
+			int err;
+
+			printk(KERN_INFO "found config in old partition at 0x%012llx, move it\n", (unsigned long long)offset);
+			iobuf = kmalloc(master->erasesize, GFP_KERNEL);
+			master->read(master, offset, master->erasesize,
+							&len, iobuf);
+
+			if (len != master->erasesize) {
+					printk(KERN_ERR "read failed at 0x%012llx\n", (unsigned long long)offset);
+			} else {
+
+				memset(&ei, 0, sizeof(struct erase_info));
+				ei.mtd  = master;
+				ei.addr = ndm_parts[6].offset;
+				ei.len  = master->erasesize;
+				err = master->erase(master, &ei);
+
+				err = master->write(master, ndm_parts[6].offset, master->erasesize,
+							&len, iobuf);
+
+				if (!err && len != master->erasesize) {
+					printk(KERN_ERR "write failed at 0x%012llx\n", (unsigned long long)ndm_parts[6].offset);
+				} else {
+					memset(&ei, 0, sizeof(struct erase_info));
+					ei.mtd  = master;
+					ei.addr = offset;
+					ei.len  = master->erasesize;
+
+					err = master->erase(master, &ei);
+
+					if ((err) || (ei.state == MTD_ERASE_FAILED)) {
+						printk(KERN_ERR "erase failed at 0x%012llx\n", (unsigned long long)offset);
+					}
+				}
+			}
+		}
+#endif
 	}
 
 	/* Config */
@@ -179,8 +227,6 @@ static int create_mtd_partitions(struct mtd_info *master,
 
 	/* RootFS */
 	ndm_parts[4].size = ndm_parts[6].offset - ndm_parts[4].offset;
-
-
 
 	*pparts = ndm_parts;
 	return (ARRAY_SIZE(ndm_parts) - delete);
