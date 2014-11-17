@@ -211,9 +211,11 @@ void br_stp_recalculate_bridge_id(struct net_bridge *br)
 	const unsigned char *addr = br_mac_zero;
 	struct net_bridge_port *p;
 
+#if 0
 	/* user has chosen a value so keep it */
 	if (br->flags & BR_SET_MAC_ADDR)
 		return;
+#endif
 
 	list_for_each_entry(p, &br->port_list, list) {
 		if (addr == br_mac_zero ||
