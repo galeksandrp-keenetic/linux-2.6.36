@@ -150,6 +150,9 @@ static int ubr_free_master(struct net *net, const char *name)
 	dev = __dev_get_by_name(net, name);
 	if (dev == NULL)
 		ret =  -ENXIO; 	/* Could not find device */
+	else if (dev->flags & IFF_UP)
+		/* Not shutdown yet. */
+		ret = -EBUSY;
 	else
 		ret = ubr_deregister(dev);
 
@@ -211,6 +214,7 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 		goto out;
 
 	memcpy(master_dev->dev_addr, dev1->dev_addr, ETH_ALEN);		// TBD ???
+	call_netdevice_notifiers(NETDEV_CHANGEADDR, master_dev);
 	ubr0->slave_dev = dev1;
 
 	p = kzalloc(sizeof(*p), GFP_KERNEL);
