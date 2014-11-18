@@ -1,5 +1,5 @@
 #define DRV_NAME		"ubridge"
-#define DRV_VERSION		"0.3"
+#define DRV_VERSION		"0.4"
 #define DRV_DESCRIPTION	"Tiny bridge driver"
 #define DRV_COPYRIGHT	"(C) 2012 NDM Systems Inc. <ap@ndmsystems.com>"
 
@@ -20,6 +20,7 @@
 #include <linux/rtnetlink.h>
 #include <linux/if_bridge.h>
 #include <linux/netfilter_bridge.h>
+#include <../net/8021q/vlan.h>
 #include "br_private.h"
 
 #define BR_PORT_BITS	10
@@ -201,9 +202,14 @@ out:
 
 static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 {
-	struct net_device *dev1;
+	struct net_device *dev1, *vlan_dev;
 	struct ubr_private *ubr0 = netdev_priv(master_dev);
 	struct net_bridge_port *p;
+#ifdef CONFIG_NET_NS
+	struct net *net = master_dev->nd_net;
+#else
+	struct net *net = &init_net;
+#endif
 	int err = -ENODEV;
 
 	if (ubr0->slave_dev != NULL)
@@ -213,9 +219,20 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 	if (!dev1)
 		goto out;
 
-	memcpy(master_dev->dev_addr, dev1->dev_addr, ETH_ALEN);		// TBD ???
+	memcpy(master_dev->dev_addr, dev1->dev_addr, ETH_ALEN);
 	call_netdevice_notifiers(NETDEV_CHANGEADDR, master_dev);
 	ubr0->slave_dev = dev1;
+	// Update all VLAN sub-devices' MAC address
+	for_each_netdev(net, vlan_dev) {
+		if (!is_vlan_dev(vlan_dev))
+			continue;
+		if (vlan_dev_info(vlan_dev)->real_dev == master_dev) {
+			struct sockaddr addr;
+			memcpy(addr.sa_data, dev1->dev_addr, ETH_ALEN);
+			if (!vlan_dev->netdev_ops->ndo_set_mac_address(vlan_dev, &addr))
+				call_netdevice_notifiers(NETDEV_CHANGEADDR, vlan_dev);
+		}
+	}
 
 	p = kzalloc(sizeof(*p), GFP_KERNEL);
 	if (p == NULL)
