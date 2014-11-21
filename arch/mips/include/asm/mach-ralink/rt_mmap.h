@@ -833,10 +833,25 @@
 #define RALINK_INTCTL_SPI               (1<<27)
 
 //Reset Control Register
-#define RALINK_PCM_RST                  (1<<11)
-#define RALINK_DMA_RST                  (1<<14)
-#define RALINK_I2C_RST                  (1<<16)
-#define RALINK_I2S_RST                  (1<<2)          /* IMR1 */
+#define RALINK_SYS_RST			(1<<0)
+#define RALINK_TIMER_RST		(1<<8)
+#define RALINK_INTC_RST			(1<<9)
+#define RALINK_MC_RST			(1<<10)
+#define RALINK_PCM_RST			(1<<11)
+#define RALINK_UART_RST			(1<<12)
+#define RALINK_PIO_RST			(1<<13)
+#define RALINK_DMA_RST			(1<<14)
+#define RALINK_I2C_RST			(1<<16)
+#define RALINK_I2S_RST			(1<<17)
+#define RALINK_SPI_RST			(1<<18)
+#define RALINK_UARTL_RST		(1<<19)
+#define RALINK_FE_RST			(1<<21)
+#define RALINK_UHST_RST			(1<<22)
+#define RALINK_ESW_RST			(1<<23)
+#define RALINK_EPHY_RST			(1<<24)
+#define RALINK_UDEV_RST			(1<<25)
+#define RALINK_PCIE0_RST		(1<<26)
+#define RALINK_PCIE1_RST		(1<<27)
 
 //Clock Conf Register
 #define RALINK_UPHY0_CLK_EN		(1<<25)
