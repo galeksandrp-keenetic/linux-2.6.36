@@ -40,10 +40,11 @@
  *           Check reg[0].bit[7] and reply the modified bmcr & bmsr by refer to reg[0]&reg[1].
  * v2.59.2 - Add "DM962XA EXT MII"
  *           correct the report of "ifconfig  eth1 up" ( loc==4: res= 0x05e1;  loc==5: res= 0x45e1;)
+ * v2.59.2s - Add ServiceTag reading ioctl call
  */
 
 //#define DEBUG
-#define LNX_DM9620_VER_STR  "V2.59.2a"
+#define LNX_DM9620_VER_STR  "V2.59.2s"
 
 
 #include <linux/module.h>
@@ -523,6 +524,40 @@ static u32 dm9620_get_link(struct net_device *net)
 	return mii_link_ok(&dev->mii);
 }
 
+#define IOCGETSRVINFO		(SIOCDEVPRIVATE+4)
+
+#define SERVICETAG_LEN		0x20
+#define SERVICEHOST_LEN		0x30
+#define SERVICEPASS_LEN		0x20
+#define NDMHWID_LEN			0x10
+
+typedef struct service_info {
+	char servicetag[SERVICETAG_LEN];
+	char servicehost[SERVICEHOST_LEN];
+	char servicepass[SERVICEPASS_LEN];
+	char ndmhwid[NDMHWID_LEN];
+} service_info_t;
+
+static long dm96xx_read_service_region(struct usbnet *dev, long offset, long size, void *buf)
+{
+	u16 *out = buf;
+	int i;
+
+	offset /= 2;
+	size /= 2;
+
+	for (i = 0; i < size; i++) {
+		if (dm_read_eeprom_word(dev, offset++, &out[i]) < 0)
+			break;
+	}
+	return i * 2;
+}
+
+#define SERVICETAG_OFF		0x80
+#define SERVICEHOST_OFF		(SERVICETAG_OFF + SERVICETAG_LEN)
+#define SERVICEPASS_OFF		(SERVICEHOST_OFF + SERVICEHOST_LEN)
+#define NDMHWID_OFF			(SERVICEPASS_OFF + SERVICEPASS_LEN)
+
 static int dm9620_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 {
 	struct usbnet *dev = netdev_priv(net);
@@ -536,8 +571,47 @@ static int dm9620_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 		case SIOCDEVPRIVATE+1:
 			dm_write_reg(dev, DM_GPR_DATA, (1<<3));  // GPIO (SMI_D) High
 			break;
+#ifdef DEBUG
 		case SIOCDEVPRIVATE+2:
 			printk("[JJ7.DEF] WR to %s\n", rq->ifr_name);
+			break;
+#endif
+
+		case IOCGETSRVINFO:
+			{
+				service_info_t *service_info = kmalloc(sizeof(service_info_t), GFP_TEMPORARY);
+				long len = 0;
+
+				if (service_info == NULL)
+					return -ENOMEM;
+				if (rq->ifr_data == NULL) {
+					kfree(service_info);
+					return -EFAULT;
+				}
+				memset(service_info, 0, sizeof(service_info_t));
+
+				len = dm96xx_read_service_region(dev, SERVICETAG_OFF, SERVICETAG_LEN, service_info->servicetag);
+				if (len > 0) {
+					len = dm96xx_read_service_region(dev, SERVICEHOST_OFF, SERVICEHOST_LEN, service_info->servicehost);
+					if (len > 0) {
+						len = dm96xx_read_service_region(dev, SERVICEPASS_OFF, SERVICEPASS_LEN, service_info->servicepass);
+						if (len > 0) {
+							len = dm96xx_read_service_region(dev, NDMHWID_OFF, NDMHWID_LEN, service_info->ndmhwid);
+							if (len > 0) {
+								copy_to_user(rq->ifr_data, service_info, sizeof(service_info_t));
+#ifdef DEBUG
+								printk("servicetag: %s\nservicehost: %s\nservicepass: %s\nhwid: %s\n", service_info->servicetag,
+										service_info->servicehost, service_info->servicepass, service_info->ndmhwid);
+#endif
+							}
+						}
+					}
+				}
+
+				kfree(service_info);
+				if (len < 1)
+					return -EIO;
+			}
 			break;
 
 		default:
