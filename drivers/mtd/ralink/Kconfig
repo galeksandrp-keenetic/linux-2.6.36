@@ -20,4 +20,14 @@ config MTD_NOR_RALINK
 	help
 	  supoort Ralink 3052  with NOR flash.
 
+config RALINK_SLIC_CONNECT_SPI_CS1
+	depends on MTD_SPI_RALINK
+	bool "SLIC CS Pin Connects to SPI CS1"
+	default n
+
+config RALINK_SPI_CS1_HIGH_ACTIVE
+	depends on RALINK_SLIC_CONNECT_SPI_CS1
+	bool "SPI CS1(Chip Select) is high active"
+	default n
+
 endmenu

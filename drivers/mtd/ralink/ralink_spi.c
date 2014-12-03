@@ -86,19 +86,23 @@ static const char *part_probes[] __initdata = { "ndmpart", NULL };
 
 #define SPI_FIFO_SIZE 16
 
-
 #if defined(CONFIG_RALINK_RT2880) || \
 	defined(CONFIG_RALINK_RT2883) || \
 	defined(CONFIG_RALINK_RT3052) || \
 	defined(CONFIG_RALINK_RT3352) || \
 	defined(CONFIG_RALINK_RT5350) || \
 	defined(CONFIG_RALINK_RT3883) || \
-	defined(CONFIG_RALINK_RT6855)
+	defined(CONFIG_RALINK_RT6855) || \
+	defined(CONFIG_RALINK_SLIC_CONNECT_SPI_CS1) // {
 	// default mode for chips before MT7620 is legacy mode
-#else
+	// use legacy mode for SLIC
+
+#else // } {
 	// default mode for chips after MT7620 is command mode
 #define COMMAND_MODE
-#endif
+
+#endif // }
+
 //#define COMMAND_MODE		// define this for SPI flash command/user mode support
 //#define RD_MODE_FAST		// use Fast Read instead of normal Read
 //#define RD_MODE_DIOR		// use DIOR (0xBB)instead of normal Read
@@ -203,7 +207,7 @@ static int spic_transfer(const u8 *cmd, int n_cmd, u8 *buf, int n_buf, int flag)
 			(buf)? (*buf) : 0, n_buf,
 			(flag == SPIC_READ_BYTES)? "read" : "write");
 
-#if defined(CONFIG_RALINK_VITESSE_SWITCH_CONNECT_SPI_CS1)||defined(CONFIG_RALINK_SLIC_CONNECT_SPI_CS1)
+#if defined(CONFIG_RALINK_SLIC_CONNECT_SPI_CS1) // {
 	/* config ARB and set the low or high active correctly according to the device */
 	ra_outl(RT2880_SPI_ARB_REG, SPIARB_ARB_EN|(SPIARB_SPI1_ACTIVE_MODE<<1)| SPIARB_SPI0_ACTIVE_MODE);
 #if	defined(CONFIG_RALINK_SPI_CS1_HIGH_ACTIVE)
@@ -211,7 +215,7 @@ static int spic_transfer(const u8 *cmd, int n_cmd, u8 *buf, int n_buf, int flag)
 #else
 	ra_or(RT2880_SPI1_CTL_REG, (~SPIARB_SPI1_ACTIVE_MODE)&0x01);
 #endif	
-#endif	
+#endif	// }
 	ra_outl(RT2880_SPICFG_REG, SPICFG_MSBFIRST | SPICFG_TXCLKEDGE_FALLING | CFG_CLK_DIV | SPICFG_SPICLKPOL );
 	
 	// assert CS and we are already CLK normal high
@@ -273,7 +277,7 @@ int spic_init(void)
 	udelay(1);
 	ra_and(RT2880_RSTCTRL_REG, ~RSTCTRL_SPI_RESET);
 
-#if defined(CONFIG_RALINK_VITESSE_SWITCH_CONNECT_SPI_CS1)||defined(CONFIG_RALINK_SLIC_CONNECT_SPI_CS1)	
+#if defined(CONFIG_RALINK_SLIC_CONNECT_SPI_CS1)	
 	/* config ARB and set the low or high active correctly according to the device */
 	ra_outl(RT2880_SPI_ARB_REG, SPIARB_ARB_EN|(SPIARB_SPI1_ACTIVE_MODE<<1)| SPIARB_SPI0_ACTIVE_MODE);
 	ra_outl(RT2880_SPI1_CTL_REG, (~SPIARB_SPI1_ACTIVE_MODE)&0x1);
