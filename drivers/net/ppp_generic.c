@@ -53,6 +53,10 @@
 #include <net/net_namespace.h>
 #include <net/netns/generic.h>
 
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#include <linux/foe_hook.h>
+#endif
+
 #define PPP_VERSION	"2.4.2"
 
 /*
@@ -1048,6 +1052,18 @@ ppp_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 static struct rtnl_link_stats64* ppp_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats64)
 {
 	struct ppp *ppp = netdev_priv(dev);
+
+#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+	struct rtnl_link_stats64 hw_nat_stats;
+	memset(&hw_nat_stats, 0, sizeof(hw_nat_stats));
+	if (ra_sw_nat_hook_get_stats)
+		if (!ra_sw_nat_hook_get_stats(dev->name, &hw_nat_stats)) {
+			ppp->stats64.tx_bytes += hw_nat_stats.tx_bytes;
+			ppp->stats64.tx_packets += hw_nat_stats.tx_packets;
+			ppp->stats64.rx_bytes += hw_nat_stats.rx_bytes;
+			ppp->stats64.rx_packets += hw_nat_stats.rx_packets;
+		}
+#endif
 
 	stats64->rx_packets = ppp->stats64.rx_packets;
 	stats64->rx_bytes   = ppp->stats64.rx_bytes;
