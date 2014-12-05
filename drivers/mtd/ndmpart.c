@@ -71,7 +71,7 @@ struct mtd_partition ndm_parts[] = {
 #ifdef CONFIG_MTD_NDM_SHRINK_STORAGE
 		size:			0x80000,
 #else
-		size:			0x100000,
+		size:			CONFIG_MTD_NDM_STORAGE_SIZE,
 #endif
 		offset:			0
 	}, {
@@ -145,8 +145,10 @@ static int create_mtd_partitions(struct mtd_info *master,
 	/* Backup */
 	ndm_parts[8].size = flash_size - ndm_parts[8].offset;
 
-	/* Delete Storage if flash size less then 8M */
-	if (flash_size < 0x800000) {
+	/* Delete Storage if flash size less then 8M, or 
+	 * NDM_STORAGE_SIZE set to zero
+	 */
+	if ((flash_size < 0x800000) || (ndm_parts[7].size = 0x0)) {
 		delete = 1;
 		for (i = 7; i < ARRAY_SIZE(ndm_parts); i++){
 			ndm_parts[i]=ndm_parts[i+1];
