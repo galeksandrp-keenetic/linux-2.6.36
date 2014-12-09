@@ -1055,6 +1055,7 @@ static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x2020, 0x4000, 0xff, 0x02, 0x01) }, /*Rostelekom Sense R41*/
 	{ USB_DEVICE_AND_INTERFACE_INFO(0x19d2, 0x0167, 0xff, 0xff, 0xff) }, /*ZTE MF821D */
 	{ USB_DEVICE(0x20a6, 0x1106) }, /*TE W130*/
+	{ USB_DEVICE(0x1bbb, 0x022c) }, /*Alcatel beeline X602D*/
 
 	{ } /* Terminating entry */
 };
