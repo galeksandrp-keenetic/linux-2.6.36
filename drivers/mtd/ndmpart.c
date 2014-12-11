@@ -148,10 +148,10 @@ static int create_mtd_partitions(struct mtd_info *master,
 	/* Delete Storage if flash size less then 8M, or 
 	 * NDM_STORAGE_SIZE set to zero
 	 */
-	if ((flash_size < 0x800000) || (ndm_parts[7].size == 0x0)) {
+	if ((flash_size < 0x800000) || (ndm_parts[7].size = 0x0)) {
 		delete = 1;
 		for (i = 7; i < ARRAY_SIZE(ndm_parts); i++){
-			ndm_parts[i] = ndm_parts[i+1];
+			ndm_parts[i]=ndm_parts[i+1];
 		}
 #if defined(CONFIG_RALINK_MT7621)
 		if (master->type == MTD_NANDFLASH)
