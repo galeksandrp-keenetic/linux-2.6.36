@@ -182,6 +182,10 @@ struct channel {
 #endif /* CONFIG_PPP_MULTILINK */
 };
 
+
+LIST_HEAD(pppoe_sessions);
+EXPORT_SYMBOL(pppoe_sessions);
+
 /*
  * SMP locking issues:
  * Both the ppp.rlock and ppp.wlock locks protect the ppp.channels
@@ -2258,9 +2262,22 @@ ppp_unregister_channel(struct ppp_channel *chan)
 {
 	struct channel *pch = chan->ppp;
 	struct ppp_net *pn;
+	int idx = ppp_channel_index(pch->chan);
+	struct list_head *plist, *temp;
+	struct pppoe_session_item *pitem;
 
 	if (!pch)
 		return;		/* should never happen */
+
+	printk(KERN_DEBUG "PPP unregister channel index=%d\n", idx);
+	list_for_each_safe(plist, temp, &pppoe_sessions) {
+		pitem = list_entry(plist, struct pppoe_session_item, list);
+		if (idx == pitem->idx) {
+			pch->ppp->dev->sid = 0;
+			list_del(plist);
+			kfree(pitem);
+		}
+	}
 
 	chan->ppp = NULL;
 
@@ -2831,6 +2848,8 @@ ppp_connect_channel(struct channel *pch, int unit)
 	struct ppp_net *pn;
 	int ret = -ENXIO;
 	int hdrlen;
+	int idx = 0;
+	struct pppoe_session_item *pitem;
 
 	pn = ppp_pernet(pch->chan_net);
 
@@ -2860,6 +2879,21 @@ ppp_connect_channel(struct channel *pch, int unit)
 	write_unlock_bh(&pch->upl);
  out:
 	mutex_unlock(&pn->all_ppp_mutex);
+
+	idx = ppp_channel_index(pch->chan);
+	printk(KERN_DEBUG "PPP connect channel dev=%s index=%d \n",
+			pch->ppp->dev->name, idx);
+	list_for_each_entry(pitem, &pppoe_sessions, list) {
+		if (idx == pitem->idx) {
+			strncpy(pitem->name, pch->ppp->dev->name, IFNAMSIZ);
+			pch->ppp->dev->sid = pitem->sid;
+			printk(KERN_DEBUG "Add dev to list\n");
+			rtnl_lock();
+			netdev_features_change(pch->ppp->dev);
+			rtnl_unlock();
+		}
+	}
+
 	return ret;
 }
 

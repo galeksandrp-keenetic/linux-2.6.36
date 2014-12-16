@@ -77,6 +77,7 @@
 #include <linux/file.h>
 #include <linux/proc_fs.h>
 #include <linux/seq_file.h>
+#include <linux/list.h>
 
 #include <linux/nsproxy.h>
 #include <net/net_namespace.h>
@@ -93,6 +94,8 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb);
 
 static const struct proto_ops pppoe_ops;
 static const struct ppp_channel_ops pppoe_chan_ops;
+
+extern struct list_head pppoe_sessions;
 
 /* per-net private data for this module */
 static int pppoe_net_id __read_mostly;
@@ -614,6 +617,9 @@ static int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 	struct net_device *dev = NULL;
 	struct pppoe_net *pn;
 	struct net *net = NULL;
+	short sid = 0;
+	int idx = 0;
+	struct pppoe_session_item *pitem;
 	int error;
 
 	lock_sock(sk);
@@ -695,6 +701,21 @@ static int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 	}
 
 	po->num = sp->sa_addr.pppoe.sid;
+	sid = be16_to_cpu(po->num);
+	idx = ppp_channel_index(&po->chan);
+	if (sid > 0 && idx > 0) {
+		printk(KERN_DEBUG "PPPoE connect: sid=%hd channel index=%d\n", sid, idx);
+		pitem = kmalloc(sizeof(*pitem), GFP_KERNEL);
+		if (pitem == NULL) {
+			error = -ENOMEM;
+			goto err_put;
+		}
+		memset(pitem->name, 0, IFNAMSIZ);
+		pitem->idx = idx;
+		pitem->sid = sid;
+		printk(KERN_DEBUG "Add chnl to list\n");
+		list_add(&pitem->list, &pppoe_sessions);
+	}
 
 end:
 	release_sock(sk);

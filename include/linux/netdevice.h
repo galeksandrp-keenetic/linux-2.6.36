@@ -887,6 +887,7 @@ struct net_device {
 	/* Interface index. Unique device identifier	*/
 	int			ifindex;
 	int			iflink;
+	int			sid;		/* Session ID for PPPoE */
 
 	struct net_device_stats	stats;
 
