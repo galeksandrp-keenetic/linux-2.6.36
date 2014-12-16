@@ -45,6 +45,13 @@ struct ppp_channel {
 	int		latency;	/* overhead time in milliseconds */
 };
 
+struct pppoe_session_item {
+	struct list_head list;
+	int idx;
+	int sid;
+	char name[IFNAMSIZ];
+};
+
 #ifdef __KERNEL__
 /* Called by the channel when it can send some more data. */
 extern void ppp_output_wakeup(struct ppp_channel *);
