@@ -1022,6 +1022,7 @@ static long sock_ioctl(struct file *file, unsigned cmd, unsigned long arg)
 			break;
 		case SIOCUBRADDBR:
 		case SIOCUBRDELBR:
+		case SIOCUBRSHOW:
 			err = -ENOPKG;
 			if (!ubr_ioctl_hook)
 				request_module("ubridge");

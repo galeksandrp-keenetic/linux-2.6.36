@@ -35,7 +35,6 @@ struct ubr_private {
 	struct br_cpu_netstats	stats;
 	struct list_head		list;
 	struct net_device		*dev;
-	uint16_t				portno;
 };
 
 static int ubr_dev_ioctl(struct net_device *, struct ifreq *, int);
@@ -274,6 +273,35 @@ out:
 	return err;
 }
 
+#define SHOW_BUF_MAX_LEN	4096
+
+static long ubr_show(char *buf, long len)
+{
+	long written = 0;
+	struct ubr_private *ubr_item;
+
+	if (len == 0 || len > SHOW_BUF_MAX_LEN)
+		len = SHOW_BUF_MAX_LEN;
+
+	list_for_each_entry(ubr_item, &ubr_list, list) {
+		written += snprintf(buf + written, len - written, "%-16s %02hhx%02hhx%02hhx%02hhx%02hhx%02hhx\t",
+				ubr_item->dev->name, ubr_item->dev->dev_addr[0], ubr_item->dev->dev_addr[1],
+				ubr_item->dev->dev_addr[2], ubr_item->dev->dev_addr[3], ubr_item->dev->dev_addr[4],
+				ubr_item->dev->dev_addr[5]);
+		if (written >= len - 1)
+			break;
+
+		if (ubr_item->slave_dev == NULL)
+			written += sprintf(buf + written, "\n");
+		else
+			written += snprintf(buf + written, len - written, "%s\n", ubr_item->slave_dev->name);
+		if (written >= len - 1)
+			break;
+	}
+
+	return written;
+}
+
 int ubr_ioctl_deviceless_stub(struct net *net, unsigned int cmd, void __user *uarg)
 {
 	char buf[IFNAMSIZ];
@@ -289,6 +317,30 @@ int ubr_ioctl_deviceless_stub(struct net *net, unsigned int cmd, void __user *ua
 			return ubr_alloc_master(buf);
 
 		return ubr_free_master(net, buf);
+	case SIOCUBRSHOW:
+		{
+			char *buf_;
+			long res;
+			struct {
+				long len;
+				char *buf;
+			} args;
+
+			if (copy_from_user(&args, uarg, sizeof(args)))
+				return -EFAULT;
+			buf_ = kmalloc(SHOW_BUF_MAX_LEN, GFP_KERNEL);
+			if (buf_ == NULL)
+				return -ENOMEM;
+			memset(buf_, 0, SHOW_BUF_MAX_LEN);
+			res = ubr_show(buf_, args.len);
+			if (copy_to_user(args.buf, buf_, res) ||
+					copy_to_user(uarg, &res, sizeof(long))) {
+				kfree(buf_);
+				return -EFAULT;
+			}
+			kfree(buf_);
+			return 0;
+		}
 	}
 	return -EOPNOTSUPP;
 }
