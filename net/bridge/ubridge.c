@@ -288,11 +288,11 @@ static long ubr_show(char *buf, long len)
 				ubr_item->dev->name, ubr_item->dev->dev_addr[0], ubr_item->dev->dev_addr[1],
 				ubr_item->dev->dev_addr[2], ubr_item->dev->dev_addr[3], ubr_item->dev->dev_addr[4],
 				ubr_item->dev->dev_addr[5]);
-		if (written >= len - 1)
+		if (written >= len - 2)
 			break;
 
 		if (ubr_item->slave_dev == NULL)
-			written += sprintf(buf + written, "\n");
+			written += sprintf(buf + written, "-\n");
 		else
 			written += snprintf(buf + written, len - written, "%s\n", ubr_item->slave_dev->name);
 		if (written >= len - 1)
@@ -358,10 +358,38 @@ static int ubr_dev_ioctl(struct net_device *dev, struct ifreq *rq, int cmd)
 	return -EOPNOTSUPP;
 }
 
+static int ubr_dev_event(
+		struct notifier_block *unused,
+		unsigned long event,
+		void *ptr)
+{
+	struct net_device *pdev = ptr;
+	struct ubr_private *ubr_item;
+
+	switch (event) {
+		case NETDEV_UNREGISTER:
+			list_for_each_entry(ubr_item, &ubr_list, list) {
+				if (ubr_item->slave_dev == pdev) {
+					/* delif */
+					netdev_rx_handler_unregister(ubr_item->slave_dev);
+					ubr_item->slave_dev = NULL;
+				}
+			}
+			break;
+	}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block ubr_device_notifier = {
+	.notifier_call  = ubr_dev_event,
+};
+
 static int __init ubridge_init(void)
 {
 	ubrioctl_set(ubr_ioctl_deviceless_stub);
 	printk(KERN_INFO "ubridge: %s, %s\n", DRV_DESCRIPTION, DRV_VERSION);
+	if (register_netdevice_notifier(&ubr_device_notifier))
+		printk(KERN_ERR "%s: Error regitering notifier\n", __func__);
 	return 0;
 }
 
@@ -369,6 +397,7 @@ static void __exit ubridge_exit(void)
 {
 	struct ubr_private *ubr, *tmp;
 
+	unregister_netdevice_notifier(&ubr_device_notifier);
 	rtnl_lock();
 	list_for_each_entry_safe(ubr, tmp, &ubr_list, list) {
 		ubr_deregister(ubr->dev);
