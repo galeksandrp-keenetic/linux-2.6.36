@@ -25,6 +25,10 @@
 #include <net/netfilter/ipv4/nf_conntrack_ipv4.h>
 #include <net/netfilter/ipv6/nf_conntrack_ipv6.h>
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+extern int ipv4_fastnat_conntrack;
+#endif
+
 static unsigned int nf_ct_udp_timeout __read_mostly = 30*HZ;
 static unsigned int nf_ct_udp_timeout_stream __read_mostly = 180*HZ;
 
@@ -117,6 +121,11 @@ static int udp_error(struct net *net, struct nf_conn *tmpl, struct sk_buff *skb,
 		return -NF_ACCEPT;
 	}
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	if (ipv4_fastnat_conntrack)
+		return NF_ACCEPT;
+#endif
+
 	/* Packet with no checksum */
 	if (!hdr->check)
 		return NF_ACCEPT;
@@ -187,7 +196,11 @@ struct nf_conntrack_l4proto nf_conntrack_l4proto_udp4 __read_mostly =
 	.print_tuple		= udp_print_tuple,
 	.packet			= udp_packet,
 	.new			= udp_new,
-	.error			= udp_error,
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	.error			= NULL,
+#else
+ 	.error			= udp_error,
+#endif
 #if defined(CONFIG_NF_CT_NETLINK) || defined(CONFIG_NF_CT_NETLINK_MODULE)
 	.tuple_to_nlattr	= nf_ct_port_tuple_to_nlattr,
 	.nlattr_to_tuple	= nf_ct_port_nlattr_to_tuple,

@@ -137,6 +137,11 @@ struct nf_conn {
 	/* Storage reserved for other modules: */
 	union nf_conntrack_proto proto;
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	/* fast nat ext */
+	u_int32_t fast_ext;
+#endif
+
 	/* Extensions */
 	struct nf_ct_ext *ext;
 #ifdef CONFIG_NET_NS

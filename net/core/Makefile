@@ -8,7 +8,7 @@ obj-y := sock.o request_sock.o skbuff.o iovec.o datagram.o stream.o scm.o \
 obj-$(CONFIG_SYSCTL) += sysctl_net_core.o
 
 obj-y		     += dev.o dev_addr_lists.o dst.o netevent.o \
-			neighbour.o rtnetlink.o utils.o link_watch.o
+			neighbour.o rtnetlink.o utils.o link_watch.o fast_vpn.o
 
 obj-$(CONFIG_NET_SK_FILTER) += filter.o
 obj-$(CONFIG_XFRM) += flow.o

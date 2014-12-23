@@ -48,6 +48,11 @@
 #if defined(CONFIG_TCSUPPORT_HWNAT)
 #include <linux/pktflow.h>
 #endif
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+#include <net/ip.h>
+#include <net/tcp.h>
+#endif
+#include <linux/netfilter_ipv4.h>
 #ifdef CONFIG_TCSUPPORT_RA_HWNAT
 #include <linux/foe_hook.h>
 #endif
@@ -99,6 +104,18 @@ EXPORT_SYMBOL_GPL(nf_conntrack_pptp_enable);
 
 static int nf_conntrack_hash_rnd_initted;
 static unsigned int nf_conntrack_hash_rnd;
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+/* Enable or Disable FastNAT */
+extern int ipv4_fastnat_conntrack;
+
+int (*fast_nat_bind_hook_func)(struct nf_conn *ct,
+	enum ip_conntrack_info ctinfo,
+	struct sk_buff *skb,
+	struct nf_conntrack_l3proto *l3proto,
+	struct nf_conntrack_l4proto *l4proto) = NULL;
+EXPORT_SYMBOL(fast_nat_bind_hook_func);
+#endif
 
 static u_int32_t __hash_conntrack(const struct nf_conntrack_tuple *tuple,
 				  u16 zone, unsigned int size, unsigned int rnd)
@@ -1047,6 +1064,18 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 	int set_reply = 0;
 	int ret;
 
+	struct nf_conn_help *phelp;
+	struct nf_conntrack_helper *helper;
+	int is_helper = 0;
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	int (*fast_nat_bind_hook)	(struct nf_conn *ct,
+		enum ip_conntrack_info ctinfo,
+		struct sk_buff *skb,
+		struct nf_conntrack_l3proto *l3proto,
+		struct nf_conntrack_l4proto *l4proto);
+#endif
+
 	if (skb->nfct) {
 		/* Previously seen (loopback or untracked)?  Ignore. */
 		tmpl = (struct nf_conn *)skb->nfct;
@@ -1129,8 +1158,42 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
         }
 #endif
 
-	if (set_reply && !test_and_set_bit(IPS_SEEN_REPLY_BIT, &ct->status))
+	if (phelp && (helper = rcu_dereference(phelp->helper))) {
+		is_helper = 1;
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+		ct->fast_ext = 1;
+#endif
+	}
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	if (pf == PF_INET &&
+		!ct->fast_ext &&
+		ipv4_fastnat_conntrack &&
+		(fast_nat_bind_hook = rcu_dereference(fast_nat_bind_hook_func)) &&
+		(hooknum == NF_IP_PRE_ROUTING) &&
+		(ctinfo == IP_CT_ESTABLISHED || ctinfo == IP_CT_ESTABLISHED + IP_CT_IS_REPLY) &&
+		(protonum == IPPROTO_TCP || protonum == IPPROTO_UDP)) {
+
+			struct nf_conntrack_tuple *t1, *t2;
+			t1 = &ct->tuplehash[IP_CT_DIR_ORIGINAL].tuple;
+			t2 = &ct->tuplehash[IP_CT_DIR_REPLY].tuple;
+			if (!(t1->dst.u3.ip == t2->src.u3.ip &&
+				t1->src.u3.ip == t2->dst.u3.ip &&
+				t1->dst.u.all == t2->src.u.all &&
+				t1->src.u.all == t2->dst.u.all)) {
+
+				ret = fast_nat_bind_hook(ct, ctinfo, skb, l3proto, l4proto);
+		}
+	}
+#endif
+
+	if (set_reply && !test_and_set_bit(IPS_SEEN_REPLY_BIT, &ct->status)) {
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+		if( hooknum == NF_IP_LOCAL_OUT )
+			ct->fast_ext = 1;
+#endif
 		nf_conntrack_event_cache(IPCT_REPLY, ct);
+	}
 out:
 	if (tmpl)
 		nf_ct_put(tmpl);
