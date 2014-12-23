@@ -28,6 +28,9 @@ config PPTP
 	help
 	  This enables PPTP protocol.
 
+config FAST_NAT
+	tristate "Fast NAT support"
+
 config WANT_COMPAT_NETLINK_MESSAGES
 	bool
 	help

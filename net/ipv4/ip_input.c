@@ -148,6 +148,10 @@
 #ifdef CONFIG_TCSUPPORT_RA_HWNAT
 #include <linux/foe_hook.h>
 #endif
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+extern int ipv4_fastnat_conntrack;
+#endif
+
 /*
  *	Process Router Attention IP option (RFC 2113)
  */

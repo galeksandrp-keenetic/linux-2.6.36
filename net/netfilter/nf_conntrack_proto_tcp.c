@@ -31,6 +31,11 @@
 #if defined(CONFIG_TCSUPPORT_HWNAT)
 #include <linux/pktflow.h>
 #endif
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+extern int ipv4_fastnat_conntrack;
+#endif
+
 /* "Be conservative in what you do,
     be liberal in what you accept from others."
     If it's non-zero, we mark only out of window RST segments as INVALID. */
@@ -794,6 +799,11 @@ static int tcp_error(struct net *net, struct nf_conn *tmpl,
 		return -NF_ACCEPT;
 	}
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	if (ipv4_fastnat_conntrack)
+		return NF_ACCEPT;
+#endif
+
 	/* Checksum invalid? Ignore.
 	 * We skip checking packets on the outgoing path
 	 * because the checksum is assumed to be correct.
@@ -1468,7 +1478,11 @@ struct nf_conntrack_l4proto nf_conntrack_l4proto_tcp4 __read_mostly =
 	.print_conntrack 	= tcp_print_conntrack,
 	.packet 		= tcp_packet,
 	.new 			= tcp_new,
-	.error			= tcp_error,
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	.error			= NULL,
+#else
+ 	.error			= tcp_error,
+#endif
 #if defined(CONFIG_NF_CT_NETLINK) || defined(CONFIG_NF_CT_NETLINK_MODULE)
 	.to_nlattr		= tcp_to_nlattr,
 	.nlattr_size		= tcp_nlattr_size,

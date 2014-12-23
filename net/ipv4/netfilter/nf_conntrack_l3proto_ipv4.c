@@ -29,6 +29,11 @@
 #include <net/netfilter/ipv4/nf_defrag_ipv4.h>
 #include <net/netfilter/nf_log.h>
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+int ipv4_fastnat_conntrack = 1;
+EXPORT_SYMBOL(ipv4_fastnat_conntrack);
+#endif
+
 #if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 #include "../../nat/hw_nat/ra_nat.h"
 #endif
@@ -245,6 +250,15 @@ static ctl_table ip_ct_sysctl_table[] = {
 		.extra1		= &log_invalid_proto_min,
 		.extra2		= &log_invalid_proto_max,
 	},
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+    {
+		.procname   = "ip_conntrack_fastnat",
+		.data       = &ipv4_fastnat_conntrack,
+		.maxlen     = sizeof(int),
+		.mode       = 0644,
+		.proc_handler   = &proc_dointvec,
+	},
+#endif
 	{ }
 };
 #endif /* CONFIG_SYSCTL && CONFIG_NF_CONNTRACK_PROC_COMPAT */
