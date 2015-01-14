@@ -27,12 +27,6 @@
 #include <linux/kernel.h>
 
 #include "xfrm_hash.h"
-#ifdef CONFIG_MTK_CRYPTO_DRIVER
-extern void
-ipsec_eip93Adapter_free(
-		    unsigned int spi
-		);
-#endif
 
 #if (defined (CONFIG_RALINK_HWCRYPTO) || defined (CONFIG_RALINK_HWCRYPTO_MODULE)) && defined (CONFIG_INET_ESP)
 extern void
@@ -326,14 +320,6 @@ int xfrm_unregister_mode(struct xfrm_mode *mode, int family)
 		modemap[mode->encap] = NULL;
 		module_put(mode->afinfo->owner);
 		err = 0;
-#if (defined (CONFIG_RALINK_HWCRYPTO) || defined (CONFIG_RALINK_HWCRYPTO_MODULE)) && defined (CONFIG_INET_ESP)
-		if (x->type != NULL)
-		{	
-			if (x->type->description[3] == '4')
-        		ipsec_eip93Adapter_free(x->id.spi);
-		}	
-#endif
-
 	}
 
 	xfrm_state_unlock_afinfo(afinfo);
@@ -572,8 +558,12 @@ int __xfrm_state_delete(struct xfrm_state *x)
 		 */
 		xfrm_state_put(x);
 		err = 0;
-#ifdef CONFIG_MTK_CRYPTO_DRIVER
-        ipsec_eip93Adapter_free(x->id.spi);
+#if (defined (CONFIG_RALINK_HWCRYPTO) || defined (CONFIG_RALINK_HWCRYPTO_MODULE)) && defined (CONFIG_INET_ESP)
+		if (x->type != NULL)
+		{
+			if (x->type->description[3] == '4')
+				ipsec_eip93Adapter_free(x->id.spi);
+		}
 #endif
 
 	}
