@@ -6,10 +6,6 @@
 
 #include <linux/gfp.h>
 #include <linux/init.h>
-#ifdef CONFIG_MTK_CRYPTO_DRIVER
-#include <net/esp.h>
-#include <linux/crypto.h>
-#endif
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/skbuff.h>
@@ -37,29 +33,11 @@ static int xfrm4_mode_tunnel_output(struct xfrm_state *x, struct sk_buff *skb)
 	struct iphdr *top_iph;
 	int flags;
 
-#ifdef CONFIG_MTK_CRYPTO_DRIVER
-	struct esp_data *esp;
-	int header_len;
-
-	esp = x->data;
-	if (!esp)
-	{
-		printk("%s: esp is NULL\n", __FUNCTION__);
-		return -EPERM;
-	}
-
-	header_len = (x->props.header_len) - (sizeof(struct ip_esp_hdr) +  crypto_aead_ivsize(esp->aead));
-	if (header_len < 0)
-	{
-		printk("%s: Wrong value for header_len:%d\n", __FUNCTION__, header_len);
-		return -EPERM;
-	}
-	skb_set_network_header(skb, -header_len);
-#elif defined (CONFIG_RALINK_HWCRYPTO) || defined (CONFIG_RALINK_HWCRYPTO_MODULE)
+#if defined (CONFIG_RALINK_HWCRYPTO) || defined (CONFIG_RALINK_HWCRYPTO_MODULE)
 	{
 		int offset = 0;
 		if (x->props.mode == XFRM_MODE_TUNNEL)
-		{
+		{	
 			if (x->encap)
 				offset = 20+8;
 			else
@@ -71,7 +49,7 @@ static int xfrm4_mode_tunnel_output(struct xfrm_state *x, struct sk_buff *skb)
 				offset = 8;
 			else
 				offset = 0;
-		}
+		}		
 		skb_set_network_header(skb, -offset);
 	}
 #else

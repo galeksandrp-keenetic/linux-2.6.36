@@ -1672,6 +1672,8 @@ void xfrm_replay_notify(struct xfrm_state *x, int event)
 		x->xflags &= ~XFRM_TIME_DEFER;
 }
 
+EXPORT_SYMBOL(xfrm_replay_notify);
+
 static void xfrm_replay_timer_handler(unsigned long data)
 {
 	struct xfrm_state *x = (struct xfrm_state*)data;
