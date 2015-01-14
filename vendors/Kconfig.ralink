@@ -2,8 +2,8 @@ menu "Ralink Module"
 
 
 config  RALINK_HWCRYPTO
-	depends on RALINK_MT7621
-	tristate "HW Crypto Engine"
+	depends on RALINK_MT7621 || MIPS_RT63365
+	tristate "HW Crypto Engine support"
 	default n
 
 #############

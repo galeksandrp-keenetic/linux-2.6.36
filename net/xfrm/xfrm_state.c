@@ -1738,6 +1738,7 @@ void xfrm_replay_advance(struct xfrm_state *x, __be32 net_seq)
 	if (xfrm_aevent_is_on(xs_net(x)))
 		xfrm_replay_notify(x, XFRM_REPLAY_UPDATE);
 }
+EXPORT_SYMBOL(xfrm_replay_advance);
 
 static LIST_HEAD(xfrm_km_list);
 static DEFINE_RWLOCK(xfrm_km_lock);
@@ -2315,4 +2316,5 @@ void xfrm_audit_state_icvfail(struct xfrm_state *x,
 	audit_log_end(audit_buf);
 }
 EXPORT_SYMBOL_GPL(xfrm_audit_state_icvfail);
+
 #endif /* CONFIG_AUDITSYSCALL */

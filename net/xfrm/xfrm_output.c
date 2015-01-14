@@ -47,6 +47,8 @@ static int xfrm_state_check_space(struct xfrm_state *x, struct sk_buff *skb)
 	return pskb_expand_head(skb, nhead, ntail, GFP_ATOMIC);
 }
 
+EXPORT_SYMBOL(xfrm_state_check_space);
+
 static int xfrm_output_one(struct sk_buff *skb, int err)
 {
 	struct dst_entry *dst = skb_dst(skb);

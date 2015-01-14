@@ -344,6 +344,7 @@ __IMEM int ip_output(struct sk_buff *skb)
 			    ip_finish_output,
 			    !(IPCB(skb)->flags & IPSKB_REROUTED));
 }
+EXPORT_SYMBOL(ip_output);
 
 int ip_queue_xmit(struct sk_buff *skb)
 {
