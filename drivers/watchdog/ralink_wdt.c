@@ -14,6 +14,7 @@
 #define TMR1VAL		(RALINK_TIMER_BASE + 0x30) /* WDG Timer Current Value Register */
 #define RLDWDOG		(RALINK_TIMER_BASE + 0x38) /* Reload Watchdog */
 #elif defined (CONFIG_RALINK_MT7621) || defined (CONFIG_RALINK_MT7628)
+#define TMRSTAT     (RALINK_TIMER_BASE)  /* Timer Status Register */
 #define TMR0LOAD	(RALINK_TIMER_BASE + 0x14)  /* Timer0 Load Value */
 #define TMR0VAL		(RALINK_TIMER_BASE + 0x18)  /* Timer0 Counter Value */
 #define TMR0CTL		(RALINK_TIMER_BASE + 0x10)  /* Timer0 Control */
