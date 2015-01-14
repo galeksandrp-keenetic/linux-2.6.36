@@ -26,13 +26,20 @@ obj-$(CONFIG_NET_IPGRE_DEMUX) += gre.o
 obj-$(CONFIG_NET_IPGRE) += ip_gre.o
 obj-$(CONFIG_SYN_COOKIES) += syncookies.o
 obj-$(CONFIG_INET_AH) += ah4.o
+# Allow software crypto implementation
+# overrides by hwcrypto
+ifeq ($(CONFIG_INET_ESP_SOFT), y)
+ifneq ($(CONFIG_RALINK_HWCRYPTO), y)
+ifneq ($(CONFIG_RALINK_HWCRYPTO), m)
 obj-$(CONFIG_INET_ESP) += esp4.o
-ifeq ($(CONFIG_TCSUPPORT_HW_CRYPTO),1)
-obj-$(CONFIG_INET_ESP) += mtk_esp4.o
 endif
-ifeq ($(CONFIG_RALINK_HWCRYPTO),m)
-ifeq ($(CONFIG_INET_ESP), y)
-obj-$(CONFIG_INET_ESP) += mtk_esp4.o
+endif
+endif
+ifeq ($(CONFIG_INET_ESP_SOFT), m)
+ifneq ($(CONFIG_RALINK_HWCRYPTO), y)
+ifneq ($(CONFIG_RALINK_HWCRYPTO), m)
+obj-$(CONFIG_INET_ESP) += esp4.o
+endif
 endif
 endif
 obj-$(CONFIG_INET_IPCOMP) += ipcomp.o

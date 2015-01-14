@@ -6,6 +6,10 @@ config  RALINK_HWCRYPTO
 	tristate "HW Crypto Engine support"
 	default n
 
+config INET_ESP_SOFT
+	tristate "Allow software ESP implementation"
+	default n
+
 #############
 # Wireless
 #############
