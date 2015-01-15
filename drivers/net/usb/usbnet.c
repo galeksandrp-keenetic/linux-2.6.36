@@ -248,7 +248,7 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 #if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
 	FOE_MAGIC_TAG(skb) = FOE_MAGIC_PCI;
 	FOE_AI(skb) = UN_HIT;
-	if (ra_sw_nat_hook_rx) {
+	if (ra_sw_nat_hook_rx && dev->hwnat_port) {
 		if (ra_sw_nat_hook_rx(skb)) {
 			status = netif_rx (skb);
 			if (status != NET_RX_SUCCESS)
@@ -1103,7 +1103,7 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 
 #if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
 	/* add tx hook point*/
-	if(ra_sw_nat_hook_tx) {
+	if(ra_sw_nat_hook_tx && dev->hwnat_port) {
 		skb->data += 4; //pointer to DA
 		ra_sw_nat_hook_tx(skb, 1);
 		skb->data -= 4;
@@ -1294,8 +1294,8 @@ void usbnet_disconnect (struct usb_interface *intf)
 		return;
 
 #if defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)
-	if (ra_sw_nat_hook_release_dstport)
-		ra_sw_nat_hook_release_dstport(DP_USB);
+	if (ra_sw_nat_hook_release_dstport && dev->hwnat_port)
+		ra_sw_nat_hook_release_dstport(dev->hwnat_port);
 #endif
 	/* Deregister dev for mdev, McMCC, 21092010 */
 	usb_deregister_dev(intf, &fake_usb_class);
@@ -1363,6 +1363,9 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	const char			*name;
 	int (*is_wimax_devname)(u16 vendor_id, u16 product_id);
 	struct usb_driver 	*driver = to_usb_driver(udev->dev.driver);
+#if defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)
+	static uint32_t		hnport;
+#endif
 
 	/* usbnet already took usb runtime pm, so have to enable the feature
 	 * for usb interface, otherwise usb_autopm_get_interface may return
@@ -1519,7 +1522,20 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 		"usb%s", net->name); */
 #if defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)
 	if (ra_sw_nat_hook_acquire_dstport) {
-		ra_sw_nat_hook_acquire_dstport(DP_USB, net->name);
+		if (hnport == 0) {
+			hnport = DP_USB;
+
+			/* TODO: we might add support multiple hwnat port numbers in the future
+			 * 		if we decide to boost all USB-net devices via hwnat
+			 */
+#if 0
+		} else {
+			hnport++;
+		}
+#endif
+			ra_sw_nat_hook_acquire_dstport(hnport, net->name);
+			dev->hwnat_port = hnport;
+		}
 	}
 #endif
 
