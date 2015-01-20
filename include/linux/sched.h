@@ -142,8 +142,7 @@ extern unsigned long nr_iowait(void);
 extern unsigned long nr_iowait_cpu(int cpu);
 extern unsigned long this_cpu_load(void);
 
-
-extern void calc_global_load(unsigned long ticks);
+extern void calc_global_load(void);
 
 extern unsigned long get_parent_ip(unsigned long addr);
 
@@ -267,8 +266,6 @@ extern void sched_init_smp(void);
 extern asmlinkage void schedule_tail(struct task_struct *prev);
 extern void init_idle(struct task_struct *idle, int cpu);
 extern void init_idle_bootup_task(struct task_struct *idle);
-
-extern int runqueue_is_locked(int cpu);
 
 extern cpumask_var_t nohz_cpu_mask;
 #if defined(CONFIG_SMP) && defined(CONFIG_NO_HZ)
@@ -506,10 +503,6 @@ struct thread_group_cputimer {
 	spinlock_t lock;
 };
 
-#ifdef CONFIG_RALINK_SOC
-struct autogroup;
-#endif
-
 /*
  * NOTE! "signal_struct" does not have it's own
  * locking, because a shared signal_struct always
@@ -577,9 +570,6 @@ struct signal_struct {
 
 	struct tty_struct *tty; /* NULL if no tty */
 
-#if defined(CONFIG_SCHED_AUTOGROUP) && defined(CONFIG_RALINK_SOC)
-	struct autogroup *autogroup;
-#endif
 	/*
 	 * Cumulative resource counters for dead threads in the group,
 	 * and for reaped dead child processes forked by this group.
@@ -1523,11 +1513,7 @@ struct task_struct {
  * MAX_RT_PRIO must not be smaller than MAX_USER_RT_PRIO.
  */
 
-#ifdef CONFIG_RALINK_SOC
-#define MAX_USER_RT_PRIO	CONFIG_MAX_USER_RT_PRIO
-#else
 #define MAX_USER_RT_PRIO	100
-#endif
 #define MAX_RT_PRIO		MAX_USER_RT_PRIO
 
 #define MAX_PRIO		(MAX_RT_PRIO + 40)
@@ -1914,22 +1900,6 @@ int sched_rt_handler(struct ctl_table *table, int write,
 		loff_t *ppos);
 
 extern unsigned int sysctl_sched_compat_yield;
-
-#ifdef CONFIG_RALINK_SOC
-#ifdef CONFIG_SCHED_AUTOGROUP
-extern unsigned int sysctl_sched_autogroup_enabled;
-
-extern void sched_autogroup_create_attach(struct task_struct *p);
-extern void sched_autogroup_detach(struct task_struct *p);
-extern void sched_autogroup_fork(struct signal_struct *sig);
-extern void sched_autogroup_exit(struct signal_struct *sig);
-#else
-static inline void sched_autogroup_create_attach(struct task_struct *p) { }
-static inline void sched_autogroup_detach(struct task_struct *p) { }
-static inline void sched_autogroup_fork(struct signal_struct *sig) { }
-static inline void sched_autogroup_exit(struct signal_struct *sig) { }
-#endif
-#endif
 
 #ifdef CONFIG_RT_MUTEXES
 extern int rt_mutex_getprio(struct task_struct *p);
