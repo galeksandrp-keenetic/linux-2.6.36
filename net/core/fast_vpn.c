@@ -30,6 +30,7 @@
 extern int (*vpn_pthrough)(struct sk_buff *skb, int in);
 extern int (*vpn_pthrough_setup)(uint32_t sip, int add);
 extern int (*l2tp_input)(struct sk_buff *skb);
+extern int (*pptp_input)(struct sk_buff *skb);
 
 #define HWADDR_LEN					6
 #define MAX_VPN_TABLE				32
@@ -49,16 +50,16 @@ static int vpn_tbl_ovr = 0;
 static struct tasklet_struct vpn_tx_task;
 static struct sk_buff_head vpn_tx_q;
 
-#define SEND_PER_LOCK	16
+#define SEND_PER_LOCK	32
 
-PVPN_HDR_TABLE vpn_find_hdr(uint32_t sip) {
+static inline PVPN_HDR_TABLE vpn_find_hdr(uint32_t sip) {
 	int ipos;
 	for( ipos = 0; ipos < vpn_tbl_cnt; ipos++ )
 		if( vpn_hdr_tbl[ipos].sip == sip ) return &vpn_hdr_tbl[ipos];
 	return NULL;
 }
 
-void vpn_add_hdr(struct net_device *dev, 	uint32_t sip, 	uint8_t *smac, uint8_t *dmac, struct vlan_ethhdr *veth) {
+static inline void vpn_add_hdr(struct net_device *dev, uint32_t sip, uint8_t *smac, uint8_t *dmac, struct vlan_ethhdr *veth) {
 	int ipos;
 	PVPN_HDR_TABLE phdr = vpn_find_hdr(sip);
 	
@@ -88,7 +89,7 @@ void vpn_add_hdr(struct net_device *dev, 	uint32_t sip, 	uint8_t *smac, uint8_t 
 	} else phdr->vset = 0;
 }
 
-void vpn_rem_hdr(uint32_t sip) {
+static inline void vpn_rem_hdr(uint32_t sip) {
 	PVPN_HDR_TABLE phdr = vpn_find_hdr(sip);
 	
 	if( phdr ) {
@@ -103,7 +104,7 @@ void vpn_rem_hdr(uint32_t sip) {
 	}
 }
 
-void vpn_clr_hdr(uint32_t sip) {
+static inline void vpn_clr_hdr(uint32_t sip) {
 	PVPN_HDR_TABLE phdr = vpn_find_hdr(sip);
 	
 	if( phdr ) 
@@ -137,21 +138,30 @@ int vpn_cross(struct sk_buff *skb, int in) {
 	PVPN_HDR_TABLE phdr;
 	__be16 vskbp;
 	int imod;
+	uint16_t offset;
+	int matched = 0;
 	
 	int (*l2tp_rx)(struct sk_buff *skb);
+	int (*pptp_rx)(struct sk_buff *skb);
 	
 	if( !vpn_tbl_cnt ) return 0; /* fast skip pkt */
 	
 	if( in == 1 ) {
 		if( eth_hdr(skb)->h_proto == htons(ETH_P_8021Q) ) {
 			veth = (struct vlan_ethhdr *)(skb_mac_header(skb));
-		} else veth = NULL;
-	
-	 	if( skb->dev && (eth_hdr(skb)->h_proto == htons(ETH_P_IP) || (veth && veth->h_vlan_encapsulated_proto == htons(ETH_P_IP))) ) {
-	 		if( veth ) iph = (struct iphdr *)(skb_mac_header(skb) + VLAN_ETH_HLEN);
-	 		else iph = (struct iphdr *)(skb_mac_header(skb) + ETH_HLEN);
+		} else {
+			veth = NULL;
+		}
+	 	if( skb->dev && (
+			(veth && veth->h_vlan_encapsulated_proto == htons(ETH_P_IP)) ||
+			(eth_hdr(skb)->h_proto == htons(ETH_P_IP))) ) {
+	 		
+	 		if ( veth )
+				iph = (struct iphdr *)(skb_mac_header(skb) + VLAN_ETH_HLEN);
+	 		else
+				iph = (struct iphdr *)(skb_mac_header(skb) + ETH_HLEN);
 	 			
-	 		if( (iph->frag_off & htons(IP_MF | IP_OFFSET)) || !(phdr = vpn_find_hdr(iph->saddr)) )
+	 		if(!(phdr = vpn_find_hdr(iph->saddr)) || (iph->frag_off & htons(IP_MF | IP_OFFSET)))
 	 			return 0; /* frag or unknown source */
 	 		
 	 		dmac = skb_mac_header(skb);
@@ -160,27 +170,34 @@ int vpn_cross(struct sk_buff *skb, int in) {
 	 		
 	 		if( !phdr->dev ) 
 	 			vpn_add_hdr(skb->dev, saddr, smac, dmac, veth);
-	 			
+	 		
+	 		rcu_read_lock();
 			if( iph->protocol == IPPROTO_UDP &&
 				 (udp = (struct udphdr*)((char *)iph + (iph->ihl << 2))) &&
 				 udp->dest == htons(1701) && 
 				 udp->source == htons(1701) &&
 				 (l2tp_rx = rcu_dereference(l2tp_input)) ) {
-				 
+				
 				 if( veth ) {
 	 				skb_pull(skb, VLAN_HLEN);
 					skb_reset_network_header(skb);
 				
 					if( skb->pkt_type == PACKET_OTHERHOST ) {
 						skb->pkt_type = PACKET_HOST;
-						imod = 1;	
-					} else imod = 0;
-					
+						imod = 1;
+					} else
+						imod = 0;
+
 					vskbp = skb->protocol;
 					skb->protocol = htons(ETH_P_IP);
 	 			 }
 				 
-				 if( l2tp_rx(skb) == 1 ) return 1;
+				 if( l2tp_rx(skb) == 1 ) {
+					rcu_read_unlock();
+					return 1;
+				 }
+				 ++matched;
+				 rcu_read_unlock();
 				 
 				 /* remod src packet */
 				 if( veth ) {
@@ -190,6 +207,31 @@ int vpn_cross(struct sk_buff *skb, int in) {
 					 skb->protocol = vskbp;
 				 }
 			}
+			if ( iph->protocol == IPPROTO_GRE &&
+				(pptp_rx = rcu_dereference(pptp_input))) {
+				 if( veth ) {
+	 				skb_pull(skb, VLAN_HLEN);
+					skb_reset_network_header(skb);
+				
+					if( skb->pkt_type == PACKET_OTHERHOST ) {
+						skb->pkt_type = PACKET_HOST;
+						imod = 1;
+					} else
+						imod = 0;
+
+					vskbp = skb->protocol;
+					skb->protocol = htons(ETH_P_IP);
+	 			 }
+
+	 			 offset = iph->ihl * 4;
+	 			 skb_pull(skb, offset);
+
+	 			 pptp_rx(skb);
+	 			 rcu_read_unlock();
+	 			 return 1;
+			}
+			if (!matched)
+				rcu_read_unlock();
 		}
 	} else {
 		if( (iph = ip_hdr(skb)) ) {
@@ -248,7 +290,7 @@ static int __init fast_vpn_init(void) {
 	rcu_assign_pointer(vpn_pthrough, vpn_cross);
 	rcu_assign_pointer(vpn_pthrough_setup, vpn_setup);
 	
-	printk("Fast VPN init, v1.01\n");
+	printk("Fast VPN init, v1.02\n");
 	return 0;
 }
 

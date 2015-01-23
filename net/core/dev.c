@@ -3453,6 +3453,9 @@ EXPORT_SYMBOL(vpn_pthrough_setup);
 int (*l2tp_input)(struct sk_buff *skb) = NULL;
 EXPORT_SYMBOL(l2tp_input);
 
+int (*pptp_input)(struct sk_buff *skb) = NULL;
+EXPORT_SYMBOL(pptp_input);
+
 static int __netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;
@@ -3634,12 +3637,12 @@ static int __netif_receive_skb(struct sk_buff *skb)
 
 	rcu_read_lock();
 
-	if( (vhook = rcu_dereference(vpn_pthrough)) && vhook(skb, 1) ) {
+	if ((vhook = rcu_dereference(vpn_pthrough)) && vhook(skb, 1) ) {
 		ret = NET_RX_SUCCESS;
 		goto out;
 	}
 
-	if( (mhook = rcu_dereference(igmp_pthrough)) && mhook(skb) ) {
+	if ( (mhook = rcu_dereference(igmp_pthrough)) && mhook(skb) ) {
 		ret = NET_RX_SUCCESS;
 		goto out;
 	}
