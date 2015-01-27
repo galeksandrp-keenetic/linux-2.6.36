@@ -1053,9 +1053,7 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 		struct sk_buff *skb)
 {
 	struct nf_conn *ct, *tmpl = NULL;
-#if defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 	struct nf_conn_help *help;
-#endif
 	enum ip_conntrack_info ctinfo;
 	struct nf_conntrack_l3proto *l3proto;
 	struct nf_conntrack_l4proto *l4proto;
@@ -1064,7 +1062,6 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 	int set_reply = 0;
 	int ret;
 
-	struct nf_conn_help *phelp;
 	struct nf_conntrack_helper *helper;
 	int is_helper = 0;
 
@@ -1146,24 +1143,22 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 		goto out;
 	}
 
-#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 	help = nfct_help(ct);
 	if (help && help->helper) {
+#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
             if( IS_SPACE_AVAILABLED(skb) &&
                     ((FOE_MAGIC_TAG(skb) == FOE_MAGIC_PCI) ||
                      (FOE_MAGIC_TAG(skb) == FOE_MAGIC_WLAN) ||
                      (FOE_MAGIC_TAG(skb) == FOE_MAGIC_GE))){
                     FOE_ALG(skb)=1;
             }
-        }
 #endif
-
-	if (phelp && (helper = rcu_dereference(phelp->helper))) {
-		is_helper = 1;
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 		ct->fast_ext = 1;
 #endif
+		is_helper = 1;
 	}
+
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	if (pf == PF_INET &&
