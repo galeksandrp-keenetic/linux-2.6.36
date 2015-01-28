@@ -200,6 +200,7 @@ fast_nat_do_bindings(struct nf_conn *ct,
 static int __init fast_nat_init(void)
 {
 	rcu_assign_pointer(fast_nat_hit_hook_func, fast_nat_path);
+	synchronize_rcu();
 	rcu_assign_pointer(fast_nat_bind_hook_func, fast_nat_do_bindings);
 	printk("Run Fast NAT\n");
 	return 0;
@@ -207,8 +208,9 @@ static int __init fast_nat_init(void)
 
 static void __exit fast_nat_fini(void)
 {
-	rcu_assign_pointer(fast_nat_hit_hook_func, NULL);
 	rcu_assign_pointer(fast_nat_bind_hook_func, NULL);
+	synchronize_rcu();
+	rcu_assign_pointer(fast_nat_hit_hook_func, NULL);
 }
 
 module_init(fast_nat_init);

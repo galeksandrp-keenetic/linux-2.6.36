@@ -203,6 +203,7 @@ next_hook:
 			ret = fast_nat_hit_hook(skb);
 		else {
 			kfree_skb(skb);
+			printk(KERN_WARNING "Got NF_FAST_NAT without hit_hook?!");
 			ret = -EPERM;
 		}
 	}

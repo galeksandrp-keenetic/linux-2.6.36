@@ -1161,6 +1161,7 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	rcu_read_lock();
 	if (pf == PF_INET &&
 		!ct->fast_ext &&
 		ipv4_fastnat_conntrack &&
@@ -1176,10 +1177,14 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 				t1->src.u3.ip == t2->dst.u3.ip &&
 				t1->dst.u.all == t2->src.u.all &&
 				t1->src.u.all == t2->dst.u.all)) {
-
-				ret = fast_nat_bind_hook(ct, ctinfo, skb, l3proto, l4proto);
+				if (likely(NULL != rcu_dereference(fast_nat_hit_hook_func))) {
+					ret = fast_nat_bind_hook(ct, ctinfo, skb, l3proto, l4proto);
+				} else {
+					printk(KERN_WARNING "Not allowed to do bind_hook without hit_hook");
+				}
 		}
 	}
+	rcu_read_unlock();
 #endif
 
 	if (set_reply && !test_and_set_bit(IPS_SEEN_REPLY_BIT, &ct->status)) {
