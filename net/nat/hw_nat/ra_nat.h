@@ -104,20 +104,42 @@ enum DstPort {
 };
 
 typedef struct {
-#if defined (CONFIG_RALINK_MT7620)
 	uint16_t MAGIC_TAG;
+#if defined (CONFIG_RALINK_MT7620)
+#ifdef __BIG_ENDIAN
+	uint32_t ALG:10;
+	uint32_t SPORT:3;
+	uint32_t CRSN:5;
+	uint32_t FOE_Entry:14;
+#else
 	uint32_t FOE_Entry:14;
 	uint32_t CRSN:5;
 	uint32_t SPORT:3;
 	uint32_t ALG:10;
+#endif
+
 #elif defined (CONFIG_RALINK_MT7621)
-	uint16_t MAGIC_TAG;
+#ifdef __BIG_ENDIAN
+	uint32_t ALG:9;
+	uint32_t SPORT:4;
+	uint32_t CRSN:5;
+	uint32_t FOE_Entry:14;
+#else
 	uint32_t FOE_Entry:14;
 	uint32_t CRSN:5;
 	uint32_t SPORT:4;
 	uint32_t ALG:9;
+#endif
 #else
-	uint16_t MAGIC_TAG;
+#ifdef __BIG_ENDIAN
+	uint32_t RESV2:4;
+	uint32_t AIS:1;
+	uint32_t SP:3;
+	uint32_t AI:8;
+	uint32_t ALG:1;
+	uint32_t FVLD:1;
+	uint32_t FOE_Entry: 14;
+#else
 	uint32_t FOE_Entry:14;
 	uint32_t FVLD:1;
 	uint32_t ALG:1;
@@ -126,7 +148,8 @@ typedef struct {
 	uint32_t AIS:1;
 	uint32_t RESV2:4;
 #endif
-#if defined (CONFIG_RA_HW_NAT_PPTP_L2TP)	
+#endif
+#if defined (CONFIG_RA_HW_NAT_PPTP_L2TP)
 	uint16_t SOURCE;
 	uint16_t DEST;
 #endif
@@ -137,7 +160,7 @@ typedef struct {
 	uint8_t dmac[6];
 	uint8_t smac[6];
 
-	//vlan header 
+	//vlan header
 	uint16_t vlan_tag;
 	uint16_t vlan1_gap;
 	uint16_t vlan1;
@@ -173,13 +196,13 @@ typedef struct {
 #endif
 
 /*
- *    2bytes	    4bytes 
+ *    2bytes	    4bytes
  * +-----------+-------------------+
  * | Magic Tag | RX/TX Desc info4  |
  * +-----------+-------------------+
  * |<------FOE Flow Info---------->|
  */
-#if defined (CONFIG_RA_HW_NAT_PPTP_L2TP)	
+#if defined (CONFIG_RA_HW_NAT_PPTP_L2TP)
 #define FOE_INFO_LEN		    10
 #define FOE_MAGIC_FASTPATH	    0x7277
 #define FOE_MAGIC_L2TPPATH	    0x7278
@@ -206,7 +229,7 @@ typedef struct {
 #define FOE_ALG(skb)		    ((PdmaRxDescInfo4 *)((skb)->head))->ALG
 #define FOE_AI(skb)		    ((PdmaRxDescInfo4 *)((skb)->head))->CRSN
 #define FOE_SP(skb)		    ((PdmaRxDescInfo4 *)((skb)->head))->SPORT	//src_port or user priority
-#if defined (CONFIG_RA_HW_NAT_PPTP_L2TP)	
+#if defined (CONFIG_RA_HW_NAT_PPTP_L2TP)
 #define FOE_SOURCE(skb)		    ((PdmaRxDescInfo4 *)((skb)->head))->SOURCE	//L4 src_port
 #define FOE_DEST(skb)		    ((PdmaRxDescInfo4 *)((skb)->head))->DEST	//L4 dest_port
 #endif
@@ -216,7 +239,7 @@ typedef struct {
 #define FOE_ALG(skb)		    ((PdmaRxDescInfo4 *)((skb)->head))->ALG
 #define FOE_AI(skb)		    ((PdmaRxDescInfo4 *)((skb)->head))->AI
 #define FOE_SP(skb)		    ((PdmaRxDescInfo4 *)((skb)->head))->SP	//src_port or user priority
-#if defined (CONFIG_RA_HW_NAT_PPTP_L2TP)	
+#if defined (CONFIG_RA_HW_NAT_PPTP_L2TP)
 #define FOE_SOURCE(skb)		    ((PdmaRxDescInfo4 *)((skb)->head))->SOURCE	//L4 src_port
 #define FOE_DEST(skb)		    ((PdmaRxDescInfo4 *)((skb)->head))->DEST	//L4 dest_port
 #endif
@@ -233,7 +256,7 @@ typedef struct {
 #define FOE_ALG(skb)		    ((PdmaRxDescInfo4 *)((skb)->end-FOE_INFO_LEN))->ALG
 #define FOE_AI(skb)		    ((PdmaRxDescInfo4 *)((skb)->end-FOE_INFO_LEN))->CRSN
 #define FOE_SP(skb)		    ((PdmaRxDescInfo4 *)((skb)->end-FOE_INFO_LEN))->SPORT //src_port or user priority
-#if defined (CONFIG_RA_HW_NAT_PPTP_L2TP)	
+#if defined (CONFIG_RA_HW_NAT_PPTP_L2TP)
 #define FOE_SOURCE(skb)		    ((PdmaRxDescInfo4 *)((skb)->end-FOE_INFO_LEN))->SOURCE	//L4 src_port
 #define FOE_DEST(skb)		    ((PdmaRxDescInfo4 *)((skb)->end-FOE_INFO_LEN))->DEST	//L4 dest_port
 #endif
