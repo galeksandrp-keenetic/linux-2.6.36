@@ -24,6 +24,12 @@ choice
 	config RA_NETWORK_TASKLET_BH
 	bool "Tasklet"
 
+	config RA_NETWORK_WORKQUEUE_BH
+	bool "Work Queue"
+
+	config RAETH_NAPI
+        bool "NAPI"
+
 endchoice
 
 #config RAETH_SKB_RECYCLE_2K
