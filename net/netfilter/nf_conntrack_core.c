@@ -108,6 +108,7 @@ static unsigned int nf_conntrack_hash_rnd;
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 /* Enable or Disable FastNAT */
 extern int ipv4_fastnat_conntrack;
+extern int (*fast_nat_hit_hook_func)(struct sk_buff *skb);
 
 int (*fast_nat_bind_hook_func)(struct nf_conn *ct,
 	enum ip_conntrack_info ctinfo,
