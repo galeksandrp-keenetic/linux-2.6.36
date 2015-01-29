@@ -27,10 +27,19 @@
 #include <linux/rcupdate.h>
 #include <linux/proc_fs.h>
 
+#include <net/fast_vpn.h>
+
 extern int (*vpn_pthrough)(struct sk_buff *skb, int in);
 extern int (*vpn_pthrough_setup)(uint32_t sip, int add);
 extern int (*l2tp_input)(struct sk_buff *skb);
 extern int (*pptp_input)(struct sk_buff *skb);
+
+const char *const fastvpn_action_name[] = {
+	"release",
+	"setup"
+};
+
+#define	FAST_VPN_ACTION(x)	(fastvpn_action_name[x])
 
 #define HWADDR_LEN					6
 #define MAX_VPN_TABLE				32
@@ -144,9 +153,9 @@ int vpn_cross(struct sk_buff *skb, int in) {
 	int (*l2tp_rx)(struct sk_buff *skb);
 	int (*pptp_rx)(struct sk_buff *skb);
 	
-	if( !vpn_tbl_cnt ) return 0; /* fast skip pkt */
+	if( !vpn_tbl_cnt ) return FAST_VPN_RES_SKIPPED; /* fast skip pkt */
 	
-	if( in == 1 ) {
+	if( in == FAST_VPN_RECV ) {
 		if( eth_hdr(skb)->h_proto == htons(ETH_P_8021Q) ) {
 			veth = (struct vlan_ethhdr *)(skb_mac_header(skb));
 		} else {
@@ -162,7 +171,7 @@ int vpn_cross(struct sk_buff *skb, int in) {
 				iph = (struct iphdr *)(skb_mac_header(skb) + ETH_HLEN);
 	 			
 	 		if(!(phdr = vpn_find_hdr(iph->saddr)) || (iph->frag_off & htons(IP_MF | IP_OFFSET)))
-	 			return 0; /* frag or unknown source */
+	 			return FAST_VPN_RES_SKIPPED; /* frag or unknown source */
 	 		
 	 		dmac = skb_mac_header(skb);
  			smac = dmac + HWADDR_LEN;
@@ -194,7 +203,7 @@ int vpn_cross(struct sk_buff *skb, int in) {
 				 
 				 if( l2tp_rx(skb) == 1 ) {
 					rcu_read_unlock();
-					return 1;
+					return FAST_VPN_RES_OK;
 				 }
 				 ++matched;
 				 rcu_read_unlock();
@@ -228,7 +237,7 @@ int vpn_cross(struct sk_buff *skb, int in) {
 
 	 			 pptp_rx(skb);
 	 			 rcu_read_unlock();
-	 			 return 1;
+	 			 return FAST_VPN_RES_OK;
 			}
 			if (!matched)
 				rcu_read_unlock();
@@ -238,7 +247,7 @@ int vpn_cross(struct sk_buff *skb, int in) {
 			daddr = iph->daddr;
 	 		
 	 		if( !(phdr = vpn_find_hdr(daddr)) || !phdr->dev ) 
-	 			return 0;
+	 			return FAST_VPN_RES_SKIPPED;
 	 			
 	 		skb->dev = phdr->dev;
 	 		
@@ -259,27 +268,30 @@ int vpn_cross(struct sk_buff *skb, int in) {
  				memcpy(dmac, &phdr->vh, VLAN_ETH_HLEN);
  			}
  			
- 			if( in == 0 ) dev_queue_xmit(skb);
+ 			if( in == FAST_VPN_SEND_SYNC ) dev_queue_xmit(skb);
  			else {
  				skb_queue_tail(&vpn_tx_q, skb);
 				tasklet_schedule(&vpn_tx_task);
  			}
  			
- 			return 1;
+ 			return FAST_VPN_RES_OK;
 		}
 	}
 
-	return 0;
+	return FAST_VPN_RES_SKIPPED;
 }
 
 int vpn_setup(uint32_t sip, int add) {
 	if( !sip || sip == 0xffffffff ) return -1;
 
-	printk("Fast VPN ctrl: %08x, %d\n", sip, add);
+	if( add != FAST_VPN_ACTION_RELEASE )
+		vpn_add_hdr(NULL, sip, NULL, NULL, NULL);
+	else
+		vpn_rem_hdr(sip);
 
-	if( add ) vpn_add_hdr(NULL, sip, NULL, NULL, NULL);
-	else vpn_rem_hdr(sip);
-	
+	printk("Fast VPN ctrl: %s for src " NIPQUAD_FMT "\n",
+		FAST_VPN_ACTION(add), NIPQUAD(sip));
+
 	return 0;
 }
 
