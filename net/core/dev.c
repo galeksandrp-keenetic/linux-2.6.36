@@ -145,7 +145,7 @@
 #include <linux/if_vlan.h>
 #include <linux/qos_type.h>
 #endif
-
+#include <net/fast_vpn.h>
 
 /* Instead of increasing this, you should create a hash table. */
 #define MAX_GRO_SKBS 8
@@ -3637,7 +3637,8 @@ static int __netif_receive_skb(struct sk_buff *skb)
 
 	rcu_read_lock();
 
-	if ((vhook = rcu_dereference(vpn_pthrough)) && vhook(skb, 1) ) {
+	if ((vhook = rcu_dereference(vpn_pthrough)) && 
+		(FAST_VPN_RES_OK == vhook(skb, FAST_VPN_RECV)) ) {
 		ret = NET_RX_SUCCESS;
 		goto out;
 	}

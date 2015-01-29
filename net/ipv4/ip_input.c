@@ -272,6 +272,7 @@ int ip_local_deliver(struct sk_buff *skb)
 		if (ip_defrag(skb, IP_DEFRAG_LOCAL_DELIVER))
 			return 0;
 	}
+	rcu_read_lock();
 	if( skb->protocol == htons(ETH_P_IP) && (iph = ip_hdr(skb)) ) {
 		if( iph->protocol == IPPROTO_UDP &&
 				(udp = (struct udphdr*)((char *)iph + (iph->ihl << 2))) &&
@@ -279,9 +280,11 @@ int ip_local_deliver(struct sk_buff *skb)
 				udp->source == htons(1701) &&
 				(l2tp_rx = rcu_dereference(l2tp_input)) &&
 				l2tp_rx(skb) == 1 ) {
+			rcu_read_unlock();
 			return 0;
 		}
 	}
+	rcu_read_unlock();
 
 
 #if defined(CONFIG_TCSUPPORT_RA_HWNAT) && !defined(CONFIG_TCSUPPORT_MT7510_FE)
