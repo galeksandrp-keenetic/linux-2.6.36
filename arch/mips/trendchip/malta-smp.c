@@ -22,7 +22,7 @@
 #include <linux/smp.h>
 #include <linux/interrupt.h>
 
-#include <asm/mach-ralink/tc3162.h>
+#include <asm/tc3162/tc3162.h>
 
 #ifdef CONFIG_MIPS_MT_SMP
 
