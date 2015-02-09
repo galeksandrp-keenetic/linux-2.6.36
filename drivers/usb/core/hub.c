@@ -1845,37 +1845,8 @@ fail:
 }
 
 /* Implementation Microsoft Compatible ID Feature Descriptors, McMCC, 19112013 */
-static void usb_get_os_str_desc(struct usb_device *udev)
-{
-	/* Read the OS String Descriptor */
-	u8 *os_str_desc = usb_cache_string(udev, 0xEE);
-
-	if(os_str_desc == NULL)
-		return;
-
-	/* Check MS Windows USB feature descriptors, see https://github.com/pbatard/libwdi/wiki/WCID-Devices */
-	if(strncmp(os_str_desc, "MSFT100", 7) == 0)
-	{
-		u8 *data, buf[40];
-		int res = 0;
-		data = buf;
-
-		memset(data, 0, sizeof(buf));
-		/* Compatible ID Feature Descriptor, part 1, 16 bytes, index 4 */
-		res = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0), 0x20, 0xC0, 0, 4,
-			data, 0x10, USB_CTRL_SET_TIMEOUT);
-		if((res < 0) || (data[6] != 0x04))
-			return;
-		memset(data, 0, sizeof(buf));
-		/* Compatible ID Feature Descriptor, part 2, 40 bytes, index 4 */
-		res = usb_control_msg(udev, usb_rcvctrlpipe(udev, 0), 0x20, 0xC0, 0, 4,
-			data, 0x28, USB_CTRL_SET_TIMEOUT);
-		if((res < 0) || ((data[17] != 0x01) && (data[18] == 0x00)))
-			return;
-		printk("Found WCID device %s in %s mode.\n", udev->product, data + 18);
-	}
-	return;
-}
+void (*usb_get_os_str_desc_hook)(struct usb_device *udev) = NULL;
+EXPORT_SYMBOL(usb_get_os_str_desc_hook);
 
 /**
  * usb_enumerate_device - Read device configs/intfs/otg (usbcore-internal)
@@ -1907,13 +1878,15 @@ static int usb_enumerate_device(struct usb_device *udev)
 		udev->serial = kstrdup("n/a (unauthorized)", GFP_KERNEL);
 	}
 	else {
+		void (*usb_get_os_str_descriptor)(struct usb_device *udev);
 		/* read the standard strings and cache them if present */
 		udev->product = usb_cache_string(udev, udev->descriptor.iProduct);
 		udev->manufacturer = usb_cache_string(udev,
 						      udev->descriptor.iManufacturer);
 		udev->serial = usb_cache_string(udev, udev->descriptor.iSerialNumber);
 		/* Get Microsoft Compatible ID Feature Descriptors, McMCC, 19112013 */
-		usb_get_os_str_desc(udev);
+		if((usb_get_os_str_descriptor = rcu_dereference(usb_get_os_str_desc_hook)))
+			usb_get_os_str_descriptor(udev);
 	}
 	err = usb_enumerate_device_otg(udev);
 fail:
@@ -3693,29 +3666,61 @@ static struct usb_driver hub_driver = {
 	.supports_autosuspend =	1,
 };
 
-int usb_hub_init(void)
+int enable_hub_control = 0;
+EXPORT_SYMBOL(enable_hub_control);
+
+int khubd_start(void)
 {
-	if (usb_register(&hub_driver) < 0) {
-		printk(KERN_ERR "%s: can't register hub driver\n",
-			usbcore_name);
-		return -1;
-	}
+	if(!enable_hub_control)
+		return 0;
 
 	khubd_task = kthread_run(hub_thread, NULL, "khubd");
 	if (!IS_ERR(khubd_task))
 		return 0;
 
 	/* Fall through if kernel_thread failed */
+	enable_hub_control = 0;
 	usb_deregister(&hub_driver);
 	printk(KERN_ERR "%s: can't start khubd\n", usbcore_name);
 
 	return -1;
+
+}
+EXPORT_SYMBOL(khubd_start);
+
+void khubd_stop(void)
+{
+	if(!enable_hub_control)
+		return;
+
+	kthread_stop(khubd_task);
+
+	usb_deregister(&hub_driver);
+	enable_hub_control = 0;
+}
+EXPORT_SYMBOL(khubd_stop);
+
+int khubd_init(void)
+{
+	if (usb_register(&hub_driver) < 0) {
+		printk(KERN_ERR "%s: can't register hub driver\n",
+			usbcore_name);
+		return -1;
+	}
+	return 0;
+}
+EXPORT_SYMBOL(khubd_init);
+
+int usb_hub_init(void)
+{
+	if(khubd_init())
+		return -1;
+	return khubd_start();
 }
 
 void usb_hub_cleanup(void)
 {
-	kthread_stop(khubd_task);
-
+	khubd_stop();
 	/*
 	 * Hub resources are freed for us by usb_deregister. It calls
 	 * usb_driver_purge on every device which in turn calls that
@@ -3723,7 +3728,6 @@ void usb_hub_cleanup(void)
 	 * The hub_disconnect function takes care of releasing the
 	 * individual hub resources. -greg
 	 */
-	usb_deregister(&hub_driver);
 } /* usb_hub_cleanup() */
 
 static int descriptors_changed(struct usb_device *udev,

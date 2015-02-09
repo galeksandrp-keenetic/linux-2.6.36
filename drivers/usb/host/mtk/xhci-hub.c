@@ -516,6 +516,11 @@ static void xhci_hub_report_link_state(u32 *status, u32 status_reg)
 	*status |= pls;
 }
 
+/* Implementation USB3-to-USB2 switch, McMCC, 13102014 */
+void (*usb3_to_usb2_set_hook)(struct xhci_hcd *xhci, unsigned short port) = NULL;
+EXPORT_SYMBOL(usb3_to_usb2_set_hook);
+/* End */
+
 int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 		u16 wIndex, char *buf, u16 wLength)
 {
@@ -530,9 +535,14 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	u16 link_state = 0;
 	u16 wake_mask = 0;
 	u16 timeout = 0;
+	void (*usb3_to_usb2_set)(struct xhci_hcd *xhci, unsigned short port);
+
+	if((usb3_to_usb2_set = rcu_dereference(usb3_to_usb2_set_hook)))
+		usb3_to_usb2_set(xhci, wIndex);
 
 	max_ports = xhci_get_ports(hcd, &port_array);
 	bus_state = &xhci->bus_state[hcd_index(hcd)];
+
 
 	spin_lock_irqsave(&xhci->lock, flags);
 	switch (typeReq) {
@@ -782,10 +792,10 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			 * HC will report connect events even before this is set.
 			 * However, khubd will ignore the roothub events until
 			 * the roothub is registered.
-			 */
+			
 			xhci_writel(xhci, temp | PORT_POWER,
 					port_array[wIndex]);
-
+			 */
 			temp = xhci_readl(xhci, port_array[wIndex]);
 			xhci_dbg(xhci, "set port power, actual port %d status  = 0x%x\n", wIndex, temp);
 			break;

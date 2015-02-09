@@ -31,8 +31,9 @@
 #ifndef SQUASHFS_MAGIC
 #define SQUASHFS_MAGIC	0x73717368
 #endif
-#define NDMS_MAGIC    0x736D646E
-#define CONFIG_MAGIC cpu_to_be32(0x2e6e646d)
+#define NDMS_MAGIC	0x736D646E
+#define CONFIG_MAGIC	cpu_to_be32(0x2e6e646d)
+#define CONFIG_MAGIC_V1	cpu_to_be32(0x1f8b0801)
 
 #define KERNEL_MAGIC	be32_to_cpu(0x27051956)
 #define ROOTFS_MAGIC	SQUASHFS_MAGIC
@@ -174,7 +175,7 @@ static int create_mtd_partitions(struct mtd_info *master,
 		master->read(master, offset, sizeof(magic),
 							&len, (uint8_t *)&magic);
 
-		if (magic == CONFIG_MAGIC) {
+		if ((magic == CONFIG_MAGIC) || (magic == CONFIG_MAGIC_V1)) {
 			unsigned char *iobuf;
 			struct erase_info ei;
 			int err;
