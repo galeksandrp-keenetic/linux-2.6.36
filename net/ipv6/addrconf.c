@@ -99,6 +99,7 @@
 
 #define	INFINITY_LIFE_TIME	0xFFFFFFFF
 #define TIME_DELTA(a, b) ((unsigned long)((long)(a) - (long)(b)))
+#define DAD_MIN_SOLICIT_DELAY_MS	2000
 
 #define ADDRCONF_TIMER_FUZZ_MINUS	(HZ > 50 ? HZ/50 : 1)
 #define ADDRCONF_TIMER_FUZZ		(HZ / 4)
@@ -2873,13 +2874,13 @@ out:
  */
 static void addrconf_dad_kick(struct inet6_ifaddr *ifp)
 {
-	unsigned long rand_num;
+	unsigned long rand_num = DAD_MIN_SOLICIT_DELAY_MS;
 	struct inet6_dev *idev = ifp->idev;
 
 	if (ifp->flags & IFA_F_OPTIMISTIC)
 		rand_num = 0;
 	else
-		rand_num = net_random() % (idev->cnf.rtr_solicit_delay ? : 1);
+		rand_num += net_random() % (idev->cnf.rtr_solicit_delay ? : 1);
 
 	ifp->probes = idev->cnf.dad_transmits;
 	addrconf_mod_timer(ifp, AC_DAD, rand_num);
