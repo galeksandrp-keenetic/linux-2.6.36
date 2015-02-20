@@ -14,7 +14,7 @@
 	$(CC) $(CFLAGS) -c $< -o $*.o
 
 obj-y    := reset.o init.o irq.o \
-            printf.o cmdline.o setup.o time.o
+            printf.o cmdline.o setup.o time.o platform.o
 
 ifeq ($(CONFIG_MIPS_MT_SMP),y)
 	obj-y += malta-amon.o
