@@ -239,6 +239,7 @@ struct pci_controller rt2880_controller = {
 	.pci_ops = &rt2880_pci_ops,
 	.mem_resource = &rt2880_res_pci_mem,
 	.io_resource = &rt2880_res_pci_io,
+	.io_map_base = RALINK_PCI_IO_MAP_BASE,
 };
 
 void __inline__ read_config(unsigned long bus, unsigned long dev, unsigned long func,
