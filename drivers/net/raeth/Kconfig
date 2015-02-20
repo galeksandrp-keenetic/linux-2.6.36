@@ -206,6 +206,11 @@ choice
 		bool "Giga_Phy MT7530 (RGMII)"
 endchoice
 
+config P5_RGMII_PHY_MODE_RTL8367_EXT_RGMII_DELAY
+       int "Delay for initing RT8367 ext switch"
+       depends on P5_RGMII_PHY_MODE_RTL8367
+       default 4
+
 config  MAC_TO_GIGAPHY_MODE_ADDR
         hex "GE1 Phy Address"
 	default 0x1F
