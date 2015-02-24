@@ -49,10 +49,21 @@ static void ralink_wdt_enable(unsigned int enable)
 	
 	result = sysRegRead(TMR1CTL);
 	
-	if (enable)
-		result |= (1<<7);
-	else
-		result &= ~(1<<7);
+	if (enable){
+#if defined (CONFIG_MIPS_RT63365)
+	     result |= (1<<25) | (1<<5);
+#else
+             result |= (1<<7);
+#endif
+	}
+	else{
+#if defined (CONFIG_MIPS_RT63365)
+	     result &= ~((1<<25)|(1<<5));
+#else
+	     result &= ~(1<<7);
+#endif
+
+	}
 
 	sysRegWrite(TMR1CTL, result);
 }
