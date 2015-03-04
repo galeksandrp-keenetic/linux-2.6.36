@@ -15,7 +15,11 @@
 #define _FE_WANTED
 
 #include <linux/version.h>
+#if LINUX_VERSION_CODE > KERNEL_VERSION(2,6,32)
 #include <asm/mach-ralink/rt_mmap.h>
+#else
+#include <asm/rt2880/rt_mmap.h>
+#endif
 
 /*
  * DEFINITIONS AND MACROS
