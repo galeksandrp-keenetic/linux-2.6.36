@@ -163,6 +163,9 @@ typedef struct {
 	//vlan header
 	uint16_t vlan_tag;
 	uint16_t vlan1_gap;
+#if !defined (CONFIG_HNAT_V2) && defined (CONFIG_RAETH_HW_VLAN_TX)
+	uint16_t vlan1_gap_pseudo;
+#endif
 	uint16_t vlan1;
 	uint16_t vlan2_gap;
 	uint16_t vlan2;
