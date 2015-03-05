@@ -1246,6 +1246,18 @@ static const struct driver_info dm9620_info = {
 	.unbind     = dm9620_unbind,
 };
 
+static const struct driver_info kplusdsl_info = {
+	.description	= "ZyXEL Keenetic Plus DSL",
+	.flags		= FLAG_ETHER,
+	.bind		= dm9620_bind,
+	.rx_fixup	= dm9620_rx_fixup,
+	.tx_fixup	= dm9620_tx_fixup,
+	.status		= dm9620_status,
+	.link_reset	= dm9620_link_reset,
+	.reset		= dm9620_link_reset,
+	.unbind     = dm9620_unbind,
+};
+
 static const struct usb_device_id products[] = {
 	{
 	 USB_DEVICE(0x07aa, 0x9601),	/* Corega FEther USB-TXC */
@@ -1621,6 +1633,10 @@ static const struct usb_device_id products[] = {
   {
    USB_DEVICE(0x0000, 0x1220),     /* Davicom 9620A CDC, 1220 test mode */
    .driver_info = (unsigned long)&dm9620_info,
+   },
+  {
+   USB_DEVICE(0x0586, 0x3427),     /* ZyXEL Keenetic Plus DSL */
+   .driver_info = (unsigned long)&kplusdsl_info,
    },
 	{},			// END
 };
