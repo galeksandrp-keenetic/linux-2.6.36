@@ -183,8 +183,7 @@ static int create_mtd_partitions(struct mtd_info *master,
 	 */
 	if ((flash_size < 0x800000) || (ndm_parts[PART_STORAGE].size == 0)) {
 		delete = 1;
-		/* XXX: Why PART_MAX? */
-		for (i = PART_STORAGE; i < PART_MAX; i++) {
+		for (i = PART_STORAGE; i < PART_MAX - 1; i++) {
 			ndm_parts[i] = ndm_parts[i + 1];
 		}
 #if defined(CONFIG_RALINK_MT7621)
