@@ -144,9 +144,20 @@ config MTD_NDM_PARTS
 	bool "NDM partitions parser"
 	depends on MTD_PARTITIONS = "y" && MTD = "y"
 
+config MTD_NDM_CONFIG_TRANSITION
+	bool "Partition \"Config\" transition"
+	depends on MTD_NDM_PARTS
+
+config MTD_NDM_CONFIG_TRANSITION_DELTA
+	hex "Delta between new and old partition"
+	default 0x80000 if MTD_NDM_SHRINK_STORAGE
+	default 0x100000
+	depends on MTD_NDM_CONFIG_TRANSITION
+
 config MTD_NDM_SHRINK_STORAGE
 	bool "Shrink NDM storage size to 512k"
 	depends on MTD_NDM_PARTS
+	select MTD_NDM_CONFIG_TRANSITION
 
 config MTD_NDM_STORAGE_SIZE
 	hex "Storage partition size"
