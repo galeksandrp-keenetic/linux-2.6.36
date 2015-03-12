@@ -38,49 +38,75 @@
 #define KERNEL_MAGIC	be32_to_cpu(0x27051956)
 #define ROOTFS_MAGIC	SQUASHFS_MAGIC
 
-struct mtd_partition ndm_parts[] = {
-	{
-		name:			"U-Boot",  		/* mtdblock0 */
+enum {
+	PART_U_BOOT,
+	PART_U_CONFIG,
+	PART_RF_EEPROM,
+	PART_KERNEL,
+	PART_ROOTFS,
+	PART_FIRMWARE,
+	PART_CONFIG,
+	PART_STORAGE,
+	PART_BACKUP,
+	PART_FULL,
+	PART_MAX
+};
+
+struct mtd_partition ndm_parts[PART_MAX] = {
+	[PART_U_BOOT] = {
+		name:			"U-Boot",  	/* mtdblock0 */
 		size:			0,  		/* 3 blocks */
 		offset:			0
-	}, {
+	},
+	[PART_U_CONFIG] = {
 		name:			"U-Config", 	/* mtdblock1 */
-		size:			0x10000,  		/* 1 block */
+		size:			0x10000,  	/* 1 block */
 		offset:			0
-	}, {
+	},
+	[PART_RF_EEPROM] = {
 		name:			"RF-EEPROM", 	/* mtdblock2 */
 		size:			0,
 		offset:			0
-	}, {
-		name:			"Kernel", 		/* mtdblock3 */
+	},
+	[PART_KERNEL] = {
+		name:			"Kernel", 	/* mtdblock3 */
 		size:			0,
 		offset:			0
-	}, {
-		name:			"RootFS", 		/* mtdblock4 */
+	},
+	[PART_ROOTFS] = {
+		name:			"RootFS", 	/* mtdblock4 */
 		size:			0,
 		offset:			0
-	}, {
+	},
+	[PART_FIRMWARE] = {
+		/* kernel and rootfs */
 		name:			"Firmware", 	/* mtdblock5 */
 		size:			0,
 		offset:			0
-	},{
-		name:			"Config", 		/* mtdblock6 */
+	},
+	[PART_CONFIG] = {
+		name:			"Config", 	/* mtdblock6 */
 		size:			0,
 		offset:			0
-	}, {
-		name:			"Storage", 		/* mtdblock7 */
+	},
+	[PART_STORAGE] = {
+		name:			"Storage", 	/* mtdblock7 */
 #ifdef CONFIG_MTD_NDM_SHRINK_STORAGE
 		size:			0x80000,
 #else
 		size:			CONFIG_MTD_NDM_STORAGE_SIZE,
 #endif
 		offset:			0
-	}, {
-		name:			"Backup", 		/* mtdblock8 */
+	},
+	[PART_BACKUP] = {
+		/* kernel, rootfs, config and storage */
+		name:			"Backup", 	/* mtdblock8 */
 		size:			0,
 		offset:			0
-	},{
-		name:			"Full", 		/* mtdblock9 */
+	},
+	[PART_FULL] = {
+		/* full flash */
+		name:			"Full", 	/* mtdblock9 */
 		size:			MTDPART_SIZ_FULL,
 		offset:			0
 	}
@@ -97,109 +123,124 @@ static int create_mtd_partitions(struct mtd_info *master,
 
 	flash_size = master->size;
 
-	printk(KERN_INFO "Current flash size = 0x%x\n",flash_size);
+	printk(KERN_INFO "Current flash size = 0x%x\n", flash_size);
 
 	/* U-Boot */
-	ndm_parts[0].offset = 0;
+	ndm_parts[PART_U_BOOT].offset = 0;
 	if (master->type == MTD_NANDFLASH)
 #if defined(CONFIG_RALINK_MT7621)
-		ndm_parts[0].size = (master->erasesize << 2);
+		ndm_parts[PART_U_BOOT].size = (master->erasesize << 2);
 #else
-		ndm_parts[0].size = (master->erasesize);
+		ndm_parts[PART_U_BOOT].size = (master->erasesize);
 #endif
 	else
-		ndm_parts[0].size = (3*master->erasesize);
+		ndm_parts[PART_U_BOOT].size = (3 * master->erasesize);
 
 	/* U-Config */
-	ndm_parts[1].offset = ndm_parts[0].size;
+	ndm_parts[PART_U_CONFIG].offset = ndm_parts[PART_U_BOOT].size;
 #if defined(CONFIG_RALINK_MT7621)
 	if (master->type == MTD_NANDFLASH)
-		ndm_parts[1].size = (master->erasesize << 2);
+		ndm_parts[PART_U_CONFIG].size = (master->erasesize << 2);
 	else
 #endif
-	ndm_parts[1].size = master->erasesize;
+	ndm_parts[PART_U_CONFIG].size = master->erasesize;
 
 	/* RF-EEPROM */
-	ndm_parts[2].offset = ndm_parts[1].offset + ndm_parts[1].size;
+	ndm_parts[PART_RF_EEPROM].offset = ndm_parts[PART_U_CONFIG].offset +
+					   ndm_parts[PART_U_CONFIG].size;
 
-	for (offset = ndm_parts[1].offset; offset < flash_size;
-		offset += master->erasesize) {
+	/* XXX: Why PART_U_CONFIG? */
+	for (offset = ndm_parts[PART_U_CONFIG].offset; offset < flash_size;
+	     offset += master->erasesize) {
 		
-		master->read(master, offset, sizeof(magic),
-						&len, (uint8_t *)&magic);
+		master->read(master, offset, sizeof(magic), &len,
+		             (uint8_t *) &magic);
 		if (magic == KERNEL_MAGIC){
-			printk(KERN_INFO "Found kernel at offset 0x%x\n",offset);
-			ndm_parts[2].size = offset - ndm_parts[2].offset;
-			ndm_parts[3].offset = offset;	//Kernel offset
-			ndm_parts[5].offset = offset;	//Firmware offset
-			ndm_parts[8].offset = offset;	//Backup offset
+			printk(KERN_INFO "Found kernel at offset 0x%x\n",
+			       offset);
+
+			ndm_parts[PART_RF_EEPROM].size = offset -
+				ndm_parts[PART_RF_EEPROM].offset;
+			ndm_parts[PART_KERNEL].offset = offset;
+			ndm_parts[PART_FIRMWARE].offset = offset;
+			ndm_parts[PART_BACKUP].offset = offset;
 		}
-		if ((le32_to_cpu(magic) == ROOTFS_MAGIC)||
-            (le32_to_cpu(magic) == NDMS_MAGIC)) {
-			printk(KERN_INFO "Found rootfs at offset 0x%x\n",offset);
-			ndm_parts[3].size = offset - ndm_parts[3].offset;
-			ndm_parts[4].offset = offset;
+		if ((le32_to_cpu(magic) == ROOTFS_MAGIC) ||
+		    (le32_to_cpu(magic) == NDMS_MAGIC)) {
+			printk(KERN_INFO "Found rootfs at offset 0x%x\n", offset);
+
+			ndm_parts[PART_KERNEL].size = offset -
+				ndm_parts[PART_KERNEL].offset;
+			ndm_parts[PART_ROOTFS].offset = offset;
 			break;
 		}
 	}
 	
 	/* Backup */
-	ndm_parts[8].size = flash_size - ndm_parts[8].offset;
+	ndm_parts[PART_BACKUP].size = flash_size - ndm_parts[PART_BACKUP].offset;
 
 	/* Delete Storage if flash size less then 8M, or 
 	 * NDM_STORAGE_SIZE set to zero
 	 */
-	if ((flash_size < 0x800000) || (ndm_parts[7].size == 0x0)) {
+	if ((flash_size < 0x800000) || (ndm_parts[PART_STORAGE].size == 0)) {
 		delete = 1;
-		for (i = 7; i < ARRAY_SIZE(ndm_parts); i++){
-			ndm_parts[i] = ndm_parts[i+1];
+		/* XXX: Why PART_MAX? */
+		for (i = PART_STORAGE; i < PART_MAX; i++) {
+			ndm_parts[i] = ndm_parts[i + 1];
 		}
 #if defined(CONFIG_RALINK_MT7621)
 		if (master->type == MTD_NANDFLASH)
-			ndm_parts[6].offset = flash_size - (master->erasesize << 1);
+			ndm_parts[PART_CONFIG].offset = flash_size -
+				(master->erasesize << 1);
 		else
 #endif
-		ndm_parts[6].offset = flash_size - master->erasesize;
+		ndm_parts[PART_CONFIG].offset = flash_size - master->erasesize;
 	} else {
-		ndm_parts[7].offset = flash_size - ndm_parts[7].size;
+		ndm_parts[PART_STORAGE].offset = flash_size -
+			ndm_parts[PART_STORAGE].size;
 #if defined(CONFIG_RALINK_MT7621)
 		if (master->type == MTD_NANDFLASH)
-			ndm_parts[6].offset = ndm_parts[7].offset - (master->erasesize << 1);
+			ndm_parts[PART_CONFIG].offset = ndm_parts[PART_STORAGE].offset -
+				(master->erasesize << 1);
 		else
 #endif
-		ndm_parts[6].offset = ndm_parts[7].offset - master->erasesize;
+		ndm_parts[PART_CONFIG].offset = ndm_parts[PART_STORAGE].offset -
+						master->erasesize;
 
 #ifdef CONFIG_MTD_NDM_SHRINK_STORAGE
 
-		offset = ndm_parts[6].offset - 0x80000;
-		master->read(master, offset, sizeof(magic),
-							&len, (uint8_t *)&magic);
+		offset = ndm_parts[PART_CONFIG].offset - 0x80000;
+		master->read(master, offset, sizeof(magic), &len,
+			     (uint8_t *) &magic);
 
 		if ((magic == CONFIG_MAGIC) || (magic == CONFIG_MAGIC_V1)) {
 			unsigned char *iobuf;
 			struct erase_info ei;
 			int err;
 
-			printk(KERN_INFO "found config in old partition at 0x%012llx, move it\n", (unsigned long long)offset);
+			printk(KERN_INFO "found config in old partition at 0x%012llx, move it\n",
+			       (unsigned long long) offset);
 			iobuf = kmalloc(master->erasesize, GFP_KERNEL);
 			master->read(master, offset, master->erasesize,
 							&len, iobuf);
 
 			if (len != master->erasesize) {
-					printk(KERN_ERR "read failed at 0x%012llx\n", (unsigned long long)offset);
+				printk(KERN_ERR "read failed at 0x%012llx\n",
+				       (unsigned long long) offset);
 			} else {
 
 				memset(&ei, 0, sizeof(struct erase_info));
 				ei.mtd  = master;
-				ei.addr = ndm_parts[6].offset;
+				ei.addr = ndm_parts[PART_CONFIG].offset;
 				ei.len  = master->erasesize;
 				err = master->erase(master, &ei);
 
-				err = master->write(master, ndm_parts[6].offset, master->erasesize,
-							&len, iobuf);
+				err = master->write(master, ndm_parts[PART_CONFIG].offset,
+						    master->erasesize, &len, iobuf);
 
 				if (!err && len != master->erasesize) {
-					printk(KERN_ERR "write failed at 0x%012llx\n", (unsigned long long)ndm_parts[6].offset);
+					printk(KERN_ERR "write failed at 0x%012llx\n",
+					       (unsigned long long) ndm_parts[PART_CONFIG].offset);
 				} else {
 					memset(&ei, 0, sizeof(struct erase_info));
 					ei.mtd  = master;
@@ -209,7 +250,8 @@ static int create_mtd_partitions(struct mtd_info *master,
 					err = master->erase(master, &ei);
 
 					if ((err) || (ei.state == MTD_ERASE_FAILED)) {
-						printk(KERN_ERR "erase failed at 0x%012llx\n", (unsigned long long)offset);
+						printk(KERN_ERR "erase failed at 0x%012llx\n",
+						       (unsigned long long) offset);
 					}
 				}
 			}
@@ -220,19 +262,21 @@ static int create_mtd_partitions(struct mtd_info *master,
 	/* Config */
 #if defined(CONFIG_RALINK_MT7621)
 	if (master->type == MTD_NANDFLASH)
-		ndm_parts[6].size = (master->erasesize << 1);
+		ndm_parts[PART_CONFIG].size = (master->erasesize << 1);
 	else
 #endif
-	ndm_parts[6].size = master->erasesize;
+	ndm_parts[PART_CONFIG].size = master->erasesize;
 
 	/* Firmware */
-	ndm_parts[5].size = ndm_parts[6].offset - ndm_parts[5].offset;
+	ndm_parts[PART_FIRMWARE].size = ndm_parts[PART_CONFIG].offset -
+					ndm_parts[PART_FIRMWARE].offset;
 
 	/* RootFS */
-	ndm_parts[4].size = ndm_parts[6].offset - ndm_parts[4].offset;
+	ndm_parts[PART_ROOTFS].size = ndm_parts[PART_CONFIG].offset -
+				      ndm_parts[PART_ROOTFS].offset;
 
 	*pparts = ndm_parts;
-	return (ARRAY_SIZE(ndm_parts) - delete);
+	return (PART_MAX - delete);
 }
 
 static struct mtd_part_parser ndm_parser = {
