@@ -149,8 +149,7 @@ static int create_mtd_partitions(struct mtd_info *master,
 	ndm_parts[PART_RF_EEPROM].offset = ndm_parts[PART_U_CONFIG].offset +
 					   ndm_parts[PART_U_CONFIG].size;
 
-	/* XXX: Why PART_U_CONFIG? */
-	for (offset = ndm_parts[PART_U_CONFIG].offset; offset < flash_size;
+	for (offset = ndm_parts[PART_RF_EEPROM].offset; offset < flash_size;
 	     offset += master->erasesize) {
 		
 		master->read(master, offset, sizeof(magic), &len,
