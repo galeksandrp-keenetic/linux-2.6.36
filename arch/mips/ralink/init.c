@@ -60,72 +60,6 @@ extern unsigned long surfboard_sysclk;
 //extern unsigned long mips_machgroup;
 u32 mips_cpu_feq;
 
-/* Environment variable */
-typedef struct {
-	char *name;
-	char *val;
-} t_env_var;
-
-int prom_argc;
-int *_prom_argv, *_prom_envp;
-
-
-/*
- * YAMON (32-bit PROM) pass arguments and environment as 32-bit pointer.
- * This macro take care of sign extension, if running in 64-bit mode.
- */
-#define prom_envp(index) ((char *)(((int *)(int)_prom_envp)[(index)]))
-
-int init_debug = 0;
-
-char *prom_getenv(char *envname)
-{
-	/*
-	 * Return a pointer to the given environment variable.
-	 * In 64-bit mode: we're using 64-bit pointers, but all pointers
-	 * in the PROM structures are only 32-bit, so we need some
-	 * workarounds, if we are running in 64-bit mode.
-	 */
-	int i, index=0;
-	// Dennis Lee +
-	return NULL;
-	// 
-	i = strlen(envname);
-
-	while (prom_envp(index)) {
-		if(strncmp(envname, prom_envp(index), i) == 0) {
-			return(prom_envp(index+1));
-		}
-		index += 2;
-	}
-
-	return NULL;
-}
-
-static inline unsigned char str2hexnum(unsigned char c)
-{
-	if (c >= '0' && c <= '9')
-		return c - '0';
-	if (c >= 'a' && c <= 'f')
-		return c - 'a' + 10;
-	return 0; /* foo */
-}
-
-static inline void str2eaddr(unsigned char *ea, unsigned char *str)
-{
-	int i;
-
-	for (i = 0; i < 6; i++) {
-		unsigned char num;
-
-		if((*str == '.') || (*str == ':'))
-			str++;
-		num = str2hexnum(*str++) << 4;
-		num |= (str2hexnum(*str++));
-		ea[i] = num;
-	}
-}
-
 #if defined(CONFIG_RALINK_MT7620) || defined(CONFIG_RALINK_MT7628) 
 #define RALINK_SYSTEM_CONTROL_BASE	0xB0000000
 #define REVID				*(unsigned int *)(RALINK_SYSTEM_CONTROL_BASE + 0x0c)
@@ -257,28 +191,6 @@ static void prom_usbinit(void)
 
 #endif
 
-}
-
-int get_ethernet_addr(char *ethernet_addr)
-{
-        char *ethaddr_str;
-
-        ethaddr_str = prom_getenv("ethaddr");
-	if (!ethaddr_str) {
-	        printk(KERN_ERR "ethaddr not set in boot prom\n");
-		return -1;
-	}
-	str2eaddr(ethernet_addr, ethaddr_str);
-
-	if (init_debug > 1) {
-	        int i;
-		printk(KERN_INFO "get_ethernet_addr: ");
-	        for (i=0; i<5; i++)
-		        printk(KERN_INFO "%02x:", (unsigned char)*(ethernet_addr+i));
-		printk(KERN_INFO "%02x\n", *(ethernet_addr+i));
-	}
-
-	return 0;
 }
 
 static void prom_cpu_id_name(void)
@@ -730,6 +642,14 @@ int serial_init(unsigned long wBaud)
 
         return (0);
 }
+
+#define parse_option(res, option, p)				\
+do {									\
+	if (strncmp(option, (char *)p, strlen(option)) == 0)		\
+			strict_strtol((char *)p + strlen(option"="),	\
+					10, &res);			\
+} while (0)
+
 __init void prom_init(void)
 {
 	//mips_machgroup = MACH_GROUP_RT2880;
@@ -737,12 +657,11 @@ __init void prom_init(void)
 #if defined (CONFIG_IRQ_GIC)
 	int result __maybe_unused;
 #endif
+	int *_prom_envp;
+	long l;
+	unsigned long memsize = 0;
 
-#ifdef CONFIG_UBOOT_CMDLINE
-	prom_argc = (int)fw_arg0;
-	_prom_argv = (int *)fw_arg1;
 	_prom_envp = (int *)fw_arg2;
-#endif
 
 	prom_init_cmdline();
 	prom_cpu_id_name();
@@ -753,7 +672,19 @@ __init void prom_init(void)
 	serial_init(57600);
 
 	prom_init_serial_port();  /* Needed for Serial Console */
-	prom_meminit();
+
+	l = (long)*_prom_envp;
+	while (l != 0) {
+		parse_option(memsize, "memsize", l);
+		if (memsize)
+			break;
+		_prom_envp++;
+		l = (long)*_prom_envp;
+	}
+
+	printk(KERN_INFO "%ldM RAM Detected!\n",memsize);
+	add_memory_region(0, memsize << 20, BOOT_MEM_RAM);
+
 	prom_usbinit();		/* USB power saving*/
 	prom_pcieinit();	/* PCIe power saving*/
 	prom_setup_printf(prom_get_ttysnum());
@@ -783,3 +714,6 @@ __init void prom_init(void)
 #endif // CONFIG_IRQ_GIC //
 }
 
+void __init prom_free_prom_memory(void)
+{
+}
