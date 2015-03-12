@@ -241,8 +241,7 @@ static int create_mtd_partitions(struct mtd_info *master,
 		}
 #if defined(CONFIG_RALINK_MT7621)
 		if (master->type == MTD_NANDFLASH)
-			ndm_parts[PART_CONFIG].offset = flash_size -
-				(master->erasesize << 1);
+			offset = flash_size - (master->erasesize << 1);
 		else
 #endif
 		offset = flash_size - master->erasesize;
@@ -251,8 +250,8 @@ static int create_mtd_partitions(struct mtd_info *master,
 			ndm_parts[PART_STORAGE].size;
 #if defined(CONFIG_RALINK_MT7621)
 		if (master->type == MTD_NANDFLASH)
-			ndm_parts[PART_CONFIG].offset = ndm_parts[PART_STORAGE].offset -
-				(master->erasesize << 1);
+			offset = ndm_parts[PART_STORAGE].offset -
+				 (master->erasesize << 1);
 		else
 #endif
 		offset = ndm_parts[PART_STORAGE].offset - master->erasesize;
