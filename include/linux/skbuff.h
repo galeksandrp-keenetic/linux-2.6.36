@@ -1574,32 +1574,10 @@ static inline int pskb_network_may_pull(struct sk_buff *skb, unsigned int len)
  * get_rps_cpus() for example only access one 64 bytes aligned block :
  * NET_IP_ALIGN(2) + ethernet_header(14) + IP_header(20/40) + ports(8)
  */
-#ifdef CONFIG_RALINK_SOC
 
-#ifndef NET_SKB_PAD
-#if defined (CONFIG_PPPOPPTP) || defined (CONFIG_PPPOL2TP)
-#define NET_SKB_PAD		96
-#define NET_SKB_PAD_ORIG	max(32, L1_CACHE_BYTES)
-#else
-#define NET_SKB_PAD		max(32, L1_CACHE_BYTES)
-#define NET_SKB_PAD_ORIG	NET_SKB_PAD
-#endif
-#endif
+#define NET_SKB_PAD		max(48, L1_CACHE_BYTES)
+#define NET_SKB_PAD_ORIG			NET_SKB_PAD
 
-#elif defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-
-#ifndef NET_SKB_PAD
-#define NET_SKB_PAD		32
-#else
-#define NET_SKB_PAD		16
-#endif
-#define NET_SKB_PAD_ORIG	NET_SKB_PAD
-#else
-
-#define NET_SKB_PAD	max(32, L1_CACHE_BYTES)
-#define NET_SKB_PAD_ORIG	NET_SKB_PAD
-
-#endif
 
 extern int ___pskb_trim(struct sk_buff *skb, unsigned int len);
 
