@@ -118,6 +118,9 @@ int (*fast_nat_bind_hook_func)(struct nf_conn *ct,
 EXPORT_SYMBOL(fast_nat_bind_hook_func);
 #endif
 
+extern void (*prebind_from_fastnat)(struct sk_buff * skb,
+	u32 orig_saddr, u16 orig_sport);
+
 static u_int32_t __hash_conntrack(const struct nf_conntrack_tuple *tuple,
 				  u16 zone, unsigned int size, unsigned int rnd)
 {
@@ -1043,6 +1046,7 @@ resolve_normal_ct(struct net *net, struct nf_conn *tmpl,
 #endif
 	return ct;
 }
+
 #ifdef CONFIG_MIPS_TC3262
 __IMEM
 #endif
@@ -1059,6 +1063,8 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 	u_int8_t protonum;
 	int set_reply = 0;
 	int ret;
+	void (*swnat_prebind)(struct sk_buff * skb,
+		u32 orig_saddr, u16 orig_sport) = NULL;
 
 	struct nf_conntrack_helper *helper;
 	int is_helper = 0;
@@ -1176,7 +1182,32 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 				t1->dst.u.all == t2->src.u.all &&
 				t1->src.u.all == t2->dst.u.all)) {
 				if (likely(NULL != rcu_dereference(fast_nat_hit_hook_func))) {
+					u32 fnat_mask = 0x7fffffff;
+					u32 fnat_mark = 0x80000000;
+					u32 orig_src;
+					u16 orig_port = 0;
+					struct iphdr *iph = (void *)skb->data;
+					struct udphdr * udph = NULL;
+					struct tcphdr * tcph = NULL;
+
+					/* Set mark for further binds */
+					skb->mark = (skb->mark & ~fnat_mask) ^ fnat_mark;
+					orig_src = iph->saddr;
+					if (protonum == IPPROTO_TCP) {
+						tcph = (void *)(skb->data + iph->ihl * 4);
+						orig_port = tcph->source;
+					}
+					if (protonum == IPPROTO_UDP) {
+						udph = (void *)(skb->data + iph->ihl * 4);
+						orig_port = udph->source;
+					}
 					ret = fast_nat_bind_hook(ct, ctinfo, skb, l3proto, l4proto);
+
+					rcu_read_lock();
+					if (NULL != (swnat_prebind = rcu_dereference(prebind_from_fastnat))) {
+						swnat_prebind(skb, orig_src ,orig_port);
+					}
+					rcu_read_unlock();
 				} else {
 					printk(KERN_WARNING "Not allowed to do bind_hook without hit_hook");
 				}

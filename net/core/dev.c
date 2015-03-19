@@ -3548,6 +3548,28 @@ EXPORT_SYMBOL(l2tp_input);
 int (*pptp_input)(struct sk_buff *skb) = NULL;
 EXPORT_SYMBOL(pptp_input);
 
+
+int (*go_swnat)(struct sk_buff * skb,
+	struct net_device ** snd_dev,
+	struct sk_buff ** snd_skb) = NULL;
+EXPORT_SYMBOL(go_swnat);
+
+void (*prebind_from_fastnat)(struct sk_buff * skb,
+	u32 orig_saddr, u16 orig_sport) = NULL;
+EXPORT_SYMBOL(prebind_from_fastnat);
+
+void (*prebind_from_l2tptx)(struct sk_buff * skb,
+	u16 tid, u16 sid, u32 saddr, u32 daddr, u16 sport, u16 dport) = NULL;
+EXPORT_SYMBOL(prebind_from_l2tptx);
+
+void (*prebind_from_pptptx)(struct sk_buff * skb,
+	struct iphdr * iph_int, struct sock *sock, u32 saddr, u32 daddr) = NULL;
+EXPORT_SYMBOL(prebind_from_pptptx);
+
+void (*prebind_from_raeth)(struct sk_buff * skb) = NULL;
+EXPORT_SYMBOL(prebind_from_raeth);
+
+
 static int __netif_receive_skb(struct sk_buff *skb)
 {
 	struct packet_type *ptype, *pt_prev;

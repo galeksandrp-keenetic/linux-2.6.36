@@ -249,6 +249,7 @@ struct ppp_net {
 
 /* Prototypes. */
 void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb);
+void ppp_stat_add_tx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes);
 static int ppp_unattached_ioctl(struct net *net, struct ppp_file *pf,
 			struct file *file, unsigned int cmd, unsigned long arg);
 static void ppp_xmit_process(struct ppp *ppp);
@@ -2620,6 +2621,14 @@ void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb) {
 	pch->ppp->stats64.rx_bytes += skb->len;
 	skb->dev->last_rx = jiffies;
 }
+
+void ppp_stat_add_tx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes) {
+	struct channel *pch = chan->ppp;
+
+	if (pch == 0 || pch->ppp == 0 ) return;
+	pch->ppp->stats64.tx_packets += add_pkt;
+	pch->ppp->stats64.tx_bytes += add_bytes;
+}
 /*
  * Stuff for handling the lists of ppp units and channels
  * and for initialization.
@@ -3024,6 +3033,7 @@ EXPORT_SYMBOL(ppp_unit_number);
 EXPORT_SYMBOL(ppp_dev_name);
 EXPORT_SYMBOL(ppp_input);
 EXPORT_SYMBOL(ppp_stat_add);
+EXPORT_SYMBOL(ppp_stat_add_tx);
 EXPORT_SYMBOL(ppp_input_error);
 EXPORT_SYMBOL(ppp_output_wakeup);
 EXPORT_SYMBOL(ppp_register_compressor);
