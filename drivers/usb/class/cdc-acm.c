@@ -1349,8 +1349,19 @@ static void acm_disconnect(struct usb_interface *intf)
 	acm->dev = NULL;
 	usb_set_intfdata(acm->control, NULL);
 	usb_set_intfdata(acm->data, NULL);
+	mutex_unlock(&open_mutex);
 
+	tty = tty_port_tty_get(&acm->port);
+	if (tty) {
+		tty_hangup(tty);
+		tty_kref_put(tty);
+	}
 	stop_data_traffic(acm);
+
+	/* Unregister tty device first to guarantee it happen before
+	 * unregistering the parent device as required by USB stack.
+	 * [AFom] NDM Systems, 2015 */
+	acm_tty_unregister(acm);
 
 	acm_write_buffers_free(acm);
 	usb_free_coherent(usb_dev, acm->ctrlsize, acm->ctrl_buffer,
@@ -1360,19 +1371,6 @@ static void acm_disconnect(struct usb_interface *intf)
 	if (!acm->combined_interfaces)
 		usb_driver_release_interface(&acm_driver, intf == acm->control ?
 					acm->data : acm->control);
-
-	if (acm->port.count == 0) {
-		acm_tty_unregister(acm);
-		mutex_unlock(&open_mutex);
-		return;
-	}
-
-	mutex_unlock(&open_mutex);
-	tty = tty_port_tty_get(&acm->port);
-	if (tty) {
-		tty_hangup(tty);
-		tty_kref_put(tty);
-	}
 }
 
 #ifdef CONFIG_PM
