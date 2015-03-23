@@ -3457,9 +3457,7 @@ int (*pptp_input)(struct sk_buff *skb) = NULL;
 EXPORT_SYMBOL(pptp_input);
 
 
-int (*go_swnat)(struct sk_buff * skb,
-	struct net_device ** snd_dev,
-	struct sk_buff ** snd_skb) = NULL;
+int (*go_swnat)(struct sk_buff * skb) = NULL;
 EXPORT_SYMBOL(go_swnat);
 
 void (*prebind_from_fastnat)(struct sk_buff * skb,
