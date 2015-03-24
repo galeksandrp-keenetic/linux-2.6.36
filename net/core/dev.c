@@ -3567,6 +3567,10 @@ EXPORT_SYMBOL(prebind_from_pptptx);
 void (*prebind_from_raeth)(struct sk_buff * skb) = NULL;
 EXPORT_SYMBOL(prebind_from_raeth);
 
+void (*swnat_add_stats_l2tp)(u32 saddr, u32 daddr, u16 sport, u16 dport,
+	u32 sent_bytes, u32 sent_packets, u32 recv_bytes, u32 recv_packets) = NULL;
+EXPORT_SYMBOL(swnat_add_stats_l2tp);
+
 
 static int __netif_receive_skb(struct sk_buff *skb)
 {
