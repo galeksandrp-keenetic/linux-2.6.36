@@ -35,7 +35,7 @@ choice
 	config FIRST_IF_EEPROM_EFUSE
 	bool "EFUSE"
 	        
-	config FIRST_IF_EERPROM_FLASH
+	config FIRST_IF_EEPROM_FLASH
 	bool "FLASH"
 endchoice
 	
@@ -116,7 +116,7 @@ choice
 	config SECOND_IF_EEPROM_EFUSE
 	bool "EFUSE"
 	        
-	config SECOND_IF_EERPROM_FLASH
+	config SECOND_IF_EEPROM_FLASH
 	bool "FLASH"
 endchoice
 
