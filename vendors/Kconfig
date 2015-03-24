@@ -6,3 +6,5 @@ source "vendors/Kconfig.ralink"
 source "vendors/Kconfig.ndms"
 
 source "vendors/Kconfig.atel"
+
+source "vendors/Kconfig.wifi"
