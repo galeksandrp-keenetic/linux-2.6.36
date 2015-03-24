@@ -379,20 +379,5 @@ config RTDEV
 	bool
 	default y if WIFI_DRIVER && !SECOND_IF_NONE || RTDEV_MII
 	default y if RTDEV_PLC
-
-#######
-# NAT
-#######
-choice
-prompt "Ralink NAT Type"
-	
-config  RA_NAT_NONE
-bool "None"
-config  RA_NAT_HW
-bool "Hardware"
-depends on !RALINK_RT5350
-endchoice
-
-
 endmenu
 
