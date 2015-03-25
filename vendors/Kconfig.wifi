@@ -164,7 +164,7 @@ config RT_SECOND_CARD_EEPROM
         depends on ! SECOND_IF_NONE
         default "prom" if SECOND_IF_EEPROM_PROM
         default "efuse" if SECOND_IF_EEPROM_EFUSE
-        default "flash" if SECOND_IF_EERPROM_FLASH
+        default "flash" if SECOND_IF_EEPROM_FLASH
 
 config MULTI_INF_SUPPORT
         bool
