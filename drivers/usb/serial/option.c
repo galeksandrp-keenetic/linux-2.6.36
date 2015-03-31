@@ -1057,6 +1057,8 @@ static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(0x20a6, 0x1106) }, /*TE W130*/
 	{ USB_DEVICE(0x1bbb, 0x022c) }, /*Alcatel beeline X602D*/
 	{ USB_DEVICE(0x1c9e, 0x9b01) },/*Longcheer LU1107*/
+	{ USB_DEVICE(0x0586, 0x3443) },/*ZyXel WAH1604*/
+	{ USB_DEVICE(0x15eb , 0x0001) },/*CDMA-450*/
 	{ } /* Terminating entry */
 };
 MODULE_DEVICE_TABLE(usb, option_ids);
