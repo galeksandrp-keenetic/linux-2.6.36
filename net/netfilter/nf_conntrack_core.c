@@ -1207,7 +1207,8 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 					ret = fast_nat_bind_hook(ct, ctinfo, skb, l3proto, l4proto);
 
 					rcu_read_lock();
-					if (NULL != (swnat_prebind = rcu_dereference(prebind_from_fastnat))) {
+					if ((skb->protocol == htons(ETH_P_8021Q)) && 
+					(NULL != (swnat_prebind = rcu_dereference(prebind_from_fastnat)))) {
 						swnat_prebind(skb, orig_src ,orig_port);
 					}
 					rcu_read_unlock();
