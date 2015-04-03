@@ -65,6 +65,11 @@ config DELAYED_TCP_ACK_SUPPORT
         depends on RLT_AP_SUPPORT
         default n
 
+config MCAST_RATE_SPECIFIC
+	bool "User Specific Tx Rate of MCAST Packet"
+	depends on RLT_AP_SUPPORT
+	default n
+
 #config MESH_SUPPORT
 #       bool "MESH Support"
 #       depends on RLT_AP_SUPPORT
@@ -79,10 +84,6 @@ config DELAYED_TCP_ACK_SUPPORT
 
 #config RT2860V2_SNMP
 #	bool "Net-SNMP Support"
-#	depends on RLT_AP_SUPPORT
-
-#config MCAST_RATE_SPECIFIC
-#	bool "User specific tx rate of mcast pkt"
 #	depends on RLT_AP_SUPPORT
 
 #config EXT_BUILD_CHANNEL_LIST
