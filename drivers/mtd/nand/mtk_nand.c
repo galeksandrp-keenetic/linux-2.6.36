@@ -4086,7 +4086,7 @@ static int read_fact_bbt(struct mtd_info *mtd, unsigned int page)
 		}
 		if (mtk_nand_exec_read_page(mtd, page, mtd->writesize, chip->buffers->databuf, chip->oob_poi))
 		{
-			printk("Signature matched and data read!\n");
+			printk(KERN_INFO "Signature matched and data read!\n");
 			memcpy(fact_bbt, chip->buffers->databuf, (bbt_size <= mtd->writesize)? bbt_size:mtd->writesize);
 			return 0;
 		}
@@ -4115,7 +4115,7 @@ static int load_fact_bbt(struct mtd_info *mtd)
 	{
 		if (read_fact_bbt(mtd, i << (chip->phys_erase_shift - chip->page_shift)) == 0)
 		{
-			printk("load_fact_bbt success %d\n", i);
+			printk(KERN_INFO "load_fact_bbt success %d\n", i);
 			return 0;
 		}
 
@@ -4300,7 +4300,7 @@ int mtk_nand_probe()
     ext_id3 = nand_chip->read_byte(mtd);
     ext_id = ext_id1 << 16 | ext_id2 << 8 | ext_id3;
     id = dev_id | (manu_id << 8);
-	printk("NAND ID [%02X %02X %02X %02X %02X, %08x]\n",manu_id, dev_id,ext_id1,\
+	printk(KERN_INFO "NAND ID [%02X %02X %02X %02X %02X, %08x]\n",manu_id, dev_id,ext_id1,\
 		ext_id2,ext_id3,ext_id);
     if (!get_device_info(id, ext_id, &devinfo))
 
@@ -4476,13 +4476,16 @@ int mtk_nand_probe()
 		{
 			nand_chip->bbt[i] |= fact_bbt[i];
 		}
-		//printk("\n");
-		for (i = 0; i < 0x100; i++)
-		{
-			printk("%02x ", nand_chip->bbt[i]);
-			if (!((i+1) & 0x1f))
-				printk("\n");
-		}
+
+		print_hex_dump(KERN_INFO, "bbt: ", DUMP_PREFIX_OFFSET,
+					   16, 1, nand_chip->bbt, 0x100, 0);
+//		printk(KERN_INFO "\n");
+//		for (i = 0; i < 0x100; i++)
+//		{
+//			printk("%02x ", nand_chip->bbt[i]);
+//			if (!((i+1) & 0x1f))
+//				printk(KERN_INFO "\n");
+//		}
 	}
 #endif
 
@@ -5116,7 +5119,7 @@ static int __init mtk_nand_init(void)
     entry->read_proc = mtk_nand_proc_read;
     entry->write_proc = mtk_nand_proc_write;
 
-    printk("MediaTek Nand driver init, version %s\n", VERSION);
+    printk(KERN_INFO "MediaTek Nand driver init, version %s\n", VERSION);
 
     return platform_driver_register(&mtk_nand_driver);
 }

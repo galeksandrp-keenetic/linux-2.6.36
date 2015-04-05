@@ -1287,7 +1287,8 @@ static void __cpuinit setup_scache(void)
 #ifdef CONFIG_MIPS_CPU_SCACHE
 			if (mips_sc_init ()) {
 				scache_size = c->scache.ways * c->scache.sets * c->scache.linesz;
-				printk("MIPS secondary cache %ldkB, %s, linesize %d bytes.\n",
+				printk(KERN_INFO
+				       "MIPS secondary cache %ldkB, %s, linesize %d bytes.\n",
 				       scache_size >> 10,
 				       way_string[c->scache.ways], c->scache.linesz);
 			}

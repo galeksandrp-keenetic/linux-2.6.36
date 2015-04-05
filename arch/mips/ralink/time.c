@@ -304,7 +304,7 @@ static int udelay_recal(void)
 		if (jiffies != ticks)   /* longer than 1 tick */
 			lpj &= ~loopbit;
 	}
-	printk("%d CPUs re-calibrate udelay(lpj = %d)\n", NR_CPUS, lpj);
+	printk(KERN_INFO "%d CPUs re-calibrate udelay(lpj = %d)\n", NR_CPUS, lpj);
 
 	for(i=0; i< NR_CPUS; i++)
 		cpu_data[i].udelay_val = lpj;

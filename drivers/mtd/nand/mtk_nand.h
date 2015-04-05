@@ -403,7 +403,7 @@ struct nand_ecclayout {
 #define MSG(evt, fmt, args...) \
 do {	\
 	if ((DBG_EVT_##evt) & DBG_EVT_MASK) { \
-		printk(fmt, ##args); \
+		printk(KERN_INFO fmt, ##args); \
 	} \
 } while(0)
 

@@ -152,7 +152,7 @@ int __init gcmp_probe(unsigned long addr, unsigned long size)
         gcmp_present = (GCMPGCB(GCMPB) & GCMP_GCB_GCMPB_GCMPBASE_MSK) == GCMP_BASE_ADDR;
 
         if (gcmp_present)
-                printk("GCMP present\n");
+                printk(KERN_INFO "GCMP present\n");
 
         return gcmp_present;
 

@@ -634,8 +634,8 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
   	write_config(0, 1, 0, PCI_BASE_ADDRESS_0, MEMORY_BASE);
   	read_config(0, 1, 0, PCI_BASE_ADDRESS_0, (unsigned long *)&val);
 	//write_config(0, 1, 0, 0x1c, 0x00000101);
- 	printk("BAR0 at slot 1 = %x\n", val);
- 	printk("bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
+ 	printk(KERN_INFO "BAR0 at slot 1 = %x\n", val);
+ 	printk(KERN_INFO "bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
 #if 0
    	res = &dev->resource[0];
     	res->start = MEMORY_BASE;
@@ -688,8 +688,8 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
   	write_config(0, 0, 0, PCI_BASE_ADDRESS_0, MEMORY_BASE);
   	read_config(0, 0, 0, PCI_BASE_ADDRESS_0, (unsigned long *)&val);
 	//write_config(0, 0, 0, 0x1c, 0x00000101);
- 	printk("BAR0 at slot 0 = %x\n", val);
- 	printk("bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
+ 	printk(KERN_INFO "BAR0 at slot 0 = %x\n", val);
+ 	printk(KERN_INFO "bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
 #if 0
    	res = &dev->resource[0];
     	res->start = MEMORY_BASE;
@@ -728,8 +728,8 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
   	write_config(0, 0, 0, PCI_BASE_ADDRESS_0, MEMORY_BASE);
   	read_config(0, 0, 0, PCI_BASE_ADDRESS_0, (unsigned long *)&val);
 	//write_config(0, 0, 0, 0x1c, 0x00000101);
- 	printk("BAR0 at slot 0 = %x\n", val);
- 	printk("bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
+ 	printk(KERN_INFO "BAR0 at slot 0 = %x\n", val);
+ 	printk(KERN_INFO "bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
 #if 0
    	res = &dev->resource[0];
     	res->start = MEMORY_BASE;
@@ -745,8 +745,8 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
   	write_config(0, 1, 0, PCI_BASE_ADDRESS_0, MEMORY_BASE);
   	read_config(0, 1, 0, PCI_BASE_ADDRESS_0, (unsigned long *)&val);
 	//write_config(0, 1, 0, 0x1c, 0x00000101);
- 	printk("BAR0 at slot 1 = %x\n", val);
- 	printk("bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
+ 	printk(KERN_INFO "BAR0 at slot 1 = %x\n", val);
+ 	printk(KERN_INFO "bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
 #if 0
    	res = &dev->resource[0];
     	res->start = MEMORY_BASE;
@@ -776,7 +776,7 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	default:
 		irq = RALINK_INT_PCIE0;
 	}
- 	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
+ 	printk(KERN_INFO "bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
 #if 0
 	for(i=0;i<16;i++){
 	read_config(1, 0, 0, i<<2, &val);
@@ -792,7 +792,7 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	default:
 		irq = RALINK_INT_PCIE1;
 	}
- 	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
+ 	printk(KERN_INFO "bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
   }else if((dev->bus->number ==2) && (slot == 0x1)){
 	switch (pcie_link_status) {
 	case 5:
@@ -802,16 +802,16 @@ int __init pcibios_map_irq(struct pci_dev *dev, u8 slot, u8 pin)
 	default:
 		irq = RALINK_INT_PCIE1;
 	}
- 	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
+ 	printk(KERN_INFO "bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
   }else if((dev->bus->number ==3) && (slot == 0x0)){
 	irq = RALINK_INT_PCIE2;
-	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
+	printk(KERN_INFO "bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
   }else if((dev->bus->number ==3) && (slot == 0x1)){
 	irq = RALINK_INT_PCIE2;
-	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
+	printk(KERN_INFO "bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
   }else if((dev->bus->number ==3) && (slot == 0x2)){
 	irq = RALINK_INT_PCIE2;
-	printk("bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
+	printk(KERN_INFO "bus=0x%x, slot = 0x%x, irq=0x%x\n",dev->bus->number, slot, irq);
   }else{
  	printk("bus=0x%x, slot = 0x%x\n",dev->bus->number, slot);
   	return 0;
@@ -933,7 +933,7 @@ void set_phy_for_ssc(void)
 	set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x100),  5, 1, 0x00);	// rg_pe1_phy_en                   //Port 1 disable
 	if(reg <= 5 && reg >= 3) { 	// 40MHz Xtal
 		set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x490),  6, 2, 0x01);	// RG_PE1_H_PLL_PREDIV             //Pre-divider ratio (for host mode)
-		printk("***** Xtal 40MHz *****\n");
+		printk(KERN_INFO "***** Xtal 40MHz *****\n");
 	} else {			// 25MHz | 20MHz Xtal
 		set_pcie_phy((u32 *)(RALINK_PCIEPHY_P0P1_CTL_OFFSET + 0x490),  6, 2, 0x00);	// RG_PE1_H_PLL_PREDIV             //Pre-divider ratio (for host mode)
 		if (reg >= 6) { 	
@@ -1055,9 +1055,9 @@ int init_rt2880pci(void)
 	val |= RALINK_PCIE2_RST;
 #endif
 	DEASSERT_SYSRST_PCIE(val);
-	printk("release PCIe RST: RALINK_RSTCTRL = %x\n", RALINK_RSTCTRL);
+	printk(KERN_INFO "release PCIe RST: RALINK_RSTCTRL = %x\n", RALINK_RSTCTRL);
 
-	printk("PCIE PHY initialize\n");
+	printk(KERN_INFO "initializing PCIE PHY...\n");
 #if defined(CONFIG_MT7621_FPGA)
 	pcie_phy_init();
 	//chk_phy_pll();
@@ -1231,7 +1231,7 @@ int init_rt2880pci(void)
 	//printk("RALINK_CLKCFG1 = %x\n", RALINK_CLKCFG1);
 
 #ifdef CONFIG_RALINK_RT3883
-	printk("\n*************** Ralink PCIe RC mode *************\n");
+	printk(KERN_INFO "\n*************** Ralink PCIe RC mode *************\n");
 	mdelay(500);
 	if(RALINK_SYSCFG1 & RALINK_PCIE_RC_MODE_EN){
 		if(( RALINK_PCI1_STATUS & 0x1) == 0)
@@ -1298,7 +1298,7 @@ int init_rt2880pci(void)
 		pcie0_disable=1;
 	}
 #elif defined (CONFIG_RALINK_MT7621)
-	printk("\n*************** MT7621 PCIe RC mode *************\n");
+	printk(KERN_INFO "\n*************** MT7621 PCIe RC mode *************\n");
 	mdelay(500);
 #if defined (CONFIG_PCIE_PORT0)
 	if(( RALINK_PCI0_STATUS & 0x1) == 0)
@@ -1326,7 +1326,7 @@ int init_rt2880pci(void)
 #endif
 #if defined (CONFIG_PCIE_PORT2)
 	if (( RALINK_PCI2_STATUS & 0x1) == 0) {
-		printk("PCIE2 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE2 no card, disable it(RST&CLK)\n");
 		ASSERT_SYSRST_PCIE(RALINK_PCIE2_RST);
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE2_CLK_EN);
 		pcie_link_status &= ~(1<<2);
@@ -1335,12 +1335,12 @@ int init_rt2880pci(void)
 		RALINK_PCI_PCIMSK_ADDR |= (1<<22); // enable pcie2 interrupt
 	}
 #endif
-	printk("pcie_link status = 0x%x\n", pcie_link_status);
-	printk("RALINK_RSTCTRL= %x\n", RALINK_RSTCTRL);
+	printk(KERN_INFO "pcie_link status = 0x%x\n", pcie_link_status);
+	printk(KERN_INFO "RALINK_RSTCTRL= %x\n", RALINK_RSTCTRL);
 	if (pcie_link_status == 0)
 		return 0;
 
-	printk("*** Configure Device number setting of Virtual PCI-PCI bridge ***\n");
+	printk(KERN_INFO "*** Configure Device number setting of Virtual PCI-PCI bridge ***\n");
 /*
 pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 3'b000			x		x		x
@@ -1352,7 +1352,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 3'b110			1		0		x
 3'b111			2		1		0
 */
-	printk("RALINK_PCI_PCICFG_ADDR = %x", RALINK_PCI_PCICFG_ADDR);
+	printk(KERN_INFO "RALINK_PCI_PCICFG_ADDR = %x", RALINK_PCI_PCICFG_ADDR);
 	switch(pcie_link_status) {
 	case 2:
 		RALINK_PCI_PCICFG_ADDR &= ~0x00ff0000;
@@ -1468,7 +1468,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 	RALINK_PCI0_CLASS = 0x06040001;
 	//RALINK_PCI0_SUBID = 0x28801814;
 	//}
-	printk("PCIE0 enabled\n");
+	printk(KERN_INFO "PCIE0 enabled\n");
 #elif defined(CONFIG_RALINK_MT7621)
 #if defined (CONFIG_PCIE_PORT0)
 	//PCIe0
@@ -1476,7 +1476,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 		RALINK_PCI0_BAR0SETUP_ADDR = 0x7FFF0001;	//open 7FFF:2G; ENABLE
 		RALINK_PCI0_IMBASEBAR0_ADDR = MEMORY_BASE;
 		RALINK_PCI0_CLASS = 0x06040001;
-		printk("PCIE0 enabled\n");
+		printk(KERN_INFO "PCIE0 enabled\n");
 	}
 #endif
 #if defined (CONFIG_PCIE_PORT1)
@@ -1485,7 +1485,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 		RALINK_PCI1_BAR0SETUP_ADDR = 0x7FFF0001;	//open 7FFF:2G; ENABLE
 		RALINK_PCI1_IMBASEBAR0_ADDR = MEMORY_BASE;
 		RALINK_PCI1_CLASS = 0x06040001;
-		printk("PCIE1 enabled\n");
+		printk(KERN_INFO "PCIE1 enabled\n");
 	}
 #endif
 #if defined (CONFIG_PCIE_PORT2)
@@ -1494,7 +1494,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 		RALINK_PCI2_BAR0SETUP_ADDR = 0x7FFF0001;	//open 7FFF:2G; ENABLE
 		RALINK_PCI2_IMBASEBAR0_ADDR = MEMORY_BASE;
 		RALINK_PCI2_CLASS = 0x06040001;
-		printk("PCIE2 enabled\n");
+		printk(KERN_INFO "PCIE2 enabled\n");
 	}
 #endif
 #endif
@@ -1513,7 +1513,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 	RALINK_PCI_PCIMSK_ADDR |= (1<<20); // enable pcie0 interrupt
 	//}
 #elif defined (CONFIG_RALINK_MT7621)
-	printk("interrupt enable status: %x\n", RALINK_PCI_PCIMSK_ADDR);
+	printk(KERN_INFO "interrupt enable status: %x\n", RALINK_PCI_PCIMSK_ADDR);
 #else
 	RALINK_PCI_PCIMSK_ADDR = 0x000c0000; // enable pci interrupt
 #endif
@@ -1568,7 +1568,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 		val |= 0x50<<8;
 		write_config(0, 1, 0, 0x70c, val);
 		read_config(0, 1, 0, 0x70c, &val);
-		printk("Port 1 N_FTS = %x\n", (unsigned int)val);
+		printk(KERN_INFO "Port 1 N_FTS = %x\n", (unsigned int)val);
 	default:
 		read_config(0, 0, 0, 0x4, &val);
 		write_config(0, 0, 0, 0x4, val|0x4); //bus master enable
@@ -1578,9 +1578,9 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 		val |= 0x50<<8;
 		write_config(0, 0, 0, 0x70c, val);
 		read_config(0, 0, 0, 0x70c, &val);
-		printk("Port 0 N_FTS = %x\n", (unsigned int)val);
+		printk(KERN_INFO "Port 0 N_FTS = %x\n", (unsigned int)val);
 	}
-	printk("config reg done\n");
+	printk(KERN_INFO "register configuration done\n");
 #elif defined (CONFIG_RALINK_RT2883)
 	read_config(0, 0, 0, 0x4, &val);
 	write_config(0, 0, 0, 0x4, val|0x7);
@@ -1592,7 +1592,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 #else 
 	write_config(0, 0, 0, PCI_BASE_ADDRESS_0, MEMORY_BASE); 
 	read_config(0, 0, 0, PCI_BASE_ADDRESS_0, &val);
-	printk("BAR0 at slot 0 = %x\n", val);
+	printk(KERN_INFO "BAR0 at slot 0 = %x\n", val);
 #endif
 #if 0 /*CONFIG_RALINK_RT6855*/
 
