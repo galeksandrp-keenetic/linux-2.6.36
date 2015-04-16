@@ -1,44 +1,29 @@
 #ifndef __SPIC_H__
 #define __SPIC_H__
 
-#if !defined (__UBOOT__)
-#include <asm/mach-ralink/rt_mmap.h>
-
-
-#define RT2880_RSTCTRL_REG		(RALINK_SYSCTL_BASE+0x34)
-
-#else //__UBOOT__
-
 #include <rt_mmap.h>
-#define	EIO		 5	/* I/O error */
-#define	EINVAL		22	/* Invalid argument */
-#define	ENOMEM		12	/* Out of memory */
-#define	EBADMSG		74	/* Not a data message */
-#define	EUCLEAN		117	/* Structure needs cleaning */
-#define RALINK_SPI_RST			(1<<11)
-#endif  //__UBOOT__
+#define RT2880_RSTCTRL_REG		(RALINK_SYSCTL_BASE+0x34)
 
 #define RSTCTRL_SPI_RESET		RALINK_SPI_RST
 
-#define RT2880_SPI_REG_BASE		(RALINK_SPI_BASE)
-#define RT2880_SPISTAT_REG		(RT2880_SPI_REG_BASE+0x00)
-#define RT2880_SPICFG_REG		(RT2880_SPI_REG_BASE+0x10)
-#define RT2880_SPICTL_REG		(RT2880_SPI_REG_BASE+0x14)
-#define RT2880_SPIDATA_REG		(RT2880_SPI_REG_BASE+0x20)
+#define RT2880_SPISTAT_REG		(RALINK_SPI_BASE+0x00)
+#define RT2880_SPICFG_REG		(RALINK_SPI_BASE+0x10)
+#define RT2880_SPICTL_REG		(RALINK_SPI_BASE+0x14)
+#define RT2880_SPIDATA_REG		(RALINK_SPI_BASE+0x20)
 
-#define RT2880_SPIUSER_REG		(RT2880_SPI_REG_BASE+0x2C)
-#define RT2880_SPIADDR_REG		(RT2880_SPI_REG_BASE+0x24)
-#define RT2880_SPIMODE_REG		(RT2880_SPI_REG_BASE+0x3c)
-#define RT2880_SPIBS_REG		(RT2880_SPI_REG_BASE+0x28)
-#define RT2880_SPITXFIFO_REG	(RT2880_SPI_REG_BASE+0x30)
-#define RT2880_SPIRXFIFO_REG	(RT2880_SPI_REG_BASE+0x34)
-#define RT2880_SPIFIFOSTAT_REG	(RT2880_SPI_REG_BASE+0x38)
+#define RT2880_SPIUSER_REG		(RALINK_SPI_BASE+0x2C)
+#define RT2880_SPIADDR_REG		(RALINK_SPI_BASE+0x24)
+#define RT2880_SPIMODE_REG		(RALINK_SPI_BASE+0x3c)
+#define RT2880_SPIBS_REG		(RALINK_SPI_BASE+0x28)
+#define RT2880_SPITXFIFO_REG	(RALINK_SPI_BASE+0x30)
+#define RT2880_SPIRXFIFO_REG	(RALINK_SPI_BASE+0x34)
+#define RT2880_SPIFIFOSTAT_REG	(RALINK_SPI_BASE+0x38)
 
 
 #define RT2880_SPI0_CTL_REG		RT2880_SPICTL_REG
-#define RT2880_SPI1_CTL_REG		(RT2880_SPI_REG_BASE+0x54)
-#define RT2880_SPI_DMA			(RT2880_SPI_REG_BASE+ 0x80)
-#define RT2880_SPI_ARB_REG		(RT2880_SPI_REG_BASE+0xf0)
+#define RT2880_SPI1_CTL_REG		(RALINK_SPI_BASE+0x54)
+#define RT2880_SPI_DMA			(RALINK_SPI_BASE+ 0x80)
+#define RT2880_SPI_ARB_REG		(RALINK_SPI_BASE+0xf0)
 
 /* SPICFG register bit field */
 #define SPICFG_LSBFIRST				(0<<8)
@@ -143,9 +128,19 @@
 #define ENABLE	1
 #define DISABLE	0
 
-#define CFG_CLK_DIV SPICFG_SPICLK_DIV8
+#define CFG_CLK_DIV SPICFG_SPICLK_DIV128
 
 #define RALINK_SYSCTL_ADDR		RALINK_SYSCTL_BASE	// system control
 #define RALINK_REG_GPIOMODE		(RALINK_SYSCTL_ADDR + 0x60)
 
+
+static inline u32 raspi_read(u32 reg)
+{
+	return __raw_readl((void __iomem *)(reg));
+}
+
+static inline void raspi_write(u32 reg, u32 val)
+{
+	__raw_writel(val,(void __iomem *)(reg));
+}
 #endif	//__SPIC_H__
