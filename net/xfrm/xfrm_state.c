@@ -28,12 +28,8 @@
 
 #include "xfrm_hash.h"
 
-#if (defined (CONFIG_RALINK_HWCRYPTO) || defined (CONFIG_RALINK_HWCRYPTO_MODULE)) && defined (CONFIG_INET_ESP)
-extern void
-ipsec_eip93Adapter_free(
-		    unsigned int spi
-		);
-#endif
+void (*eip93Adapter_free)(unsigned int spi) = NULL;
+EXPORT_SYMBOL(eip93Adapter_free);
 
 /* Each xfrm_state may be linked to two tables:
 
@@ -538,11 +534,22 @@ EXPORT_SYMBOL(__xfrm_state_destroy);
 
 int __xfrm_state_delete(struct xfrm_state *x)
 {
+	void (*ipsec_do_free)(unsigned int spi);
 	struct net *net = xs_net(x);
 	int err = -ESRCH;
 
 	if (x->km.state != XFRM_STATE_DEAD) {
 		x->km.state = XFRM_STATE_DEAD;
+
+		if ((x->type != NULL) && 
+			(NULL != (ipsec_do_free = rcu_dereference(eip93Adapter_free))) &&
+			(x->type->description) &&
+			(x->type->description[0] == 'E') &&
+			(x->type->description[3] == '4')) { // 'ESP4'
+
+				ipsec_do_free(x->id.spi);
+		}
+
 		spin_lock(&xfrm_state_lock);
 		list_del(&x->km.all);
 		hlist_del(&x->bydst);
@@ -558,14 +565,6 @@ int __xfrm_state_delete(struct xfrm_state *x)
 		 */
 		xfrm_state_put(x);
 		err = 0;
-#if (defined (CONFIG_RALINK_HWCRYPTO) || defined (CONFIG_RALINK_HWCRYPTO_MODULE)) && defined (CONFIG_INET_ESP)
-		if (x->type != NULL)
-		{
-			if (x->type->description[3] == '4')
-				ipsec_eip93Adapter_free(x->id.spi);
-		}
-#endif
-
 	}
 
 	return err;
