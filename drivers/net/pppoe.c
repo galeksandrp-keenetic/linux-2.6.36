@@ -86,6 +86,8 @@
 
 #include <asm/uaccess.h>
 
+#include <net/fast_vpn.h>
+
 #define PPPOE_HASH_BITS 4
 #define PPPOE_HASH_SIZE (1 << PPPOE_HASH_BITS)
 #define PPPOE_HASH_MASK	(PPPOE_HASH_SIZE - 1)
@@ -916,6 +918,9 @@ end:
 	return error;
 }
 
+extern void (*prebind_from_pppoetx)(struct sk_buff * skb, struct sock *sock,
+	u16 sid);
+
 /************************************************************************
  *
  * xmit function for internal use.
@@ -927,6 +932,8 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 	struct net_device *dev = po->pppoe_dev;
 	struct pppoe_hdr *ph;
 	int data_len = skb->len;
+	void (*swnat_prebind)(struct sk_buff * skb, struct sock *sock,
+		u16 sid) = NULL;
 
 	/* The higher-level PPP code (ppp_unregister_channel()) ensures the PPP
 	 * xmit operations conclude prior to an unregistration call.  Thus
@@ -960,6 +967,18 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 
 	skb->protocol = cpu_to_be16(ETH_P_PPP_SES);
 	skb->dev = dev;
+
+	rcu_read_lock();
+	if (SWNAT_FNAT_CHECK_MARK(skb) &&
+		(NULL != (swnat_prebind = rcu_dereference(prebind_from_pppoetx)))) {
+
+		sock_hold(sk);
+		swnat_prebind(skb, sk, ph->sid);
+
+		SWNAT_FNAT_RESET_MARK(skb);
+		SWNAT_PPP_SET_MARK(skb);
+	}
+	rcu_read_unlock();
 
 	dev_hard_header(skb, dev, ETH_P_PPP_SES,
 			po->pppoe_pa.remote, NULL, data_len);
