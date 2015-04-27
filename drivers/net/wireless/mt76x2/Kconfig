@@ -30,7 +30,7 @@ config DOT11W_PMF_SUPPORT
 	default n
 
 config TXBF_SUPPORT
-	bool "TX bean forming support"
+	bool "TX beamforming support"
 	depends on WIFI_DRIVER
 	default n
 
