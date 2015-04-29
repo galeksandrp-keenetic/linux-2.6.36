@@ -97,8 +97,14 @@ static const char *part_probes[] __initdata = { "ndmpart", NULL };
 	// use legacy mode for SLIC
 
 #else // } {
-	// default mode for chips after MT7620 is command mode
+
+#if defined(CONFIG_RALINK_SLIC_CONNECT_SPI_CS1) // {
+static DECLARE_MUTEX(SPI_SEM);
+EXPORT_SYMBOL(SPI_SEM);
+#else
+// default mode for chips after MT7620 is command mode
 #define COMMAND_MODE
+#endif // }
 
 #endif // }
 
@@ -207,6 +213,7 @@ static int spic_transfer(const u8 *cmd, int n_cmd, u8 *buf, int n_buf, int flag)
 			(flag == SPIC_READ_BYTES)? "read" : "write");
 
 #if defined(CONFIG_RALINK_SLIC_CONNECT_SPI_CS1) // {
+	down(&SPI_SEM);
 	/* config ARB and set the low or high active correctly according to the device */
 	ra_outl(RT2880_SPI_ARB_REG, SPIARB_ARB_EN|(SPIARB_SPI1_ACTIVE_MODE<<1)| SPIARB_SPI0_ACTIVE_MODE);
 #if	defined(CONFIG_RALINK_SPI_CS1_HIGH_ACTIVE)
@@ -252,6 +259,10 @@ static int spic_transfer(const u8 *cmd, int n_cmd, u8 *buf, int n_buf, int flag)
 end_trans:
 	// de-assert CS and
 	ra_or (RT2880_SPICTL_REG, (SPICTL_SPIENA_HIGH));
+
+#if defined(CONFIG_RALINK_SLIC_CONNECT_SPI_CS1) // {
+	up(&SPI_SEM);
+#endif // }
 
 	return retval;
 }
