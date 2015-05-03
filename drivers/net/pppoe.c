@@ -86,7 +86,9 @@
 
 #include <asm/uaccess.h>
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 #include <net/fast_vpn.h>
+#endif // #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
 #define PPPOE_HASH_BITS 4
 #define PPPOE_HASH_SIZE (1 << PPPOE_HASH_BITS)
@@ -932,8 +934,11 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 	struct net_device *dev = po->pppoe_dev;
 	struct pppoe_hdr *ph;
 	int data_len = skb->len;
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	void (*swnat_prebind)(struct sk_buff * skb, struct sock *sock,
 		u16 sid) = NULL;
+#endif // #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
 	/* The higher-level PPP code (ppp_unregister_channel()) ensures the PPP
 	 * xmit operations conclude prior to an unregistration call.  Thus
@@ -968,6 +973,7 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 	skb->protocol = cpu_to_be16(ETH_P_PPP_SES);
 	skb->dev = dev;
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	rcu_read_lock();
 	if (SWNAT_FNAT_CHECK_MARK(skb) &&
 		(NULL != (swnat_prebind = rcu_dereference(prebind_from_pppoetx)))) {
@@ -979,6 +985,7 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 		SWNAT_PPP_SET_MARK(skb);
 	}
 	rcu_read_unlock();
+#endif // #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
 	dev_hard_header(skb, dev, ETH_P_PPP_SES,
 			po->pppoe_pa.remote, NULL, data_len);
