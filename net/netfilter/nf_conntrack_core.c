@@ -117,12 +117,11 @@ int (*fast_nat_bind_hook_func)(struct nf_conn *ct,
 	struct nf_conntrack_l3proto *l3proto,
 	struct nf_conntrack_l4proto *l4proto) = NULL;
 EXPORT_SYMBOL(fast_nat_bind_hook_func);
-#endif
-
 extern void (*prebind_from_fastnat)(struct sk_buff * skb,
 		u32 orig_saddr, u16 orig_sport,
 		struct nf_conn * ct,
 		enum ip_conntrack_info ct_info);
+#endif
 
 static u_int32_t __hash_conntrack(const struct nf_conntrack_tuple *tuple,
 				  u16 zone, unsigned int size, unsigned int rnd)
@@ -1069,10 +1068,12 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 	u_int8_t protonum;
 	int set_reply = 0;
 	int ret;
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	void (*swnat_prebind)(struct sk_buff * skb,
 		u32 orig_saddr, u16 orig_sport,
 		struct nf_conn * ct,
 		enum ip_conntrack_info ct_info) = NULL;
+#endif // #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
 	struct nf_conntrack_helper *helper;
 	int is_helper = 0;
@@ -1191,30 +1192,37 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 				t1->dst.u.all == t2->src.u.all &&
 				t1->src.u.all == t2->dst.u.all)) {
 				if (likely(NULL != rcu_dereference(fast_nat_hit_hook_func))) {
-					u32 orig_src;
+					u32 orig_src, new_src;
 					u16 orig_port = 0;
-					struct iphdr *iph = (void *)skb->data;
+					struct iphdr *iph = (struct iphdr *)skb->data;
 					struct udphdr * udph = NULL;
 					struct tcphdr * tcph = NULL;
 
-					/* Set mark for further binds */
-					SWNAT_FNAT_SET_MARK(skb);
 					orig_src = iph->saddr;
-					if (protonum == IPPROTO_TCP) {
-						tcph = (void *)(skb->data + iph->ihl * 4);
+					if ((iph->version == 4) && (protonum == IPPROTO_TCP)) {
+						tcph = (struct tcphdr *)(skb->data + iph->ihl * 4);
 						orig_port = tcph->source;
 					}
-					if (protonum == IPPROTO_UDP) {
-						udph = (void *)(skb->data + iph->ihl * 4);
+					if ((iph->version == 4) && (protonum == IPPROTO_UDP)) {
+						udph = (struct udphdr *)(skb->data + iph->ihl * 4);
 						orig_port = udph->source;
 					}
+
 					ret = fast_nat_bind_hook(ct, ctinfo, skb, l3proto, l4proto);
 
-					rcu_read_lock();
-					if (NULL != (swnat_prebind = rcu_dereference(prebind_from_fastnat))) {
-						swnat_prebind(skb, orig_src, orig_port, ct, ctinfo);
+					iph = (struct iphdr *)skb->data;
+					new_src = iph->saddr;
+
+					/* Get rid of junky binds, do swnat only when src IP changed */
+					if (orig_src != new_src) { 
+						/* Set mark for further binds */
+						SWNAT_FNAT_SET_MARK(skb);
+						rcu_read_lock();
+						if (NULL != (swnat_prebind = rcu_dereference(prebind_from_fastnat))) {
+							swnat_prebind(skb, orig_src, orig_port, ct, ctinfo);
+						}
+						rcu_read_unlock();
 					}
-					rcu_read_unlock();
 				} else {
 					printk(KERN_WARNING "Not allowed to do bind_hook without hit_hook");
 				}

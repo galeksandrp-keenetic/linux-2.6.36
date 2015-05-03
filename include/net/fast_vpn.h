@@ -17,6 +17,9 @@
 
 /* SWNAT section */
 
+#define SWNAT_ORIGIN_RAETH		0x10
+#define SWNAT_ORIGIN_RT2860		0x20
+
 /* 32-th bit */
 #define SWNAT_FNAT_MARK		0x80000000
 #define SWNAT_FNAT_MASK		0x7fffffff
