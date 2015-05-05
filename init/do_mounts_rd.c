@@ -81,7 +81,7 @@ identify_ramdisk_image(int fd, int start_block, decompress_fn *decompressor)
 
 	*decompressor = decompress_method(buf, size, &compress_name);
 	if (compress_name) {
-		printk(KERN_NOTICE "RAMDISK: %s image found at block %d\n",
+		printk(KERN_INFO "RAMDISK: %s image found at block %d\n",
 		       compress_name, start_block);
 		if (!*decompressor)
 			printk(KERN_EMERG
@@ -94,7 +94,7 @@ identify_ramdisk_image(int fd, int start_block, decompress_fn *decompressor)
 	/* romfs is at block zero too */
 	if (romfsb->word0 == ROMSB_WORD0 &&
 	    romfsb->word1 == ROMSB_WORD1) {
-		printk(KERN_NOTICE
+		printk(KERN_INFO
 		       "RAMDISK: romfs filesystem found at block %d\n",
 		       start_block);
 		nblocks = (ntohl(romfsb->size)+BLOCK_SIZE-1)>>BLOCK_SIZE_BITS;
@@ -102,7 +102,7 @@ identify_ramdisk_image(int fd, int start_block, decompress_fn *decompressor)
 	}
 
 	if (cramfsb->magic == CRAMFS_MAGIC) {
-		printk(KERN_NOTICE
+		printk(KERN_INFO
 		       "RAMDISK: cramfs filesystem found at block %d\n",
 		       start_block);
 		nblocks = (cramfsb->size + BLOCK_SIZE - 1) >> BLOCK_SIZE_BITS;
@@ -111,7 +111,7 @@ identify_ramdisk_image(int fd, int start_block, decompress_fn *decompressor)
 
 	/* squashfs is at block zero too */
 	if (le32_to_cpu(squashfsb->s_magic) == SQUASHFS_MAGIC) {
-		printk(KERN_NOTICE
+		printk(KERN_INFO
 		       "RAMDISK: squashfs filesystem found at block %d\n",
 		       start_block);
 		nblocks = (le64_to_cpu(squashfsb->bytes_used) + BLOCK_SIZE - 1)
@@ -128,7 +128,7 @@ identify_ramdisk_image(int fd, int start_block, decompress_fn *decompressor)
 	/* Try minix */
 	if (minixsb->s_magic == MINIX_SUPER_MAGIC ||
 	    minixsb->s_magic == MINIX_SUPER_MAGIC2) {
-		printk(KERN_NOTICE
+		printk(KERN_INFO
 		       "RAMDISK: Minix filesystem found at block %d\n",
 		       start_block);
 		nblocks = minixsb->s_nzones << minixsb->s_log_zone_size;
@@ -137,7 +137,7 @@ identify_ramdisk_image(int fd, int start_block, decompress_fn *decompressor)
 
 	/* Try ext2 */
 	if (ext2sb->s_magic == cpu_to_le16(EXT2_SUPER_MAGIC)) {
-		printk(KERN_NOTICE
+		printk(KERN_INFO
 		       "RAMDISK: ext2 filesystem found at block %d\n",
 		       start_block);
 		nblocks = le32_to_cpu(ext2sb->s_blocks_count) <<
@@ -162,11 +162,8 @@ int __init rd_load_image(char *from)
 	unsigned long rd_blocks, devblocks;
 	int nblocks, i, disk;
 	char *buf = NULL;
-	unsigned short rotate = 0;
 	decompress_fn decompressor = NULL;
-#if !defined(CONFIG_S390) && !defined(CONFIG_PPC_ISERIES)
-	char rotator[4] = { '|' , '/' , '-' , '\\' };
-#endif
+
 
 	out_fd = sys_open("/dev/ram", O_RDWR, 0);
 	if (out_fd < 0)
@@ -230,12 +227,12 @@ int __init rd_load_image(char *from)
 		goto done;
 	}
 
-	printk(KERN_NOTICE "RAMDISK: Loading %dKiB [%ld disk%s] into ram disk... ",
+	printk(KERN_INFO "RAMDISK: Loading %dKiB [%ld disk%s] into ram disk... ",
 		nblocks, ((nblocks-1)/devblocks)+1, nblocks>devblocks ? "s" : "");
 	for (i = 0, disk = 1; i < nblocks; i++) {
 		if (i && (i % devblocks == 0)) {
 			printk("done disk #%d.\n", disk++);
-			rotate = 0;
+
 			if (sys_close(in_fd)) {
 				printk("Error closing the disk.\n");
 				goto noclose_input;
@@ -250,14 +247,8 @@ int __init rd_load_image(char *from)
 		}
 		sys_read(in_fd, buf, BLOCK_SIZE);
 		sys_write(out_fd, buf, BLOCK_SIZE);
-#if !defined(CONFIG_S390) && !defined(CONFIG_PPC_ISERIES)
-		if (!(i % 16)) {
-			printk("%c\b", rotator[rotate & 0x3]);
-			rotate++;
-		}
-#endif
 	}
-	printk("done.\n");
+	printk(KERN_INFO "done.\n");
 
 successful_load:
 	res = 1;
