@@ -975,7 +975,11 @@ static int __pppoe_xmit(struct sock *sk, struct sk_buff *skb)
 
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	rcu_read_lock();
-	if (SWNAT_FNAT_CHECK_MARK(skb) &&
+	if (SWNAT_PPP_CHECK_MARK(skb)) {
+		/* We already have PPP encap, do skip it */
+		SWNAT_FNAT_RESET_MARK(skb);
+		SWNAT_PPP_RESET_MARK(skb);
+	} else if (SWNAT_FNAT_CHECK_MARK(skb) &&
 		(NULL != (swnat_prebind = rcu_dereference(prebind_from_pppoetx)))) {
 
 		sock_hold(sk);
