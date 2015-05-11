@@ -28,6 +28,7 @@
 #include <linux/version.h>
 #include <linux/mtd/map.h>
 #include <linux/mtd/gen_probe.h>
+#include <linux/spinlock.h>
 #include <linux/semaphore.h>
 #include <linux/slab.h>
 #include <linux/spi/spi.h>
@@ -99,8 +100,8 @@ static const char *part_probes[] __initdata = { "ndmpart", NULL };
 #else // } {
 
 #if defined(CONFIG_RALINK_SLIC_CONNECT_SPI_CS1) // {
-static DECLARE_MUTEX(SPI_SEM);
-EXPORT_SYMBOL(SPI_SEM);
+static spinlock_t spi_lock = SPIN_LOCK_UNLOCKED;
+EXPORT_SYMBOL(spi_lock);
 #else
 // default mode for chips after MT7620 is command mode
 #define COMMAND_MODE
@@ -213,7 +214,7 @@ static int spic_transfer(const u8 *cmd, int n_cmd, u8 *buf, int n_buf, int flag)
 			(flag == SPIC_READ_BYTES)? "read" : "write");
 
 #if defined(CONFIG_RALINK_SLIC_CONNECT_SPI_CS1) // {
-	down(&SPI_SEM);
+	spin_lock_bh(&spi_lock);
 	/* config ARB and set the low or high active correctly according to the device */
 	ra_outl(RT2880_SPI_ARB_REG, SPIARB_ARB_EN|(SPIARB_SPI1_ACTIVE_MODE<<1)| SPIARB_SPI0_ACTIVE_MODE);
 #if	defined(CONFIG_RALINK_SPI_CS1_HIGH_ACTIVE)
@@ -261,7 +262,7 @@ end_trans:
 	ra_or (RT2880_SPICTL_REG, (SPICTL_SPIENA_HIGH));
 
 #if defined(CONFIG_RALINK_SLIC_CONNECT_SPI_CS1) // {
-	up(&SPI_SEM);
+	spin_unlock_bh(&spi_lock);
 #endif // }
 
 	return retval;
