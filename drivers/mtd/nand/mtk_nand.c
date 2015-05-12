@@ -2461,10 +2461,12 @@ static int is_skip_bad_block(struct mtd_info *mtd, int page)
 	struct nand_chip *chip = mtd->priv;
 
 	count ++;
+	/*
 	if ((page << chip->page_shift) >= 0x07b80000)
 	{
 		return 0;
 	}
+	*/
 	return 1;
 }
 
