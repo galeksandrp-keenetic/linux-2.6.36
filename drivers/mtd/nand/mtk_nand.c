@@ -103,6 +103,7 @@ unsigned int CFG_BLOCKSIZE;
 
 #if defined(SKIP_BAD_BLOCK)
 static int shift_on_bbt = 0;
+static int is_skip_bad_block(struct mtd_info *mtd, int page);
 extern void nand_bbt_set(struct mtd_info *mtd, int page, int flag);
 extern int nand_bbt_get(struct mtd_info *mtd, int page);
 int mtk_nand_read_oob_hw(struct mtd_info *mtd, struct nand_chip *chip, int page);
@@ -262,9 +263,6 @@ static u8 g_running_dma = 0;
 static u32 g_dump_count = 0;
 #endif
 #if defined (__KERNEL_NAND__)
-#if defined (CONFIG_JFFS2_FS)
-#define NAND_JFFS2_WORKAROUND 1
-#endif
 static const char *part_probes[] __initdata = { "ndmpart", NULL };
 //extern struct mtd_partition g_pasStatic_Partition[];
 static struct mtd_partition *mtd_parts;
@@ -878,7 +876,10 @@ static bool mtk_nand_check_bch_error(struct mtd_info *mtd, u8 * pDataBuf, u32 u4
         }
         if ((correct_count > 2) && bRet)
         {
-            mtd->ecc_stats.corrected++;
+#if defined(SKIP_BAD_BLOCK)
+		if (!is_skip_bad_block(mtd, u4PageAddr))
+#endif
+			mtd->ecc_stats.corrected++;
         } else
         {
             printk(KERN_INFO "Less than 2 bit error, ignore\n");
@@ -897,7 +898,7 @@ static bool mtk_nand_check_bch_error(struct mtd_info *mtd, u8 * pDataBuf, u32 u4
         {
             mtd->ecc_stats.failed++;
             bRet = false;
-            //printk(KERN_ERR"UnCorrectable at PageAddr=%d\n", u4PageAddr);
+            printk(KERN_ERR"UnCorrectable at PageAddr=%d\n", u4PageAddr);
         } else
         {
             for (i = 0; i < ((u4ErrNum + 1) >> 1); ++i)
@@ -910,10 +911,16 @@ static bool mtk_nand_check_bch_error(struct mtd_info *mtd, u8 * pDataBuf, u32 u4
                     u4ErrByteLoc = u4ErrBitLoc1th / 8;
                     u4BitOffset = u4ErrBitLoc1th % 8;
                     pDataBuf[u4ErrByteLoc] = pDataBuf[u4ErrByteLoc] ^ (1 << u4BitOffset);
-                    mtd->ecc_stats.corrected++;
+#if defined(SKIP_BAD_BLOCK)
+		    if (!is_skip_bad_block(mtd, u4PageAddr))
+#endif
+                        mtd->ecc_stats.corrected++;
                 } else
                 {
-                    mtd->ecc_stats.failed++;
+#if defined(SKIP_BAD_BLOCK)
+		if (!is_skip_bad_block(mtd, u4PageAddr))
+#endif
+                    mtd->ecc_stats.corrected++;
                     //printk(KERN_ERR"UnCorrectable ErrLoc=%d\n", au4ErrBitLoc[i]);
                 }
                 u4ErrBitLoc2nd = (au4ErrBitLoc[i] >> 16) & 0x1FFF;
@@ -924,11 +931,17 @@ static bool mtk_nand_check_bch_error(struct mtd_info *mtd, u8 * pDataBuf, u32 u4
                         u4ErrByteLoc = u4ErrBitLoc2nd / 8;
                         u4BitOffset = u4ErrBitLoc2nd % 8;
                         pDataBuf[u4ErrByteLoc] = pDataBuf[u4ErrByteLoc] ^ (1 << u4BitOffset);
-                        mtd->ecc_stats.corrected++;
+#if defined(SKIP_BAD_BLOCK)
+			if (!is_skip_bad_block(mtd, u4PageAddr))
+#endif
+                            mtd->ecc_stats.corrected++;
                     } else
                     {
-                        mtd->ecc_stats.failed++;
-                        //printk(KERN_ERR"UnCorrectable High ErrLoc=%d\n", au4ErrBitLoc[i]);
+#if defined(SKIP_BAD_BLOCK)
+			if (!is_skip_bad_block(mtd, u4PageAddr))
+#endif
+				mtd->ecc_stats.corrected++;
+				//printk(KERN_ERR"UnCorrectable High ErrLoc=%d\n", au4ErrBitLoc[i]);
                     }
                 }
             }
@@ -2318,7 +2331,10 @@ static int block_remap(struct mtd_info *mtd, int block)
 
 int check_block_remap(struct mtd_info *mtd, int block)
 {
-	if (shift_on_bbt)
+	struct nand_chip *chip = mtd->priv;
+	int page_per_block_bit = chip->phys_erase_shift - chip->page_shift;
+
+	if ((shift_on_bbt) && (is_skip_bad_block(mtd, (block << page_per_block_bit))))
 		return  block_remap(mtd, block);
 	else
 		return block;
@@ -2445,7 +2461,7 @@ static int is_skip_bad_block(struct mtd_info *mtd, int page)
 	struct nand_chip *chip = mtd->priv;
 
 	count ++;
-	if ((page << chip->page_shift) >= chip->chipsize)
+	if ((page << chip->page_shift) >= 0x07b80000)
 	{
 		return 0;
 	}
@@ -3020,6 +3036,10 @@ static int mtk_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip, u8 *
     /* else
        return -EIO; */
 #endif
+	if (mtk_nand_exec_read_page(mtd, page_in_block + mapped_block * page_per_block, mtd->writesize, buf, chip->oob_poi))
+		return 0;
+	else
+		return -EIO;
     }
     else
     {
@@ -3121,6 +3141,9 @@ static int mtk_nand_erase(struct mtd_info *mtd, int page)
         	    return NAND_STATUS_FAIL;
         	}
 #endif
+		mtk_nand_block_markbad_hw(mtd, (page_in_block + mapped_block * page_per_block) << chip->page_shift);
+		nand_bbt_set(mtd, page_in_block + mapped_block * page_per_block, 0x3);
+		return -EIO;
 	}
 	else
 	{ 
@@ -3535,6 +3558,9 @@ static int mtk_nand_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int 
         	    return -EIO;
         	}
 #endif
+		mtk_nand_block_markbad_hw(mtd, (page_in_block + mapped_block * page_per_block) << chip->page_shift);
+		nand_bbt_set(mtd, page_in_block + mapped_block * page_per_block, 0x3);
+		return -EIO;
 	}
 	else
 	{
@@ -3690,15 +3716,10 @@ static int mtk_nand_read_oob(struct mtd_info *mtd, struct nand_chip *chip, int p
 		}
 		// allow to read oob even if the block is bad
 	}
-    	if (mtk_nand_read_oob_hw(mtd, chip, page_in_block + mapped_block * page_per_block)!=0)
-	{
-    		return -1;
-	}
     }
-#else
+#endif
     	if (mtk_nand_read_oob_hw(mtd, chip, page_in_block + mapped_block * page_per_block)!=0)
     		return -1;
-#endif
     return 0;                   // the return value is sndcmd
 }
 
@@ -3787,10 +3808,8 @@ static int mtk_nand_block_bad(struct mtd_info *mtd, loff_t ofs, int getchip)
 	    	        ret = 1;
 	    	    }
 	    	}
-	    	break;
 #endif
 	    }
-	    else
 		break;		    
 #endif 
 	}while(1);

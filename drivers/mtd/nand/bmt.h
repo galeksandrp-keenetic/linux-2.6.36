@@ -1,6 +1,7 @@
 #ifndef __BMT_H__
 #define __BMT_H__
 
+#include <linux/module.h>
 #include "nand_def.h"
 
 #if defined(__PRELOADER_NAND__)

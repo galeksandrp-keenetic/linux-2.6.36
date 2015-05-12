@@ -2942,6 +2942,21 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 				(((extid >> 1) & 0x04) | (extid & 0x03));
 			busw = 0;
 		} else {
+#if defined (CONFIG_MTK_MTD_NAND)
+			/* Calc pagesize */
+			//mtd->writesize = 1024 << (extid & 0x03);
+			extid >>= 2;
+			/* Calc oobsize */
+			//mtd->oobsize = (8 << (extid & 0x01)) *
+			//	(mtd->writesize >> 9);
+			extid >>= 2;
+			/* Calc blocksize. Blocksize is multiples of 64KiB */
+			//mtd->erasesize = (64 * 1024) << (extid & 0x03);
+			extid >>= 2;
+			/* Get buswidth information */
+			busw = (extid & 0x01) ? NAND_BUSWIDTH_16 : 0;
+
+#else
 			/* Calc pagesize */
 			mtd->writesize = 1024 << (extid & 0x03);
 			extid >>= 2;
@@ -2954,6 +2969,7 @@ static struct nand_flash_dev *nand_get_flash_type(struct mtd_info *mtd,
 			extid >>= 2;
 			/* Get buswidth information */
 			busw = (extid & 0x01) ? NAND_BUSWIDTH_16 : 0;
+#endif
 		}
 	} else {
 		/*
