@@ -91,11 +91,7 @@ struct mtd_partition ndm_parts[PART_MAX] = {
 	},
 	[PART_STORAGE] = {
 		name:			"Storage", 	/* mtdblock7 */
-#ifdef CONFIG_MTD_NDM_SHRINK_STORAGE
-		size:			0x80000,
-#else
 		size:			CONFIG_MTD_NDM_STORAGE_SIZE,
-#endif
 		offset:			0
 	},
 	[PART_BACKUP] = {
