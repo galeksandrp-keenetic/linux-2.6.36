@@ -396,7 +396,12 @@ static void tcp_options(const struct sk_buff *skb,
 
 	ptr = skb_header_pointer(skb, dataoff + sizeof(struct tcphdr),
 				 length, buff);
-	BUG_ON(ptr == NULL);
+
+	if(ptr == NULL) {
+		if (net_ratelimit())
+			printk(KERN_INFO "bad tcp_options pointer");
+		return;
+	}
 
 	state->td_scale =
 	state->flags = 0;
@@ -451,7 +456,11 @@ static void tcp_sack(const struct sk_buff *skb, unsigned int dataoff,
 
 	ptr = skb_header_pointer(skb, dataoff + sizeof(struct tcphdr),
 				 length, buff);
-	BUG_ON(ptr == NULL);
+	if(ptr == NULL) {
+		if (net_ratelimit())
+			printk(KERN_INFO "bad tcp_sack pointer");
+		return;
+	}
 
 	/* Fast path for timestamp-only option */
 	if (length == TCPOLEN_TSTAMP_ALIGNED*4
@@ -664,7 +673,12 @@ static bool tcp_in_window(const struct nf_conn *ct,
 		 before(sack, receiver->td_end + 1),
 		 after(sack, receiver->td_end - MAXACKWINDOW(sender) - 1));
 
-#if defined(CONFIG_TCSUPPORT_HWNAT) || defined(CONFIG_TCSUPPORT_RA_HWNAT) || defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#if (defined(CONFIG_TCSUPPORT_HWNAT) || \
+	defined(CONFIG_TCSUPPORT_RA_HWNAT) || \
+	defined(CONFIG_RA_HW_NAT) || \
+	defined(CONFIG_RA_HW_NAT_MODULE) || \
+	defined(CONFIG_FAST_NAT) || \
+	defined(CONFIG_FAST_NAT_MODULE))
 	res = 1;
 #else
 	if (before(seq, sender->td_maxend + 1) &&
@@ -847,7 +861,11 @@ static int tcp_packet(struct nf_conn *ct,
 	unsigned int index;
 
 	th = skb_header_pointer(skb, dataoff, sizeof(_tcph), &_tcph);
-	BUG_ON(th == NULL);
+	if(th == NULL) {
+		if (net_ratelimit())
+			printk(KERN_INFO "bad tcp_packet pointer");
+		return -NF_ACCEPT;
+	}
 
 	spin_lock_bh(&ct->lock);
 	old_state = ct->proto.tcp.state;
@@ -1087,7 +1105,11 @@ static bool tcp_new(struct nf_conn *ct, const struct sk_buff *skb,
 	const struct ip_ct_tcp_state *receiver = &ct->proto.tcp.seen[1];
 
 	th = skb_header_pointer(skb, dataoff, sizeof(_tcph), &_tcph);
-	BUG_ON(th == NULL);
+	if(th == NULL) {
+		if (net_ratelimit())
+			printk(KERN_INFO "bad tcp_new pointer");
+		return false;
+	}
 
 	/* Don't need lock here: this conntrack not in circulation yet */
 	new_state

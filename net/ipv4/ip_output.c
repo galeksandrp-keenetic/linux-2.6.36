@@ -854,6 +854,12 @@ int ip_append_data(struct sock *sk,
 	if (flags&MSG_PROBE)
 		return 0;
 
+	/* bug fix for udp_sendmsg, McMCC, 07112009 */
+	if (unlikely(rtp == NULL))
+		return -EFAULT;
+	if (unlikely(inet == NULL))
+		return -EFAULT;
+
 	if (skb_queue_empty(&sk->sk_write_queue)) {
 		/*
 		 * setup for corking.
@@ -889,8 +895,13 @@ int ip_append_data(struct sock *sk,
 		}
 	} else {
 		rt = (struct rtable *)inet->cork.dst;
-		if (inet->cork.flags & IPCORK_OPT)
-			opt = inet->cork.opt;
+		if(!rt)
+			return -EFAULT;
+		if (inet->cork.flags & IPCORK_OPT) {
+			if(inet->cork.opt) {
+				opt = inet->cork.opt;
+			}
+		}
 
 		transhdrlen = 0;
 		exthdrlen = 0;
@@ -1291,6 +1302,9 @@ int ip_push_pending_frames(struct sock *sk)
 	__be16 df = 0;
 	__u8 ttl;
 	int err = 0;
+
+	if (unlikely(rt == NULL))
+		goto out;
 
 	if ((skb = __skb_dequeue(&sk->sk_write_queue)) == NULL)
 		goto out;
