@@ -1472,8 +1472,10 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
 	int chipnr, page, realpage, col, bytes, aligned;
 	struct nand_chip *chip = mtd->priv;
 	struct mtd_ecc_stats stats;
+#ifndef CONFIG_MTK_MTD_NAND
 	int blkcheck = (1 << (chip->phys_erase_shift - chip->page_shift)) - 1;
 	int sndcmd = 1;
+#endif
 	int ret = 0;
 	uint32_t readlen = ops->len;
 	uint32_t oobreadlen = ops->ooblen;
@@ -1504,7 +1506,7 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
 			bufpoi = aligned ? buf : chip->buffers->databuf;
 
 #if defined (CONFIG_MTK_MTD_NAND)
-            ret = chip->read_page(mtd, chip, bufpoi, page);
+			ret = chip->read_page(mtd, chip, bufpoi, page);
 #else
 			if (likely(sndcmd)) {
 				chip->cmdfunc(mtd, NAND_CMD_READ0, 0x00, page);
@@ -1580,11 +1582,13 @@ static int nand_do_read_ops(struct mtd_info *mtd, loff_t from,
 			chip->select_chip(mtd, chipnr);
 		}
 
+#ifndef CONFIG_MTK_MTD_NAND
 		/* Check, if the chip supports auto page increment
 		 * or if we have hit a block boundary.
 		 */
 		if (!NAND_CANAUTOINCR(chip) || !(page & blkcheck))
 			sndcmd = 1;
+#endif
 	}
 
 	ops->retlen = ops->len - (size_t) readlen;
@@ -3135,6 +3139,7 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
 	return 0;
 }
 
+#if 0
 static void nand_panic_wait(struct mtd_info *mtd)
 {
 	struct nand_chip *chip = mtd->priv;
@@ -3181,6 +3186,7 @@ static int nand_panic_write(struct mtd_info *mtd, loff_t to, size_t len,
     
     return ret;
 }
+#endif
 
 
 /**

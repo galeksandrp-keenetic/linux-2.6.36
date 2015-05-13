@@ -257,7 +257,9 @@ static u8 local_buffer[4096 + 512];
 extern void nand_release_device(struct mtd_info *mtd);
 extern int nand_get_device(struct nand_chip *chip, struct mtd_info *mtd, int new_state);
 
+#ifdef MTK_NAND_BMT
 static bmt_struct *g_bmt;
+#endif
 struct mtk_nand_host *host;
 static u8 g_running_dma = 0;
 #ifdef DUMP_NATIVE_BACKTRACE
@@ -282,8 +284,6 @@ static u8 local_oob_buf[NAND_MAX_OOBSIZE];
 int dummy_driver_debug;
 #endif
 
-static u32 nand_ecc_bit = 4;
-static u8 nand_ecc_offset = 8;
 static u8 nand_badblock_offset = 0;
 
 #if defined(__BOOT_NAND__)||defined(__UBOOT_NAND__)
@@ -466,9 +466,9 @@ u32 nand_virt_to_phys_add(u32 va)
     pte_t *pte;
     u32 pa;
 
-    if (virt_addr_valid(va))
+    if (virt_addr_valid((void *) va))
     {
-        return __virt_to_phys(va);
+        return __virt_to_phys((void *) va);
     }
 
     if (NULL == current)
@@ -833,14 +833,15 @@ static bool mtk_nand_check_bch_error(struct mtd_info *mtd, u8 * pDataBuf, u32 u4
 {
     bool bRet = true;
     u16 u2SectorDoneMask = 1 << u4SecIndex;
-    u32 u4ErrorNumDebug, i, u4ErrNum;
+    u32 i, u4ErrNum;
     u32 timeout = 0xFFFF;
-    u32 correct_count = 0;
-    // int el;
 #ifdef MANUAL_CORRECT
     u32 au4ErrBitLoc[6];
     u32 u4ErrByteLoc, u4BitOffset;
     u32 u4ErrBitLoc1th, u4ErrBitLoc2nd;
+#else
+    u32 correct_count = 0;
+    u32 u4ErrorNumDebug;
 #endif
 
     //4 // Wait for Decode Done
@@ -889,7 +890,7 @@ static bool mtk_nand_check_bch_error(struct mtd_info *mtd, u8 * pDataBuf, u32 u4
 #else
     /* We will manually correct the error bits in the last sector, not all the sectors of the page! */
     memset(au4ErrBitLoc, 0x0, sizeof(au4ErrBitLoc));
-    u4ErrorNumDebug = DRV_Reg32(ECC_DECENUM_REG32);
+    //u4ErrorNumDebug = DRV_Reg32(ECC_DECENUM_REG32);
     u4ErrNum = DRV_Reg32(ECC_DECENUM_REG32) >> (u4SecIndex << 2);
     u4ErrNum &= 0xF;
 
@@ -1298,6 +1299,7 @@ static bool mtk_nand_check_RW_count(u16 u2WriteSize)
     return true;
 }
 
+#ifdef __UBOOT_NAND__
 /**
  * nand_wait - [DEFAULT]  wait until the command is done
  * @mtd:	MTD device structure
@@ -1309,7 +1311,7 @@ static bool mtk_nand_check_RW_count(u16 u2WriteSize)
  */
 static int mtk_nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
 {
-	unsigned long timeo = 0;//jiffies;
+	//unsigned long timeo = 0;//jiffies;
 	
 	int status, state = chip->state;
 
@@ -1348,6 +1350,8 @@ static int mtk_nand_wait(struct mtd_info *mtd, struct nand_chip *chip)
 	status = (int)chip->read_byte(mtd);
 	return status;
 }
+#endif
+
 /******************************************************************************
  * mtk_nand_ready_for_read
  * 
@@ -2091,9 +2095,6 @@ bool mtk_nand_exec_read_page(struct mtd_info *mtd, u32 u4RowAddr, u32 u4PageSize
 #ifdef NAND_PFM
     struct timeval pfm_time_read;
 #endif
-    unsigned short PageFmt_Reg = 0;
-    unsigned int NAND_ECC_Enc_Reg = 0;
-    unsigned int NAND_ECC_Dec_Reg = 0;
     PFM_BEGIN(pfm_time_read);
 
     if (((u32) pPageBuf % 16) && local_buffer_16_align)
@@ -3480,6 +3481,7 @@ static int mtk_nand_write_oob_raw(struct mtd_info *mtd, const uint8_t * buf, int
     return 0;
 }
 
+#ifndef NAND_JFFS2_WORKAROUND
 static int mtk_nand_write_oob_hw(struct mtd_info *mtd, struct nand_chip *chip, int page)
 {
     int i, iter;
@@ -3588,6 +3590,7 @@ static int mtk_nand_write_oob(struct mtd_info *mtd, struct nand_chip *chip, int 
 
     return 0;
 }
+#endif
 
 int mtk_nand_block_markbad_hw(struct mtd_info *mtd, loff_t offset)
 {
@@ -4119,8 +4122,7 @@ static int read_fact_bbt(struct mtd_info *mtd, unsigned int page)
 static int load_fact_bbt(struct mtd_info *mtd)
 {
 	struct nand_chip *chip = mtd->priv;
-	int i, j;
-	unsigned int page;
+	int i;
 	u32 total_block;
 
 	total_block = 1 << (chip->chip_shift - chip->phys_erase_shift);
