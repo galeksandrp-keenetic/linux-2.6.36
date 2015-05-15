@@ -6,7 +6,6 @@ static struct sch_ep **ss_in_eps[MAX_EP_NUM];
 static struct sch_ep **hs_eps[MAX_EP_NUM];	//including tt isoc
 static struct sch_ep **tt_intr_eps[MAX_EP_NUM];
 
-
 int mtk_xhci_scheduler_init(void){
 	int i;
 
@@ -432,8 +431,10 @@ int mtk_xhci_scheduler_add_ep(int dev_speed, int is_in, int isTT, int ep_type, i
 	int break_out;
 	int frame_interval;
 
-	printk(KERN_ERR "add_ep parameters, dev_speed %d, is_in %d, isTT %d, ep_type %d, maxp %d, interval %d, burst %d, mult %d, ep 0x%x, ep_ctx 0x%x, sch_ep 0x%x\n", dev_speed, is_in, isTT, ep_type, maxp
+/*
+	printk(KERN_DEBUG "add_ep parameters, dev_speed %d, is_in %d, isTT %d, ep_type %d, maxp %d, interval %d, burst %d, mult %d, ep 0x%x, ep_ctx 0x%x, sch_ep 0x%x\n", dev_speed, is_in, isTT, ep_type, maxp
 		, interval, burst, mult, ep, ep_ctx, sch_ep);
+*/
 	if(isTT && ep_type == USB_EP_INT && ((dev_speed == USB_SPEED_LOW) || (dev_speed == USB_SPEED_FULL))){
 		frame_interval = interval >> 3;
 		for(frame_idx=0; frame_idx<frame_interval; frame_idx++){
@@ -598,8 +599,10 @@ int mtk_xhci_scheduler_add_ep(int dev_speed, int is_in, int isTT, int ep_type, i
 		temp_ep_ctx->reserved[0] |= (BPKTS(bPkts) | BCSCOUNT(bCsCount) | BBM(bBm));
 		temp_ep_ctx->reserved[1] |= (BOFFSET(bOffset) | BREPEAT(bRepeat));
 
+/*
 		printk(KERN_DEBUG "[DBG] BPKTS: %x, BCSCOUNT: %x, BBM: %x\n", bPkts, bCsCount, bBm);
 		printk(KERN_DEBUG "[DBG] BOFFSET: %x, BREPEAT: %x\n", bOffset, bRepeat);
+*/
 		return SCH_SUCCESS;
 	}
 	else{

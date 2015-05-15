@@ -1159,7 +1159,7 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++)
 			dev->actconfig->interface[i]->unregistering = 1;
 
-		dev_info(&dev->dev, "[DBG MESSAGE]set all interface unregister %d\n",
+		dev_dbg(&dev->dev, "[DBG MESSAGE]set all interface unregister %d\n",
 			dev->devnum);
 		for (i = 0; i < dev->actconfig->desc.bNumInterfaces; i++) {
 			struct usb_interface	*interface;
@@ -1170,13 +1170,13 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 				continue;
 			dev_dbg(&dev->dev, "unregistering interface %s\n",
 				dev_name(&interface->dev));
-			dev_info(&dev->dev, "[DBG MESSAGE]remove interface %d\n",
+			dev_dbg(&dev->dev, "[DBG MESSAGE]remove interface %d\n",
 				i);
 			remove_intf_ep_devs(interface);
-			dev_info(&dev->dev, "[DBG MESSAGE]device delete interface %d\n",i);
+			dev_dbg(&dev->dev, "[DBG MESSAGE]device delete interface %d\n",i);
 			device_del(&interface->dev);
 		}
-		dev_info(&dev->dev, "[DBG MESSAGE]remove all interface_ep_devs %d\n",
+		dev_dbg(&dev->dev, "[DBG MESSAGE]remove all interface_ep_devs %d\n",
 			dev->devnum);
 		/* Now that the interfaces are unbound, nobody should
 		 * try to access them.
@@ -1185,13 +1185,13 @@ void usb_disable_device(struct usb_device *dev, int skip_ep0)
 			put_device(&dev->actconfig->interface[i]->dev);
 			dev->actconfig->interface[i] = NULL;
 		}
-		dev_info(&dev->dev, "[DBG MESSAGE]set all interface NULL %d\n",
+		dev_dbg(&dev->dev, "[DBG MESSAGE]set all interface NULL %d\n",
 			dev->devnum);
 		dev->actconfig = NULL;
 		
 		if (dev->state == USB_STATE_CONFIGURED)
 			usb_set_device_state(dev, USB_STATE_ADDRESS);
-		dev_info(&dev->dev, "[DBG MESSAGE]set device state ADDRESS done %d\n",
+		dev_dbg(&dev->dev, "[DBG MESSAGE]set device state ADDRESS done %d\n",
 			dev->devnum);
 	}
 

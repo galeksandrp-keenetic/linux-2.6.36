@@ -1683,7 +1683,7 @@ void usb_disconnect(struct usb_device **pdev)
 
 	usb_lock_device(udev);
 	
-	dev_info(&udev->dev, "[DBG HUB]Lock device done, device number %d\n",
+	dev_dbg(&udev->dev, "[DBG HUB]Lock device done, device number %d\n",
 			udev->devnum);
 	/* Free up all the children before we remove this device */
 	for (i = 0; i < USB_MAXCHILDREN; i++) {
@@ -1697,20 +1697,20 @@ void usb_disconnect(struct usb_device **pdev)
 	 */
 	dev_dbg (&udev->dev, "unregistering device\n");
 	mutex_lock(hcd->bandwidth_mutex);
-	dev_info(&udev->dev, "[DBG HUB]mutex_lock hcd->bandwidth_mutex done, device number %d\n",
+	dev_dbg(&udev->dev, "[DBG HUB]mutex_lock hcd->bandwidth_mutex done, device number %d\n",
 			udev->devnum);
 	usb_disable_device(udev, 0);
-	dev_info(&udev->dev, "[DBG HUB]usb_disable_device done, device number %d\n",
+	dev_dbg(&udev->dev, "[DBG HUB]usb_disable_device done, device number %d\n",
 			udev->devnum);
 	mutex_unlock(hcd->bandwidth_mutex);
 	usb_hcd_synchronize_unlinks(udev);
-	dev_info(&udev->dev, "[DBG HUB]mutex_unlock hcd->bandwidth_mutex done, device number %d\n",
+	dev_dbg(&udev->dev, "[DBG HUB]mutex_unlock hcd->bandwidth_mutex done, device number %d\n",
 			udev->devnum);
 	usb_remove_ep_devs(&udev->ep0);
-	dev_info(&udev->dev, "[DBG HUB]usb_remove_ep_devs done, device number %d\n",
+	dev_dbg(&udev->dev, "[DBG HUB]usb_remove_ep_devs done, device number %d\n",
 			udev->devnum);
 	usb_unlock_device(udev);
-	dev_info(&udev->dev, "[DBG HUB]usb_unlock_device done, device number %d\n",
+	dev_dbg(&udev->dev, "[DBG HUB]usb_unlock_device done, device number %d\n",
 			udev->devnum);
 
 	/* Unregister the device.  The device driver is responsible

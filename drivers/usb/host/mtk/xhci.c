@@ -1592,7 +1592,7 @@ int xhci_drop_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 			kfree(sch_ep);
 		}
 		else{
-			xhci_warn(xhci, "[MTK]Doesn't find ep_sch instance when removing endpoint\n");
+			xhci_dbg(xhci, "[MTK]Doesn't find ep_sch instance when removing endpoint\n");
 		}
 #else
 		mtk_xhci_scheduler_remove_ep(xhci, udev, ep);
