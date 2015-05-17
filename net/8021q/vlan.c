@@ -372,8 +372,10 @@ static int register_vlan_device(struct net_device *real_dev, u16 vlan_id)
 	if (err < 0)
 		goto out_free_newdev;
 #if defined (CONFIG_RAETH_HW_VLAN_TX)
+	rcu_read_lock();
 	if (rcu_dereference(add_hw_vlan_vid))
 		err = add_hw_vlan_vid(vlan_id);
+	rcu_read_unlock();
 
 	if (err < 0)
 		goto out_free_newdev;
