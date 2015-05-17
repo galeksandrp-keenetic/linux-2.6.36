@@ -33,6 +33,7 @@
 #include <linux/kdebug.h>
 #include <linux/string.h>
 #include <linux/rwsem.h>
+#include <linux/sched.h>
 #include <linux/slab.h>
 #include <linux/ctype.h>
 #include <linux/init.h>
