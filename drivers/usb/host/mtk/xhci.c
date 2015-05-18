@@ -47,6 +47,15 @@ static int link_quirk;
 module_param(link_quirk, int, S_IRUGO | S_IWUSR);
 MODULE_PARM_DESC(link_quirk, "Don't clear the chain bit on a link TRB");
 
+static struct file_operations xhci_mtk_test_fops = {
+    owner:   THIS_MODULE,
+    read:    xhci_mtk_test_read,
+    write:   xhci_mtk_test_write,
+    unlocked_ioctl:   xhci_mtk_test_unlock_ioctl,
+    open:    xhci_mtk_test_open,
+    release: xhci_mtk_test_release,
+};
+
 /* TODO: copied from ehci-hcd.c - can this be refactored? */
 /*
  * handshake - spin reading hc until handshake completes or fails
@@ -391,6 +400,7 @@ static void compliance_mode_recovery_timer_init(struct xhci_hcd *xhci)
 	xhci_dbg(xhci, "Compliance Mode Recovery Timer Initialized.\n");
 }
 
+#if 0
 /*
  * This function identifies the systems that have installed the SN65LVPE502CP
  * USB3.0 re-driver and that need the Compliance Mode Quirk.
@@ -422,7 +432,7 @@ static int xhci_all_ports_seen_u0(struct xhci_hcd *xhci)
 {
 	return (xhci->port_status_u0 == ((1 << xhci->num_usb3_ports)-1));
 }
-
+#endif
 
 /*
  * Initialize memory for HCD and xHC (one-time init).
@@ -547,7 +557,7 @@ int xhci_run(struct usb_hcd *hcd)
 {
 	u32 temp;
 	u64 temp_64;
-	int ret;
+	// int ret;
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 	
 	/* Start the xHCI host controller running only after the USB 2.0 roothub
@@ -1577,6 +1587,7 @@ int xhci_drop_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		else{
 			isTT = 0;
 		}
+
 		if(usb_endpoint_xfer_int(&ep->desc)){
 			ep_type = USB_EP_INT;
 		}
@@ -1585,6 +1596,9 @@ int xhci_drop_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		}
 		else if(usb_endpoint_xfer_bulk(&ep->desc)){
 			ep_type = USB_EP_BULK;
+		}
+		else{
+			ep_type = USB_EP_CONTROL;
 		}
 		sch_ep = mtk_xhci_scheduler_remove_ep(udev->speed, usb_endpoint_dir_in(&ep->desc)
 			, isTT, ep_type, (mtk_u32 *)ep);
@@ -1624,9 +1638,9 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		struct usb_host_endpoint *ep)
 {
 	struct xhci_hcd *xhci;
-	struct xhci_container_ctx *in_ctx, *out_ctx;
+	struct xhci_container_ctx *in_ctx; // *out_ctx
 	unsigned int ep_index;
-	struct xhci_ep_ctx *ep_ctx, *in_ep_ctx;;
+	struct xhci_ep_ctx *in_ep_ctx; // *ep_ctx
 	struct xhci_slot_ctx *slot_ctx;
 	struct xhci_input_control_ctx *ctrl_ctx;
 	u32 added_ctxs;
@@ -1638,9 +1652,9 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		struct sch_ep *sch_ep;
 		int isTT;
 		int ep_type;
-		int maxp;
-		int burst;
-		int mult;
+		int maxp = 0;
+		int burst = 0;
+		int mult = 0;
 		int interval;
 #endif
 
@@ -1669,10 +1683,10 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 
 	virt_dev = xhci->devs[udev->slot_id];
 	in_ctx = virt_dev->in_ctx;
-	out_ctx = virt_dev->out_ctx;
+	// out_ctx = virt_dev->out_ctx;
 	ctrl_ctx = xhci_get_input_control_ctx(xhci, in_ctx);
 	ep_index = xhci_get_endpoint_index(&ep->desc);
-	ep_ctx = xhci_get_ep_ctx(xhci, out_ctx, ep_index);
+	// ep_ctx = xhci_get_ep_ctx(xhci, out_ctx, ep_index);
 
 	/* If this endpoint is already in use, and the upper layers are trying
 	 * to add it again without dropping it, reject the addition.
@@ -1715,6 +1729,7 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		else{
 			isTT = 0;
 		}
+
 		if(usb_endpoint_xfer_int(&ep->desc)){
 			ep_type = USB_EP_INT;
 		}
@@ -1723,6 +1738,9 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		}
 		else if(usb_endpoint_xfer_bulk(&ep->desc)){
 			ep_type = USB_EP_BULK;
+		}
+		else{
+			ep_type = USB_EP_CONTROL;
 		}
 		if(udev->speed == USB_SPEED_FULL || udev->speed == USB_SPEED_HIGH 
 			|| udev->speed == USB_SPEED_LOW){
@@ -2794,7 +2812,6 @@ int xhci_discover_or_reset_device(struct usb_hcd *hcd, struct usb_device *udev)
 	int timeleft;
 	int last_freed_endpoint;
 	struct xhci_slot_ctx *slot_ctx;
-	int old_active_eps = 0;
 
 	ret = xhci_check_args(hcd, udev, NULL, 0, false, __func__);
 	if (ret <= 0)

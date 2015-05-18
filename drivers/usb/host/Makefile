@@ -7,7 +7,7 @@ ifeq ($(CONFIG_USB_DEBUG),y)
 endif
 
 ifdef CONFIG_USB_MT7621_XHCI_HCD
-xhci-hcd-objs := mtk/xhci.o mtk/xhci-mem.o mtk/xhci-plat.o mtk/xhci-ring.o mtk/xhci-hub.o mtk/xhci-dbg.o mtk/mtk-phy.o mtk/xhci-mtk-scheduler.o mtk/xhci-mtk-power.o mtk/xhci-mtk.o mtk/mtk-phy-7621.o mtk/mtk-phy-ahb.o
+xhci-hcd-objs := mtk/xhci.o mtk/xhci-mem.o mtk/xhci-ring.o mtk/xhci-hub.o mtk/xhci-dbg.o mtk/mtk-phy.o mtk/xhci-mtk-scheduler.o mtk/xhci-mtk-power.o mtk/xhci-mtk.o mtk/mtk-phy-7621.o mtk/mtk-phy-ahb.o
 
 obj-$(CONFIG_U3_PHY_GPIO_SUPPORT)	+= mtk/mtk-phy-gpio.o
 obj-$(CONFIG_C60802_SUPPORT)		+= mtk/mtk-phy-c60802.o

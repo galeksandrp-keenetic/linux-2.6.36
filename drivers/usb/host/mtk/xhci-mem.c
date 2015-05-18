@@ -1291,7 +1291,7 @@ int xhci_endpoint_init(struct xhci_hcd *xhci,
 	struct xhci_ep_ctx *ep_ctx;
 	struct xhci_ring *ep_ring;
 	unsigned int max_packet;
-	unsigned int max_burst;
+	unsigned int max_burst = 0;
 	enum xhci_ring_type type;
 	u32 max_esit_payload;
 
@@ -1612,7 +1612,7 @@ void xhci_mem_cleanup(struct xhci_hcd *xhci)
 	struct xhci_cd  *cur_cd, *next_cd;
 	unsigned long	flags;
         int size;
-	int i, j, num_ports;
+	int i;
 
 	/* Free the Event Ring Segment Table and the actual Event Ring */
 	size = sizeof(struct xhci_erst_entry)*(xhci->erst.num_entries);
@@ -1937,7 +1937,7 @@ static int xhci_setup_port_arrays(struct xhci_hcd *xhci, gfp_t flags)
 	__le32 __iomem *addr;
 	u32 offset;
 	unsigned int num_ports;
-	int i, j, port_index;
+	int i, port_index;
 
 	addr = &xhci->cap_regs->hcc_params;
 	offset = XHCI_HCC_EXT_CAPS(xhci_readl(xhci, addr));

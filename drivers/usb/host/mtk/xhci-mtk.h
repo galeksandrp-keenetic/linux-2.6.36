@@ -77,29 +77,20 @@
 #define XHCI_MTK_TEST_MAJOR		234
 #define DEVICE_NAME			"xhci_mtk_test"
 
-#define CLI_MAGIC			'CLI'
+#define CLI_MAGIC			0x434c49 // 'CLI'
 #define IOCTL_READ			_IOR(CLI_MAGIC, 0, int)
 #define IOCTL_WRITE			_IOW(CLI_MAGIC, 1, int)
 
 void reinitIP(void);
-void setInitialReg();
+void setInitialReg(void);
 void dbg_prb_out(void);
 int call_function(char *buf);
 
-int xhci_mtk_test_unlock_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
+long xhci_mtk_test_unlock_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 int xhci_mtk_test_open(struct inode *inode, struct file *file);
 int xhci_mtk_test_release(struct inode *inode, struct file *file);
 ssize_t xhci_mtk_test_read(struct file *file, char *buf, size_t count, loff_t *ptr);
 ssize_t xhci_mtk_test_write(struct file *file, const char *buf, size_t count, loff_t * ppos);
-
-static struct file_operations xhci_mtk_test_fops = {
-    owner:   THIS_MODULE,
-    read:    xhci_mtk_test_read,
-    write:   xhci_mtk_test_write,
-    unlocked_ioctl:   xhci_mtk_test_unlock_ioctl,
-    open:    xhci_mtk_test_open,
-    release: xhci_mtk_test_release,
-};
 
 /*
   mediatek probe out

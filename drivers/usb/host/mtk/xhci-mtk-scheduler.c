@@ -259,16 +259,14 @@ int count_hs_bw(int ep_type, int maxp, int interval, int offset, int td_size){
 
 int count_tt_isoc_bw(int is_in, int maxp, int interval, int offset, int td_size){
 	char is_cs;
-	int mframe_idx, frame_idx, s_frame, s_mframe, cur_mframe;
+	int cur_mframe; // s_frame, s_mframe
 	int bw_required, max_bw;
 	int ss_cs_count;
 	int cs_mframe;
-	int max_frame;
 	int i,j;
 	struct sch_ep *cur_sch_ep;
 	int ep_offset;
 	int ep_interval;
-	int ep_cs_count;
 	int tt_isoc_interval;	//for isoc tt check
 	int cur_tt_isoc_interval;	//for isoc tt check
 	int tmp_offset;
@@ -280,8 +278,10 @@ int count_tt_isoc_bw(int is_in, int maxp, int interval, int offset, int td_size)
 	if(is_in){
 		is_cs = 1;
 	}
+/*
 	s_frame = offset/8;
 	s_mframe = offset%8;
+*/
 	ss_cs_count = (maxp + (188 - 1))/188;
 	if(is_cs){
 		cs_mframe = offset%8 + 2 + ss_cs_count;
@@ -355,13 +355,11 @@ int count_tt_isoc_bw(int is_in, int maxp, int interval, int offset, int td_size)
 
 int count_tt_intr_bw(int interval, int frame_offset){
 	//check all eps in tt_intr_eps
-	int ret;
-	int i,j;
+	int i;
 	int ep_offset;
 	int ep_interval;
 	int tmp_offset;
 	int tmp_interval;
-	ret = SCH_SUCCESS;
 	struct sch_ep *cur_sch_ep;
 	
 	for(i=0; i<MAX_EP_NUM; i++){
@@ -426,7 +424,7 @@ int mtk_xhci_scheduler_add_ep(int dev_speed, int is_in, int isTT, int ep_type, i
 	int td_size;
 	int mframe_idx, frame_idx;
 	int bw_cost;
-	int cur_bw, best_bw, best_bw_idx,repeat, max_repeat, best_bw_repeat;
+	int cur_bw, best_bw, best_bw_idx,repeat, max_repeat, best_bw_repeat = 0;
 	int cur_offset, cs_mframe;
 	int break_out;
 	int frame_interval;

@@ -13,7 +13,7 @@
 #include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
 
-void setInitialReg(){
+void setInitialReg(void){
 	__u32 __iomem *addr;
 	u32 temp;
 
@@ -49,43 +49,43 @@ void setInitialReg(){
 	writel(temp, addr);
 #elif defined (CONFIG_MT7621_ASIC)
 	/* set SSUSB DMA burst size to 128B */
-	addr = SSUSB_U3_XHCI_BASE + SSUSB_HDMA_CFG;
+	addr = (void *) (SSUSB_U3_XHCI_BASE + SSUSB_HDMA_CFG);
 	temp = SSUSB_HDMA_CFG_MT7621_VALUE;
 	writel(temp, addr);
 
 	/* extend U3 LTSSM Polling.LFPS timeout value */
-	addr = SSUSB_U3_XHCI_BASE + U3_LTSSM_TIMING_PARAMETER3;
+	addr = (void *) (SSUSB_U3_XHCI_BASE + U3_LTSSM_TIMING_PARAMETER3);
 	temp = U3_LTSSM_TIMING_PARAMETER3_VALUE;
 	writel(temp, addr);
 
 	/* EOF */
-	addr = SSUSB_U3_XHCI_BASE + SYNC_HS_EOF;
+	addr = (void *) (SSUSB_U3_XHCI_BASE + SYNC_HS_EOF);
 	temp = SYNC_HS_EOF_VALUE;
 	writel(temp, addr);
 
 #if defined (CONFIG_PERIODIC_ENP)
 	/* HSCH_CFG1: SCH2_FIFO_DEPTH */
-	addr = SSUSB_U3_XHCI_BASE + HSCH_CFG1;
+	addr = (void *) (SSUSB_U3_XHCI_BASE + HSCH_CFG1);
 	temp = readl(addr);
 	temp &= ~(0x3 << SCH2_FIFO_DEPTH_OFFSET);
 	writel(temp, addr);
 #endif
 
 	/* Doorbell handling */
-	addr = SIFSLV_IPPC + SSUSB_IP_SPAR0;
+	addr = (void *) (SIFSLV_IPPC + SSUSB_IP_SPAR0);
 	temp = 0x1;
 	writel(temp, addr);
 
 	/* Set SW PLL Stable mode to 1 for U2 LPM device remote wakeup */
 	/* Port 0 */
-	addr = U2_PHY_BASE + U2_PHYD_CR1;
+	addr = (void *) (U2_PHY_BASE + U2_PHYD_CR1);
 	temp = readl(addr);
 	temp &= ~(0x3 << 18);
 	temp |= (1 << 18);
 	writel(temp, addr);
 
 	/* Port 1 */
-	addr = U2_PHY_BASE_P1 + U2_PHYD_CR1;
+	addr = (void *) (U2_PHY_BASE_P1 + U2_PHYD_CR1);
 	temp = readl(addr);
 	temp &= ~(0x3 << 18);
 	temp |= (1 << 18);
@@ -98,26 +98,23 @@ void setInitialReg(){
 void setLatchSel(void){
 	__u32 __iomem *latch_sel_addr;
 	u32 latch_sel_value;
-	latch_sel_addr = U3_PIPE_LATCH_SEL_ADD;
+	latch_sel_addr = (void *) U3_PIPE_LATCH_SEL_ADD;
 	latch_sel_value = ((U3_PIPE_LATCH_TX)<<2) | (U3_PIPE_LATCH_RX);
 	writel(latch_sel_value, latch_sel_addr);
 }
 
 void reinitIP(void){
-	__u32 __iomem *ip_reset_addr;
-	u32 ip_reset_value;
-
 	enableAllClockPower();
 
 #ifdef CONFIG_MT7621_FPGA
 	setLatchSel();
 #endif
 	mtk_xhci_scheduler_init();
-#if PERF_PROBE
+#ifdef PERF_PROBE
 	mtk_probe_init(0x38383838);
 	mtk_probe_out(0x0);
 #endif
-#if WEB_CAM_PROBE
+#ifdef WEB_CAM_PROBE
 	mtk_probe_init(0x70707070);
 	mtk_probe_out(0x0);
 #endif
@@ -150,6 +147,9 @@ static int dbg_u3w(int argc, char**argv)
 	int u4TimingValue;
 	char u1TimingValue;
 	int u4TimingAddress;
+#ifdef CONFIG_MT7621_ASIC
+	u32 __iomem *addr;
+#endif
 
 	if (argc<3)
     {
@@ -163,7 +163,8 @@ static int dbg_u3w(int argc, char**argv)
 	u1TimingValue = u4TimingValue & 0xff;
 #ifdef CONFIG_MT7621_ASIC
 /* access MMIO directly */
-	writel(u1TimingValue, u4TimingAddress);
+	addr = (void *) u4TimingAddress;
+	writel(u1TimingValue, addr);
 #else
 /* access through I2C or GPIO window */
 	_U3Write_Reg(u4TimingAddress, u1TimingValue);
@@ -177,6 +178,9 @@ static int dbg_u3r(int argc, char**argv)
 {
 	char u1ReadTimingValue;
 	int u4TimingAddress;
+#ifdef CONFIG_MT7621_ASIC
+	u32 __iomem *addr;
+#endif
 	if (argc<2)
     {
         printk(KERN_ERR "Arg: address\n");
@@ -187,7 +191,8 @@ static int dbg_u3r(int argc, char**argv)
 	u4TimingAddress = (int)simple_strtol(argv[1], &argv[1], 16);
 #ifdef CONFIG_MT7621_ASIC
 /* access MMIO directly */
-	u1ReadTimingValue = readl(u4TimingAddress);
+	addr = (void *) u4TimingAddress;
+	u1ReadTimingValue = readl(addr);
 #else
 /* access through I2C or GPIO window */
 	u1ReadTimingValue = _U3Read_Reg(u4TimingAddress);
@@ -198,9 +203,10 @@ static int dbg_u3r(int argc, char**argv)
 
 static int dbg_u3init(int argc, char**argv)
 {
-	int ret;
-	ret = u3phy_init();
+	u3phy_init();
+
 	printk(KERN_ERR "phy registers and operations initial done\n");
+
 	if(u3phy_ops->u2_slew_rate_calibration){
 		u3phy_ops->u2_slew_rate_calibration(u3phy);
 	}
@@ -213,21 +219,20 @@ static int dbg_u3init(int argc, char**argv)
 }
 
 void dbg_setU1U2(int argc, char**argv){
-	struct xhci_hcd *xhci;
 	int u1_value;
 	int u2_value;
-	u32 port_id, temp;
+	u32 temp;
 	u32 __iomem *addr;
 	
 	if (argc<3)
     {
         printk(KERN_ERR "Arg: u1value u2value\n");
-        return RET_FAIL;
+        return;
     }
 
 	u1_value = (int)simple_strtol(argv[1], &argv[1], 10);
 	u2_value = (int)simple_strtol(argv[2], &argv[2], 10);
-	addr = (SSUSB_U3_XHCI_BASE + 0x424);
+	addr = (void *) (SSUSB_U3_XHCI_BASE + 0x424);
 	temp = readl(addr);
 	temp = temp & (~(0x0000ffff));
 	temp = temp | u1_value | (u2_value<<8);
@@ -237,7 +242,6 @@ void dbg_setU1U2(int argc, char**argv){
 
 int call_function(char *buf)
 {
-	int i;
 	int argc;
 	char *argv[80];
 
@@ -264,25 +268,24 @@ int call_function(char *buf)
 char w_buf[200];
 char r_buf[200] = "this is a test";
 
-int xhci_mtk_test_unlock_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
+long xhci_mtk_test_unlock_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-
-    int len = 200;
+	int len = 200;
 
 	switch (cmd) {
-		case IOCTL_READ:
-			copy_to_user((char *) arg, r_buf, len);
-			printk(KERN_DEBUG "IOCTL_READ: %s\r\n", r_buf);
-			break;
-		case IOCTL_WRITE:
-			copy_from_user(w_buf, (char *) arg, len);
-			printk(KERN_DEBUG "IOCTL_WRITE: %s\r\n", w_buf);
+	case IOCTL_READ:
+		copy_to_user((char *) arg, r_buf, len);
+		printk(KERN_DEBUG "IOCTL_READ: %s\r\n", r_buf);
+		break;
 
-			//invoke function
-			return call_function(w_buf);
-			break;
-		default:
-			return -ENOTTY;
+	case IOCTL_WRITE:
+		copy_from_user(w_buf, (char *) arg, len);
+		printk(KERN_DEBUG "IOCTL_WRITE: %s\r\n", w_buf);
+
+		//invoke function
+		return call_function(w_buf);
+	default:
+		return -ENOTTY;
 	}
 
 	return len;

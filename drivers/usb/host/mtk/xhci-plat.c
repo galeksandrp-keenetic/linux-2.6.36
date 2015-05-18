@@ -229,7 +229,6 @@ static void xhci_hcd_release (struct device *dev)
 	printk(KERN_INFO "dev = 0x%08X.\n", (uint32_t)dev);
 }
 
-
 static struct platform_driver usb_xhci_driver = {
 	.probe  = xhci_plat_probe,
 	.remove = xhci_plat_remove,
@@ -238,6 +237,7 @@ static struct platform_driver usb_xhci_driver = {
 		.owner =	THIS_MODULE,
 	},
 };
+
 MODULE_ALIAS("platform:xhci-hcd");
 #if 0
 int xhci_register_plat(void)

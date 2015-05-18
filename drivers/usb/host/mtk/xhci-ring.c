@@ -145,7 +145,7 @@ static void next_trb(struct xhci_hcd *xhci,
  */
 static void inc_deq(struct xhci_hcd *xhci, struct xhci_ring *ring)
 {
-	unsigned long long addr;
+	//unsigned long long addr;
 
 	ring->deq_updates++;
 
@@ -176,7 +176,7 @@ static void inc_deq(struct xhci_hcd *xhci, struct xhci_ring *ring)
 		}
 	} while (last_trb(xhci, ring, ring->deq_seg, ring->dequeue));
 
-	addr = (unsigned long long) xhci_trb_virt_to_dma(ring->deq_seg, ring->dequeue);
+	//addr = (unsigned long long) xhci_trb_virt_to_dma(ring->deq_seg, ring->dequeue);
 }
 
 /*
@@ -201,7 +201,7 @@ static void inc_enq(struct xhci_hcd *xhci, struct xhci_ring *ring,
 {
 	u32 chain;
 	union xhci_trb *next;
-	unsigned long long addr;
+	//unsigned long long addr;
 
 	chain = le32_to_cpu(ring->enqueue->generic.field[3]) & TRB_CHAIN;
 	/* If this is not event ring, there is one less usable TRB */
@@ -251,7 +251,7 @@ static void inc_enq(struct xhci_hcd *xhci, struct xhci_ring *ring,
 		ring->enqueue = ring->enq_seg->trbs;
 		next = ring->enqueue;
 	}
-	addr = (unsigned long long) xhci_trb_virt_to_dma(ring->enq_seg, ring->enqueue);
+	//addr = (unsigned long long) xhci_trb_virt_to_dma(ring->enq_seg, ring->enqueue);
 }
 
 /*
@@ -261,7 +261,7 @@ static void inc_enq(struct xhci_hcd *xhci, struct xhci_ring *ring,
 static inline int room_on_ring(struct xhci_hcd *xhci, struct xhci_ring *ring,
 		unsigned int num_trbs)
 {
-	int num_trbs_in_deq_seg;
+	// int num_trbs_in_deq_seg;
 
 	if (ring->num_trbs_free < num_trbs)
 			return 0;
@@ -1360,7 +1360,7 @@ static void handle_cmd_completion(struct xhci_hcd *xhci,
 	struct xhci_input_control_ctx *ctrl_ctx;
 	struct xhci_virt_device *virt_dev;
 	unsigned int ep_index;
-	struct xhci_ring *ep_ring;
+	// struct xhci_ring *ep_ring;
 	unsigned int ep_state;
 
 	cmd_dma = le64_to_cpu(event->cmd_trb);
@@ -1436,7 +1436,7 @@ static void handle_cmd_completion(struct xhci_hcd *xhci,
 				ep_index != (unsigned int) -1 &&
 		    le32_to_cpu(ctrl_ctx->add_flags) - SLOT_FLAG ==
 		    le32_to_cpu(ctrl_ctx->drop_flags)) {
-			ep_ring = xhci->devs[slot_id]->eps[ep_index].ring;
+			// ep_ring = xhci->devs[slot_id]->eps[ep_index].ring;
 			ep_state = xhci->devs[slot_id]->eps[ep_index].ep_state;
 			if (!(ep_state & EP_HALTED))
 				goto bandwidth_change;
@@ -2692,13 +2692,13 @@ irqreturn_t xhci_irq(struct usb_hcd *hcd)
 {
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 	u32 status;
-	union xhci_trb *trb;
+	// union xhci_trb *trb;
 	u64 temp_64;
 	union xhci_trb *event_ring_deq;
 	dma_addr_t deq;
 
 	spin_lock(&xhci->lock);
-	trb = xhci->event_ring->dequeue;
+	// trb = xhci->event_ring->dequeue;
 	/* Check if the xHC generated the interrupt, or the irq is shared */
 	status = xhci_readl(xhci, &xhci->op_regs->status);
 	if (status == 0xffffffff)
@@ -3126,7 +3126,7 @@ static int queue_bulk_sg_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 	struct scatterlist *sg;
 	int num_sgs;
 	int trb_buff_len, this_sg_len, running_total;
-	unsigned int total_packet_count;
+	// unsigned int total_packet_count;
 	bool first_trb;
 	u64 addr;
 	bool more_trbs_coming;
@@ -3140,8 +3140,10 @@ static int queue_bulk_sg_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 
 	num_trbs = count_sg_trbs_needed(xhci, urb);
 	num_sgs = urb->num_sgs;
+/*
 	total_packet_count = roundup(urb->transfer_buffer_length,
 			usb_endpoint_maxp(&urb->ep->desc));
+*/
 
 	trb_buff_len = prepare_transfer(xhci, xhci->devs[slot_id],
 			ep_index, urb->stream_id,
@@ -3284,7 +3286,7 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 	u32 field, length_field;
 
 	int running_total, trb_buff_len, ret;
-	unsigned int total_packet_count;
+	// unsigned int total_packet_count;
 	u64 addr;
 	int max_packet;
 
@@ -3319,6 +3321,9 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 		case USB_SPEED_HIGH:
 		case USB_SPEED_FULL:
 		case USB_SPEED_LOW:
+		case USB_SPEED_WIRELESS:
+		case USB_SPEED_UNKNOWN:
+		default:
 			max_packet = urb->ep->desc.wMaxPacketSize & 0x7ff;
 			break;
 	}
@@ -3345,8 +3350,10 @@ int xhci_queue_bulk_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 	start_cycle = ep_ring->cycle_state;
 
 	running_total = 0;
+/*
 	total_packet_count = roundup(urb->transfer_buffer_length,
 			usb_endpoint_maxp(&urb->ep->desc));
+*/
 	/* How much data is in the first TRB? */
 	addr = (u64) urb->transfer_dma;
 	trb_buff_len = TRB_MAX_BUFF_SIZE -
@@ -3644,6 +3651,9 @@ static int xhci_queue_isoc_tx(struct xhci_hcd *xhci, gfp_t mem_flags,
 		case USB_SPEED_HIGH:
 		case USB_SPEED_FULL:
 		case USB_SPEED_LOW:
+		case USB_SPEED_WIRELESS:
+		case USB_SPEED_UNKNOWN:
+		default:
 			max_packet = urb->ep->desc.wMaxPacketSize & 0x7ff;
 			break;
 	}
