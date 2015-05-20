@@ -5292,7 +5292,7 @@ int ranand_erase(unsigned int offs, u32 len)
 		return -1;
 	}
 	
-	while (len) {
+	while (len > 0) {
 		page = (int)(offs >> nand_chip->page_shift); 
 		/* select device and check wp */
 #ifdef CONFIG_BADBLOCK_CHECK
@@ -5302,6 +5302,7 @@ int ranand_erase(unsigned int offs, u32 len)
 			printf("%s: attempt to erase a bad block at 0x%08x\n", __func__, offs);
 			ret++;
 			offs += mtd->erasesize;
+			len -= mtd->erasesize;
 			continue;
 		}
 #endif
