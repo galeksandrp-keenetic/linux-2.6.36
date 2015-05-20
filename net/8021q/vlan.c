@@ -181,8 +181,10 @@ void unregister_vlan_dev(struct net_device *dev, struct list_head *head)
 		ops->ndo_vlan_rx_kill_vid(real_dev, vlan_id);
 
 #if defined (CONFIG_RAETH_HW_VLAN_TX)
+	rcu_read_lock();
 	if (rcu_dereference(del_hw_vlan_vid))
 		del_hw_vlan_vid(vlan_id);
+	rcu_read_unlock();
 #endif
 	grp->nr_vlans--;
 
