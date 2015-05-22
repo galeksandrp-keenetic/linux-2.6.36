@@ -552,13 +552,13 @@ PHY_INT32 u2_slew_rate_calibration_c60802(struct u3phy_info *info){
 		// => u4FmOut = USB_FM_OUT
 		// read FM_OUT
 		u4FmOut = U3PhyReadReg32(((PHY_UINT32)&info->sifslv_fm_regs_c->fmmonr0));
-		printk("FM_OUT value: u4FmOut = %d(0x%08X)\n", u4FmOut, u4FmOut);
+		// printk("FM_OUT value: u4FmOut = %d(0x%08X)\n", u4FmOut, u4FmOut);
 
 		// check if FM detection done 
 		if (u4FmOut != 0)
 		{
 			fgRet = 0;
-			printk("FM detection done! loop = %d\n", i);
+			printk(KERN_INFO "FM detection done, loop = %d\n", i);
 			
 			break;
 		}
