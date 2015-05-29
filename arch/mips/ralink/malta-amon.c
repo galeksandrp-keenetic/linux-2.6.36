@@ -65,7 +65,7 @@ void amon_cpu_start(int cpu,
 	}
 	launch += cpu;
 
-	printk("launch: starting cpu%d\n", cpu);
+	printk(KERN_INFO "launch: starting cpu%d\n", cpu);
 
 	launch->pc = pc;
 	launch->gp = gp;
@@ -78,7 +78,7 @@ void amon_cpu_start(int cpu,
 	while ((launch->flags & LAUNCH_FGONE) == 0)
 		;
 	smp_rmb();		/* Target will be updating flags soon */
-	printk("launch: cpu%d gone!\n", cpu);
+	printk(KERN_INFO "launch: cpu%d gone\n", cpu);
 }
 
 /*
