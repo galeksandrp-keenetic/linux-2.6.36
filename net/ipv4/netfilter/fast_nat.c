@@ -202,7 +202,7 @@ static int __init fast_nat_init(void)
 	rcu_assign_pointer(fast_nat_hit_hook_func, fast_nat_path);
 	synchronize_rcu();
 	rcu_assign_pointer(fast_nat_bind_hook_func, fast_nat_do_bindings);
-	printk("Run Fast NAT\n");
+	printk(KERN_INFO "fast NAT loaded\n");
 	return 0;
 }
 
@@ -211,6 +211,7 @@ static void __exit fast_nat_fini(void)
 	rcu_assign_pointer(fast_nat_bind_hook_func, NULL);
 	synchronize_rcu();
 	rcu_assign_pointer(fast_nat_hit_hook_func, NULL);
+	printk(KERN_INFO "fast NAT unloaded\n");
 }
 
 module_init(fast_nat_init);
