@@ -2264,12 +2264,13 @@ ppp_unregister_channel(struct ppp_channel *chan)
 {
 	struct channel *pch = chan->ppp;
 	struct ppp_net *pn;
-	int idx = ppp_channel_index(pch->chan);
-	struct list_head *plist, *temp;
-	struct pppoe_session_item *pitem;
 
 	if (!pch)
 		return;		/* should never happen */
+
+	int idx = ppp_channel_index(pch->chan);
+	struct list_head *plist, *temp;
+	struct pppoe_session_item *pitem;
 
 	printk(KERN_DEBUG "PPP unregister channel index=%d\n", idx);
 	list_for_each_safe(plist, temp, &pppoe_sessions) {
