@@ -2273,11 +2273,12 @@ ppp_unregister_channel(struct ppp_channel *chan)
 	struct list_head *plist, *temp;
 	struct pppoe_session_item *pitem;
 
-	printk(KERN_DEBUG "PPP unregister channel index=%d\n", idx);
+	pr_debug("PPP unregister channel index=%d\n", idx);
 	list_for_each_safe(plist, temp, &pppoe_sessions) {
 		pitem = list_entry(plist, struct pppoe_session_item, list);
 		if (idx == pitem->idx) {
-			pch->ppp->dev->sid = 0;
+			if (pch->ppp && pch->ppp->dev)
+				pch->ppp->dev->sid = 0;
 			list_del(plist);
 			kfree(pitem);
 		}
@@ -2900,17 +2901,19 @@ ppp_connect_channel(struct channel *pch, int unit)
  out:
 	mutex_unlock(&pn->all_ppp_mutex);
 
-	idx = ppp_channel_index(pch->chan);
-	printk(KERN_DEBUG "PPP connect channel dev=%s index=%d \n",
+	pr_debug("PPP connect channel dev=%s index=%d \n",
 			pch->ppp->dev->name, idx);
+	idx = ppp_channel_index(pch->chan);
 	list_for_each_entry(pitem, &pppoe_sessions, list) {
 		if (idx == pitem->idx) {
-			strncpy(pitem->name, pch->ppp->dev->name, IFNAMSIZ);
-			pch->ppp->dev->sid = pitem->sid;
-			printk(KERN_DEBUG "Add dev to list\n");
-			rtnl_lock();
-			netdev_features_change(pch->ppp->dev);
-			rtnl_unlock();
+			if (pch->ppp && pch->ppp->dev) {
+				strncpy(pitem->name, pch->ppp->dev->name, IFNAMSIZ);
+				pch->ppp->dev->sid = pitem->sid;
+				pr_debug("Add dev to list\n");
+				rtnl_lock();
+				netdev_features_change(pch->ppp->dev);
+				rtnl_unlock();
+			}
 		}
 	}
 
