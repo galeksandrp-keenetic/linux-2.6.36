@@ -708,7 +708,7 @@ static int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 	sid = be16_to_cpu(po->num);
 	idx = ppp_channel_index(&po->chan);
 	if (sid > 0 && idx > 0) {
-		printk(KERN_DEBUG "PPPoE connect: sid=%hd channel index=%d\n", sid, idx);
+		pr_debug("PPPoE connect: sid=%hd channel index=%d\n", sid, idx);
 		pitem = kmalloc(sizeof(*pitem), GFP_KERNEL);
 		if (pitem == NULL) {
 			error = -ENOMEM;
@@ -717,7 +717,7 @@ static int pppoe_connect(struct socket *sock, struct sockaddr *uservaddr,
 		memset(pitem->name, 0, IFNAMSIZ);
 		pitem->idx = idx;
 		pitem->sid = sid;
-		printk(KERN_DEBUG "Add chnl to list\n");
+		pr_debug("Add chnl to list\n");
 		list_add(&pitem->list, &pppoe_sessions);
 	}
 
