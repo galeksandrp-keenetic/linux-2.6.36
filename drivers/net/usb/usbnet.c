@@ -245,7 +245,7 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 		  skb->len + sizeof (struct ethhdr), skb->protocol);
 	memset (skb->cb, 0, sizeof (struct skb_data));
 
-#if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
+#if (defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)) && defined (CONFIG_RA_HW_NAT_NIC_USB)
 	FOE_MAGIC_TAG(skb) = FOE_MAGIC_PCI;
 	FOE_AI(skb) = UN_HIT;
 	if (ra_sw_nat_hook_rx && dev->hwnat_port) {
@@ -347,7 +347,7 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 	unsigned long		lockflags;
 	size_t			size = dev->rx_urb_size;
 
-#if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
+#if (defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)) && defined (CONFIG_RA_HW_NAT_NIC_USB)
 	if ((skb = alloc_skb (size + NET_IP_ALIGN + FOE_INFO_LEN, flags)) == NULL) {
 #else
 	if ((skb = alloc_skb (size + NET_IP_ALIGN, flags)) == NULL) {
@@ -357,7 +357,7 @@ static int rx_submit (struct usbnet *dev, struct urb *urb, gfp_t flags)
 		usb_free_urb (urb);
 		return -ENOMEM;
 	}
-#if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
+#if (defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)) && defined (CONFIG_RA_HW_NAT_NIC_USB)
 	skb_reserve (skb, NET_IP_ALIGN + FOE_INFO_LEN);
 #else
 //#ifndef DWC_HOST_ONLY
@@ -1101,7 +1101,7 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 		goto drop;
 	}
 
-#if defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)
+#if (defined (CONFIG_RA_HW_NAT) || defined (CONFIG_RA_HW_NAT_MODULE)) && defined (CONFIG_RA_HW_NAT_NIC_USB)
 	/* add tx hook point*/
 	if(ra_sw_nat_hook_tx && dev->hwnat_port) {
 		skb->data += 4; //pointer to DA
@@ -1293,7 +1293,7 @@ void usbnet_disconnect (struct usb_interface *intf)
 	if (!dev)
 		return;
 
-#if defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)
+#if (defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)) && defined (CONFIG_RA_HW_NAT_NIC_USB)
 	if (ra_sw_nat_hook_release_dstport && dev->hwnat_port)
 		ra_sw_nat_hook_release_dstport(dev->hwnat_port);
 #endif
@@ -1363,7 +1363,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	const char			*name;
 	int (*is_wimax_devname)(u16 vendor_id, u16 product_id);
 	struct usb_driver 	*driver = to_usb_driver(udev->dev.driver);
-#if defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)
+#if (defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)) && defined (CONFIG_RA_HW_NAT_NIC_USB)
 	static uint32_t		hnport;
 #endif
 
@@ -1520,7 +1520,7 @@ usbnet_probe (struct usb_interface *udev, const struct usb_device_id *prod)
 	usb_register_dev(udev, &fake_usb_class);
 	/*devfs_mk_cdev(MKDEV(USB_MAJOR, udev->minor), S_IFCHR | S_IRUGO | S_IWUGO, 
 		"usb%s", net->name); */
-#if defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)
+#if (defined (CONFIG_RA_HW_NAT)  || defined (CONFIG_RA_HW_NAT_MODULE)) && defined (CONFIG_RA_HW_NAT_NIC_USB)
 	if (ra_sw_nat_hook_acquire_dstport) {
 		if (hnport == 0) {
 			hnport = DP_USB;
