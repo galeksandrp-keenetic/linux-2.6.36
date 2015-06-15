@@ -18,7 +18,7 @@
 #include <linux/spinlock.h>
 #include <net/dst.h>
 #include <net/xfrm.h>
-#if  defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
+#if	defined(CONFIG_RA_HW_NAT) || defined(CONFIG_RA_HW_NAT_MODULE)
 #include "../nat/hw_nat/ra_nat.h"
 #endif
 
@@ -40,8 +40,6 @@ static int xfrm_state_check_space(struct xfrm_state *x, struct sk_buff *skb)
 
 	return pskb_expand_head(skb, nhead, ntail, GFP_ATOMIC);
 }
-
-EXPORT_SYMBOL(xfrm_state_check_space);
 
 static int xfrm_output_one(struct sk_buff *skb, int err)
 {
@@ -99,13 +97,6 @@ static int xfrm_output_one(struct sk_buff *skb, int err)
 #endif
 
 		err = x->type->output(x, skb);
-#if defined (CONFIG_RALINK_HWCRYPTO) || defined (CONFIG_RALINK_HWCRYPTO_MODULE)
-		if (skb->protocol == htons(ETH_P_IP) || skb->protocol == htons(ETH_P_IPV6))
-		{
-			if (err == 1)
-				return err;
-		}
-#endif	
 		if (err == -EINPROGRESS)
 			goto out_exit;
 
@@ -157,10 +148,7 @@ int xfrm_output_resume(struct sk_buff *skb, int err)
 
 	if (err == -EINPROGRESS)
 		err = 0;
-#if defined (CONFIG_RALINK_HWCRYPTO) || defined (CONFIG_RALINK_HWCRYPTO_MODULE)
-	if (skb->protocol == htons(ETH_P_IP))
-		return 0;
-#endif	
+
 out:
 	return err;
 }

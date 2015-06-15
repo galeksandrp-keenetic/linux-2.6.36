@@ -28,9 +28,6 @@
 
 #include "xfrm_hash.h"
 
-void (*eip93Adapter_free)(unsigned int spi) = NULL;
-EXPORT_SYMBOL(eip93Adapter_free);
-
 /* Each xfrm_state may be linked to two tables:
 
    1. Hash table by (spi,daddr,ah/esp) to find SA by SPI. (input,ctl)
@@ -534,22 +531,11 @@ EXPORT_SYMBOL(__xfrm_state_destroy);
 
 int __xfrm_state_delete(struct xfrm_state *x)
 {
-	void (*ipsec_do_free)(unsigned int spi);
 	struct net *net = xs_net(x);
 	int err = -ESRCH;
 
 	if (x->km.state != XFRM_STATE_DEAD) {
 		x->km.state = XFRM_STATE_DEAD;
-
-		if ((x->type != NULL) && 
-			(NULL != (ipsec_do_free = rcu_dereference(eip93Adapter_free))) &&
-			(x->type->description) &&
-			(x->type->description[0] == 'E') &&
-			(x->type->description[3] == '4')) { // 'ESP4'
-
-				ipsec_do_free(x->id.spi);
-		}
-
 		spin_lock(&xfrm_state_lock);
 		list_del(&x->km.all);
 		hlist_del(&x->bydst);
@@ -1671,8 +1657,6 @@ void xfrm_replay_notify(struct xfrm_state *x, int event)
 		x->xflags &= ~XFRM_TIME_DEFER;
 }
 
-EXPORT_SYMBOL(xfrm_replay_notify);
-
 static void xfrm_replay_timer_handler(unsigned long data)
 {
 	struct xfrm_state *x = (struct xfrm_state*)data;
@@ -1739,7 +1723,6 @@ void xfrm_replay_advance(struct xfrm_state *x, __be32 net_seq)
 	if (xfrm_aevent_is_on(xs_net(x)))
 		xfrm_replay_notify(x, XFRM_REPLAY_UPDATE);
 }
-EXPORT_SYMBOL(xfrm_replay_advance);
 
 static LIST_HEAD(xfrm_km_list);
 static DEFINE_RWLOCK(xfrm_km_lock);
@@ -2317,5 +2300,4 @@ void xfrm_audit_state_icvfail(struct xfrm_state *x,
 	audit_log_end(audit_buf);
 }
 EXPORT_SYMBOL_GPL(xfrm_audit_state_icvfail);
-
 #endif /* CONFIG_AUDITSYSCALL */
