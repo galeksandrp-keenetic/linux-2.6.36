@@ -77,7 +77,7 @@
 #define XHCI_MTK_TEST_MAJOR		234
 #define DEVICE_NAME			"xhci_mtk_test"
 
-#define CLI_MAGIC			0x434c49 // 'CLI'
+#define CLI_MAGIC			'C'
 #define IOCTL_READ			_IOR(CLI_MAGIC, 0, int)
 #define IOCTL_WRITE			_IOW(CLI_MAGIC, 1, int)
 

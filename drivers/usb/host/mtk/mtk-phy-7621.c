@@ -136,10 +136,6 @@ PHY_INT32 eyescan_init(struct u3phy_info *info){
 	return PHY_TRUE;
 }
 
-// Too big for stack in function below.
-static PHY_UINT32 pwErrCnt0[CYCLE_COUNT_MAX][ERRCNT_MAX][ERRCNT_MAX];
-static PHY_UINT32 pwErrCnt1[CYCLE_COUNT_MAX][ERRCNT_MAX][ERRCNT_MAX];
-
 PHY_INT32 phy_eyescan(struct u3phy_info *info, PHY_INT32 x_t1, PHY_INT32 y_t1, PHY_INT32 x_br, PHY_INT32 y_br, PHY_INT32 delta_x, PHY_INT32 delta_y
 		, PHY_INT32 eye_cnt, PHY_INT32 num_cnt, PHY_INT32 PI_cal_en, PHY_INT32 num_ignore_cnt){
 	PHY_INT32 cOfst = 0;
@@ -155,6 +151,9 @@ PHY_INT32 phy_eyescan(struct u3phy_info *info, PHY_INT32 x_t1, PHY_INT32 y_t1, P
 	//PHY_INT8 isBreak;
 	PHY_UINT32 wErr0 = 0, wErr1 = 0;
 	//PHY_UINT32 temp;
+
+	PHY_UINT32 pwErrCnt0[CYCLE_COUNT_MAX][ERRCNT_MAX][ERRCNT_MAX];
+	PHY_UINT32 pwErrCnt1[CYCLE_COUNT_MAX][ERRCNT_MAX][ERRCNT_MAX];
 
 	_rEye1.bX_tl = x_t1;
 	_rEye1.bY_tl = y_t1;

@@ -32,10 +32,10 @@
 #include	"xhci-ext-caps.h"
 //#include "pci-quirks.h"
 
+#define MTK_HCD_NAME "xhc_mtk"
+
 #define XHC_IRQ 22
-//#define XHC_IRQ 15
 #define XHC_IO_START 0x1E1C0000
-//#define XHC_IO_START 0xF0040000
 #define XHC_IO_LENGTH 0x10000
 
 /* xHCI PCI Configuration Registers */

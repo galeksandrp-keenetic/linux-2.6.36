@@ -11,58 +11,56 @@ static int g_num_u2_port;
 void enableXhciAllPortPower(struct xhci_hcd *xhci){
 	int i;
 	u32 port_id, temp;
-	u32 __iomem *addr;
+	//u32 __iomem *addr;
+	__le32 __iomem addr;
 
-	addr = (void *) SSUSB_IP_CAP;
-	g_num_u3_port = SSUSB_U3_PORT_NUM(readl(addr));
-	g_num_u2_port = SSUSB_U2_PORT_NUM(readl(addr));
+
+	g_num_u3_port = SSUSB_U3_PORT_NUM(readl((const volatile void __iomem *)SSUSB_IP_CAP));
+	g_num_u2_port = SSUSB_U2_PORT_NUM(readl((const volatile void __iomem *)SSUSB_IP_CAP));
 	
-	for(i=1; i<=g_num_u3_port; i++){
-		port_id=i;
-		addr = &xhci->op_regs->port_status_base + NUM_PORT_REGS * ((port_id - 1) & 0xff);
-		temp = xhci_readl(xhci, addr);
+	for (i = 1; i <= g_num_u3_port; i++) {
+		port_id = i;
+                addr =  (__le32 __iomem)(&xhci->op_regs->port_status_base);
+                addr += NUM_PORT_REGS * ((port_id - 1) & 0xff) * sizeof(__le32);
+		temp = xhci_readl(xhci, (__le32 __iomem *)addr);
 		temp = xhci_port_state_to_neutral(temp);
 		temp |= PORT_POWER;
-		xhci_writel(xhci, temp, addr);
+		xhci_writel(xhci, temp, (__le32 __iomem *)addr);
 	}
-	for(i=1; i<=g_num_u2_port; i++){
+	for (i = 1; i <= g_num_u2_port; i++) {
 		port_id=i+g_num_u3_port;
-		addr = &xhci->op_regs->port_status_base + NUM_PORT_REGS * ((port_id - 1) & 0xff);
-		temp = xhci_readl(xhci, addr);
+		addr =  (__le32 __iomem)(&xhci->op_regs->port_status_base);
+		addr += NUM_PORT_REGS * ((port_id - 1) & 0xff) * sizeof(__le32);
+		temp = xhci_readl(xhci, (__le32 __iomem *)addr);
 		temp = xhci_port_state_to_neutral(temp);
 		temp |= PORT_POWER;
-		xhci_writel(xhci, temp, addr);
+		xhci_writel(xhci, temp, (__le32 __iomem *)addr);
 	}
 }
 
-void enableAllClockPower(void){
+void enableAllClockPower(){
 
 	int i;
 	u32 temp;
-	u32 __iomem *addr;
 
-	addr = (void *) SSUSB_IP_CAP;
-	g_num_u3_port = SSUSB_U3_PORT_NUM(readl(addr));
-	g_num_u2_port = SSUSB_U2_PORT_NUM(readl(addr));
+	g_num_u3_port = SSUSB_U3_PORT_NUM(readl((const volatile void __iomem *)SSUSB_IP_CAP));
+	g_num_u2_port = SSUSB_U2_PORT_NUM(readl((const volatile void __iomem *)SSUSB_IP_CAP));
 
 	//2.	Enable xHC
-	addr = (void *) SSUSB_IP_PW_CTRL;
-	writel(readl(addr) | (SSUSB_IP_SW_RST), addr);
-	writel(readl(addr) & (~SSUSB_IP_SW_RST), addr);
-
-	addr = (void *) SSUSB_IP_PW_CTRL_1;
-	writel(readl(addr) & (~SSUSB_IP_PDN), addr);
+	writel(readl((const volatile void __iomem *)SSUSB_IP_PW_CTRL) | (SSUSB_IP_SW_RST), (volatile void __iomem *)SSUSB_IP_PW_CTRL);
+	writel(readl((const volatile void __iomem *)SSUSB_IP_PW_CTRL) & (~SSUSB_IP_SW_RST), (volatile void __iomem *)SSUSB_IP_PW_CTRL);
+	writel(readl((const volatile void __iomem *)SSUSB_IP_PW_CTRL_1) & (~SSUSB_IP_PDN), (volatile void __iomem *)SSUSB_IP_PW_CTRL_1);
 	
 	//1.	Enable target ports 
 	for(i=0; i<g_num_u3_port; i++){
-		addr = (void *) SSUSB_U3_CTRL(i);
-		temp = readl(addr) & (~SSUSB_U3_PORT_PDN) & (~SSUSB_U3_PORT_DIS);
-		writel(temp, addr);
+		temp = readl((const volatile void __iomem *)SSUSB_U3_CTRL(i));
+		temp = temp & (~SSUSB_U3_PORT_PDN) & (~SSUSB_U3_PORT_DIS);
+		writel(temp, (volatile void __iomem *)SSUSB_U3_CTRL(i));
 	}
 	for(i=0; i<g_num_u2_port; i++){
-		addr = (void *) SSUSB_U2_CTRL(i);
-		temp = readl(addr) & (~SSUSB_U2_PORT_PDN) & (~SSUSB_U2_PORT_DIS);
-		writel(temp, addr);
+		temp = readl((const volatile void __iomem *)SSUSB_U2_CTRL(i));
+		temp = temp & (~SSUSB_U2_PORT_PDN) & (~SSUSB_U2_PORT_DIS);
+		writel(temp, (volatile void __iomem *)SSUSB_U2_CTRL(i));
 	}
 	msleep(100);
 }
@@ -79,47 +77,42 @@ void enableAllClockPower(void){
 void disablePortClockPower(void){
 	int i;
 	u32 temp;
-	u32 __iomem *addr;
 
-	addr = (void *) SSUSB_IP_CAP;
-	g_num_u3_port = SSUSB_U3_PORT_NUM(readl(addr));
-	g_num_u2_port = SSUSB_U2_PORT_NUM(readl(addr));
+	g_num_u3_port = SSUSB_U3_PORT_NUM(readl((const volatile void __iomem *)SSUSB_IP_CAP));
+	g_num_u2_port = SSUSB_U2_PORT_NUM(readl((const volatile void __iomem *)SSUSB_IP_CAP));
 	
 	for(i=0; i<g_num_u3_port; i++){
-		addr = (void *) SSUSB_U3_CTRL(i);
-		temp = readl(addr) | (SSUSB_U3_PORT_PDN);
-		writel(temp, addr);
+		temp = readl((const volatile void __iomem *)SSUSB_U3_CTRL(i));
+		temp = temp | (SSUSB_U3_PORT_PDN);
+		writel(temp, (volatile void __iomem *)SSUSB_U3_CTRL(i));
 	}
 	for(i=0; i<g_num_u2_port; i++){
-		addr = (void *) SSUSB_U2_CTRL(i);
-		temp = readl(addr) | (SSUSB_U2_PORT_PDN);
-		writel(temp, addr);
+		temp = readl((const volatile void __iomem *)SSUSB_U2_CTRL(i));
+		temp = temp | (SSUSB_U2_PORT_PDN);
+		writel(temp, (volatile void __iomem *)SSUSB_U2_CTRL(i));
 	}
-
-	addr = (void *) SSUSB_IP_PW_CTRL_1;
-	writel(readl(addr) | (SSUSB_IP_PDN), addr);
+	writel(readl((const volatile void __iomem *)SSUSB_IP_PW_CTRL_1) | (SSUSB_IP_PDN), (volatile void __iomem *)SSUSB_IP_PW_CTRL_1);
 }
 
 //if IP ctrl power is disabled, enable it
 //enable clock/power of a port
 //port_index: port number
 //port_rev: 0x2 - USB2.0, 0x3 - USB3.0 (SuperSpeed)
-void enablePortClockPower(int port_index, int port_rev){
+void enablePortClockPower(int port_index, int port_rev)
+{
 	u32 temp;
-	u32 __iomem *addr;
 	
-	addr = (void *) SSUSB_IP_PW_CTRL_1;
-	writel(readl(addr) & (~SSUSB_IP_PDN), addr);
+	writel(readl((const volatile void __iomem *)SSUSB_IP_PW_CTRL_1) & (~SSUSB_IP_PDN), (volatile void __iomem *)SSUSB_IP_PW_CTRL_1);
 
 	if(port_rev == 0x3){
-		addr = (void *) SSUSB_U3_CTRL(port_index);
-		temp = readl(addr) & (~SSUSB_U3_PORT_PDN);
-		writel(temp, addr);
+		temp = readl((const volatile void __iomem *)SSUSB_U3_CTRL(port_index));
+		temp = temp & (~SSUSB_U3_PORT_PDN);
+		writel(temp, (volatile void __iomem *)SSUSB_U3_CTRL(port_index));
 	}
 	else if(port_rev == 0x2){
-		addr = (void *) SSUSB_U2_CTRL(port_index);
-		temp = readl(addr) & (~SSUSB_U2_PORT_PDN);
-		writel(temp, addr);
+		temp = readl((const volatile void __iomem *)SSUSB_U2_CTRL(port_index));
+		temp = temp & (~SSUSB_U2_PORT_PDN);
+		writel(temp, (volatile void __iomem *)SSUSB_U2_CTRL(port_index));
 	}
 }
 

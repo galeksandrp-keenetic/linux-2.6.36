@@ -33,7 +33,6 @@
 #include <asm/uaccess.h>
 #include <linux/dma-mapping.h>
 #include <linux/platform_device.h>
-#include "xhci-plat.c"
 #include "mtk-phy.h"
 #include "xhci-mtk-scheduler.h"
 #include "xhci-mtk-power.h"
@@ -55,6 +54,7 @@ static struct file_operations xhci_mtk_test_fops = {
     open:    xhci_mtk_test_open,
     release: xhci_mtk_test_release,
 };
+
 
 /* TODO: copied from ehci-hcd.c - can this be refactored? */
 /*
@@ -242,14 +242,14 @@ static int xhci_setup_msi(struct xhci_hcd *xhci)
 
 	ret = pci_enable_msi(pdev);
 	if (ret) {
-		xhci_dbg(xhci, "failed to allocate MSI entry\n");
+		xhci_err(xhci, "failed to allocate MSI entry\n");
 		return ret;
 	}
 
 	ret = request_irq(pdev->irq, (irq_handler_t)xhci_msi_irq,
 				0, "xhci_hcd", xhci_to_hcd(xhci));
 	if (ret) {
-		xhci_dbg(xhci, "disable MSI interrupt\n");
+		xhci_err(xhci, "disable MSI interrupt\n");
 		pci_disable_msi(pdev);
 	}
 
@@ -290,7 +290,7 @@ static int xhci_setup_msix(struct xhci_hcd *xhci)
 
 	ret = pci_enable_msix(pdev, xhci->msix_entries, xhci->msix_count);
 	if (ret) {
-		xhci_dbg(xhci, "Failed to enable MSI-X\n");
+		xhci_err(xhci, "Failed to enable MSI-X\n");
 		goto free_entries;
 	}
 
@@ -306,7 +306,7 @@ static int xhci_setup_msix(struct xhci_hcd *xhci)
 	return ret;
 
 disable_msix:
-	xhci_dbg(xhci, "disable MSI-X interrupt\n");
+	xhci_err(xhci, "disable MSI-X interrupt\n");
 	xhci_free_irq(xhci);
 	pci_disable_msix(pdev);
 free_entries:
@@ -400,13 +400,13 @@ static void compliance_mode_recovery_timer_init(struct xhci_hcd *xhci)
 	xhci_dbg(xhci, "Compliance Mode Recovery Timer Initialized.\n");
 }
 
-#if 0
 /*
  * This function identifies the systems that have installed the SN65LVPE502CP
  * USB3.0 re-driver and that need the Compliance Mode Quirk.
  * Systems:
  * Vendor: Hewlett-Packard -> System Models: Z420, Z620 and Z820
  */
+#ifndef CONFIG_MT7621_ASIC
 static bool compliance_mode_recovery_timer_quirk_check(void)
 {
 	const char *dmi_product_name, *dmi_sys_vendor;
@@ -427,12 +427,17 @@ static bool compliance_mode_recovery_timer_quirk_check(void)
 
 	return false;
 }
+#endif
 
+#ifdef CONFIG_PM
+#ifdef CONFIG_XHCI_PM
 static int xhci_all_ports_seen_u0(struct xhci_hcd *xhci)
 {
 	return (xhci->port_status_u0 == ((1 << xhci->num_usb3_ports)-1));
 }
 #endif
+#endif
+
 
 /*
  * Initialize memory for HCD and xHC (one-time init).
@@ -557,7 +562,9 @@ int xhci_run(struct usb_hcd *hcd)
 {
 	u32 temp;
 	u64 temp_64;
-	// int ret;
+#if 0
+	int ret;
+#endif
 	struct xhci_hcd *xhci = hcd_to_xhci(hcd);
 	
 	/* Start the xHCI host controller running only after the USB 2.0 roothub
@@ -1238,8 +1245,8 @@ int xhci_urb_enqueue(struct usb_hcd *hcd, struct urb *urb, gfp_t mem_flags)
 	buffer = kzalloc(size * sizeof(struct xhci_td), mem_flags);
 	if (!buffer) {
 		kfree(urb_priv);
-			return -ENOMEM;
-		}
+		return -ENOMEM;
+	}
 
 	for (i = 0; i < size; i++) {
 		urb_priv->td[i] = buffer;
@@ -1587,7 +1594,6 @@ int xhci_drop_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		else{
 			isTT = 0;
 		}
-
 		if(usb_endpoint_xfer_int(&ep->desc)){
 			ep_type = USB_EP_INT;
 		}
@@ -1597,16 +1603,16 @@ int xhci_drop_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		else if(usb_endpoint_xfer_bulk(&ep->desc)){
 			ep_type = USB_EP_BULK;
 		}
-		else{
+		else
 			ep_type = USB_EP_CONTROL;
-		}
+
 		sch_ep = mtk_xhci_scheduler_remove_ep(udev->speed, usb_endpoint_dir_in(&ep->desc)
 			, isTT, ep_type, (mtk_u32 *)ep);
 		if(sch_ep != NULL){
 			kfree(sch_ep);
 		}
 		else{
-			xhci_dbg(xhci, "[MTK]Doesn't find ep_sch instance when removing endpoint\n");
+			xhci_warn(xhci, "[MTK]Doesn't find ep_sch instance when removing endpoint\n");
 		}
 #else
 		mtk_xhci_scheduler_remove_ep(xhci, udev, ep);
@@ -1638,9 +1644,9 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		struct usb_host_endpoint *ep)
 {
 	struct xhci_hcd *xhci;
-	struct xhci_container_ctx *in_ctx; // *out_ctx
+	struct xhci_container_ctx *in_ctx;
 	unsigned int ep_index;
-	struct xhci_ep_ctx *in_ep_ctx; // *ep_ctx
+	struct xhci_ep_ctx *in_ep_ctx;
 	struct xhci_slot_ctx *slot_ctx;
 	struct xhci_input_control_ctx *ctrl_ctx;
 	u32 added_ctxs;
@@ -1649,13 +1655,13 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 	struct xhci_virt_device *virt_dev;
 	int ret = 0;
 #if MTK_SCH_NEW
-		struct sch_ep *sch_ep;
-		int isTT;
-		int ep_type;
-		int maxp = 0;
-		int burst = 0;
-		int mult = 0;
-		int interval;
+	struct sch_ep *sch_ep;
+	int isTT;
+	int ep_type;
+	int maxp = 0;
+	int burst = 0;
+	int mult = 0;
+	int interval;
 #endif
 
 
@@ -1683,10 +1689,8 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 
 	virt_dev = xhci->devs[udev->slot_id];
 	in_ctx = virt_dev->in_ctx;
-	// out_ctx = virt_dev->out_ctx;
 	ctrl_ctx = xhci_get_input_control_ctx(xhci, in_ctx);
 	ep_index = xhci_get_endpoint_index(&ep->desc);
-	// ep_ctx = xhci_get_ep_ctx(xhci, out_ctx, ep_index);
 
 	/* If this endpoint is already in use, and the upper layers are trying
 	 * to add it again without dropping it, reject the addition.
@@ -1729,7 +1733,6 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		else{
 			isTT = 0;
 		}
-
 		if(usb_endpoint_xfer_int(&ep->desc)){
 			ep_type = USB_EP_INT;
 		}
@@ -1739,20 +1742,23 @@ int xhci_add_endpoint(struct usb_hcd *hcd, struct usb_device *udev,
 		else if(usb_endpoint_xfer_bulk(&ep->desc)){
 			ep_type = USB_EP_BULK;
 		}
-		else{
+		else
 			ep_type = USB_EP_CONTROL;
-		}
-		if(udev->speed == USB_SPEED_FULL || udev->speed == USB_SPEED_HIGH 
-			|| udev->speed == USB_SPEED_LOW){
+
+		if (udev->speed == USB_SPEED_FULL || udev->speed == USB_SPEED_HIGH 
+			|| udev->speed == USB_SPEED_LOW) {
 			maxp = ep->desc.wMaxPacketSize & 0x7FF;
 			burst = ep->desc.wMaxPacketSize >> 11;
 			mult = 0;
 		}
-		else if(udev->speed == USB_SPEED_SUPER){
+		else if (udev->speed == USB_SPEED_SUPER) {
 			maxp = ep->desc.wMaxPacketSize & 0x7FF;
 			burst = ep->ss_ep_comp.bMaxBurst;
 			mult = ep->ss_ep_comp.bmAttributes & 0x3;
 		}
+		else
+			return -EINVAL;
+
 		interval = (1 << ((in_ep_ctx->ep_info >> 16) & 0xff));
 		sch_ep = kmalloc(sizeof(struct sch_ep), GFP_KERNEL);
 		if(mtk_xhci_scheduler_add_ep(udev->speed, usb_endpoint_dir_in(&ep->desc),
@@ -2038,6 +2044,8 @@ static int xhci_configure_endpoint(struct xhci_hcd *xhci,
 	u32 *cmd_status;
 	struct xhci_virt_device *virt_dev;
 	union xhci_trb *cmd_trb;
+        struct xhci_slot_ctx *slot_ctx;
+
 
 	spin_lock_irqsave(&xhci->lock, flags);
 	virt_dev = xhci->devs[udev->slot_id];
@@ -2074,6 +2082,12 @@ static int xhci_configure_endpoint(struct xhci_hcd *xhci,
 		cmd_status = &virt_dev->cmd_status;
 	}
 	init_completion(cmd_completion);
+        slot_ctx = xhci_get_slot_ctx(xhci, virt_dev->in_ctx);
+
+        xhci_dbg(xhci, "@@@@ New Input Control Context:\n");
+        slot_ctx = xhci_get_slot_ctx(xhci, virt_dev->in_ctx);
+        xhci_dbg_ctx(xhci, virt_dev->in_ctx,
+                     LAST_CTX_TO_EP_NUM(le32_to_cpu(slot_ctx->dev_info)));
 
 	cmd_trb = xhci->cmd_ring->dequeue;
 	if (!ctx_change)
@@ -4224,12 +4238,17 @@ MODULE_DESCRIPTION(DRIVER_DESC);
 MODULE_AUTHOR(DRIVER_AUTHOR);
 MODULE_LICENSE("GPL");
 
+static void xhci_hcd_release (struct device *dev)
+{
+	printk(KERN_INFO "dev = 0x%08X.\n", (uint32_t)dev);
+}
+
 static struct platform_device xhci_platform_dev = {
-		.name = hcd_name,
-		.id   = -1,
+	.name = MTK_HCD_NAME,
+	.id   = -1,
         .dev = { 
-				.coherent_dma_mask = 0xffffffff,
-				.release = xhci_hcd_release,
+		.coherent_dma_mask = 0xffffffff,
+		.release = xhci_hcd_release,
         },
 };
 
@@ -4241,7 +4260,8 @@ static int __init xhci_hcd_init(void)
 	//rgister a chr device for re init hcd.
 	retval = register_chrdev(XHCI_MTK_TEST_MAJOR, DEVICE_NAME, &xhci_mtk_test_fops);
 	
-	retval = platform_driver_register(&usb_xhci_driver);
+	//retval = platform_driver_register(&usb_xhci_driver);
+	retval = xhci_register_plat();
 	if (retval < 0)
 	{
 		printk(KERN_ERR "Problem registering platform driver.");
@@ -4264,18 +4284,18 @@ static int __init xhci_hcd_init(void)
 	#if 1
 	pPlatformDev = &xhci_platform_dev;
 	memset(pPlatformDev, 0, sizeof(struct platform_device));
-	pPlatformDev->name = hcd_name;
+	pPlatformDev->name = MTK_HCD_NAME;
 	pPlatformDev->id = -1;
 	pPlatformDev->dev.coherent_dma_mask = 0xffffffff;
 	pPlatformDev->dev.dma_mask = &pPlatformDev->dev.coherent_dma_mask;
 	pPlatformDev->dev.release = xhci_hcd_release;
 	#endif
 	retval = platform_device_register(&xhci_platform_dev);
-	if (retval < 0)
-    {
-        platform_driver_unregister (&usb_xhci_driver);
-    }
-	
+	if (retval < 0) {
+	        //platform_driver_unregister (&usb_xhci_driver);
+		xhci_unregister_plat();
+	}
+
 	/*
 	 * Check the compiler generated sizes of structures that must be laid
 	 * out in specific ways for hardware access.
@@ -4300,6 +4320,7 @@ module_init(xhci_hcd_init);
 static void __exit xhci_hcd_cleanup(void)
 {
 	platform_device_unregister(&xhci_platform_dev);
-	platform_driver_unregister(&usb_xhci_driver);
+	//platform_driver_unregister(&usb_xhci_driver);
+	xhci_unregister_plat();
 }
 module_exit(xhci_hcd_cleanup);

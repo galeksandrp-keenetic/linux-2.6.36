@@ -26,8 +26,6 @@
 
 #include "xhci.h"
 
-static const char hcd_name[] = "xhc_mtk";
-
 static void xhci_plat_quirks(struct device *dev, struct xhci_hcd *xhci)
 {
 	/*
@@ -224,22 +222,15 @@ static int xhci_plat_remove(struct platform_device *dev)
 	return 0;
 }
 
-static void xhci_hcd_release (struct device *dev)
-{
-	printk(KERN_INFO "dev = 0x%08X.\n", (uint32_t)dev);
-}
-
 static struct platform_driver usb_xhci_driver = {
 	.probe  = xhci_plat_probe,
 	.remove = xhci_plat_remove,
 	.driver = {
-                .name =		(char *) hcd_name,
-		.owner =	THIS_MODULE,
+                .name =	MTK_HCD_NAME,
+		.owner = THIS_MODULE,
 	},
 };
-
 MODULE_ALIAS("platform:xhci-hcd");
-#if 0
 int xhci_register_plat(void)
 {
 	return platform_driver_register(&usb_xhci_driver);
@@ -249,4 +240,3 @@ void xhci_unregister_plat(void)
 {
 	platform_driver_unregister(&usb_xhci_driver);
 }
-#endif
