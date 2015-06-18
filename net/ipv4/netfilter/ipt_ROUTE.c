@@ -90,8 +90,7 @@ static int route(struct sk_buff *skb,
 	}
 	
 	/* Drop old route. */
-	dst_release(skb_dst(skb));
-	skb_dst_set(skb, NULL);
+	skb_dst_drop(skb);
 
 	if (!ifindex || rt->dst.dev->ifindex == ifindex) {
 		struct dst_entry *dst;
@@ -252,8 +251,7 @@ static unsigned int route_iif(const struct ipt_route_target_info *route_info,
 	}
 
 	skb->dev = dev_in;
-	dst_release(skb_dst(skb));
-	skb_dst_set(skb, NULL);
+	skb_dst_drop(skb);
 
 	netif_rx(skb);
 	dev_put(dev_in);
@@ -328,7 +326,6 @@ static unsigned int ipt_route_target (struct sk_buff *skb,
 
 			if (skb->dev == rt->dst.dev) {
 				/* Drop old route. */
-				dst_release(skb_dst(skb));
 				skb_dst_set(skb, &rt->dst);
 
 				/* this will traverse normal stack, and 
