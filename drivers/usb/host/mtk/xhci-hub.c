@@ -543,6 +543,7 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 	max_ports = xhci_get_ports(hcd, &port_array);
 	bus_state = &xhci->bus_state[hcd_index(hcd)];
 
+
 	spin_lock_irqsave(&xhci->lock, flags);
 	switch (typeReq) {
 	case GetHubStatus:
@@ -791,10 +792,10 @@ int xhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
 			 * HC will report connect events even before this is set.
 			 * However, khubd will ignore the roothub events until
 			 * the roothub is registered.
-			 */
+			
 			xhci_writel(xhci, temp | PORT_POWER,
 					port_array[wIndex]);
-
+			 */
 			temp = xhci_readl(xhci, port_array[wIndex]);
 			xhci_dbg(xhci, "set port power, actual port %d status  = 0x%x\n", wIndex, temp);
 			break;

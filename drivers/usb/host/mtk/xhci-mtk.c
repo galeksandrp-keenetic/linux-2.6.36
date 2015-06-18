@@ -49,43 +49,43 @@ void setInitialReg(void){
 	writel(temp, addr);
 #elif defined (CONFIG_MT7621_ASIC)
 	/* set SSUSB DMA burst size to 128B */
-	addr = (__u32 __iomem *)(SSUSB_U3_XHCI_BASE + SSUSB_HDMA_CFG);
+	addr = (void *) (SSUSB_U3_XHCI_BASE + SSUSB_HDMA_CFG);
 	temp = SSUSB_HDMA_CFG_MT7621_VALUE;
 	writel(temp, addr);
 
 	/* extend U3 LTSSM Polling.LFPS timeout value */
-	addr = (__u32 __iomem *)(SSUSB_U3_XHCI_BASE + U3_LTSSM_TIMING_PARAMETER3);
+	addr = (void *) (SSUSB_U3_XHCI_BASE + U3_LTSSM_TIMING_PARAMETER3);
 	temp = U3_LTSSM_TIMING_PARAMETER3_VALUE;
 	writel(temp, addr);
 
 	/* EOF */
-	addr = (__u32 __iomem *)(SSUSB_U3_XHCI_BASE + SYNC_HS_EOF);
+	addr = (void *) (SSUSB_U3_XHCI_BASE + SYNC_HS_EOF);
 	temp = SYNC_HS_EOF_VALUE;
 	writel(temp, addr);
 
 #if defined (CONFIG_PERIODIC_ENP)
 	/* HSCH_CFG1: SCH2_FIFO_DEPTH */
-	addr = (__u32 __iomem *)(SSUSB_U3_XHCI_BASE + HSCH_CFG1);
+	addr = (void *) (SSUSB_U3_XHCI_BASE + HSCH_CFG1);
 	temp = readl(addr);
 	temp &= ~(0x3 << SCH2_FIFO_DEPTH_OFFSET);
 	writel(temp, addr);
 #endif
 
 	/* Doorbell handling */
-	addr = (__u32 __iomem *)(SIFSLV_IPPC + SSUSB_IP_SPAR0);
+	addr = (void *) (SIFSLV_IPPC + SSUSB_IP_SPAR0);
 	temp = 0x1;
 	writel(temp, addr);
 
 	/* Set SW PLL Stable mode to 1 for U2 LPM device remote wakeup */
 	/* Port 0 */
-	addr = (__u32 __iomem *)(U2_PHY_BASE + U2_PHYD_CR1);
+	addr = (void *) (U2_PHY_BASE + U2_PHYD_CR1);
 	temp = readl(addr);
 	temp &= ~(0x3 << 18);
 	temp |= (1 << 18);
 	writel(temp, addr);
 
 	/* Port 1 */
-	addr = (__u32 __iomem *)(U2_PHY_BASE_P1 + U2_PHYD_CR1);
+	addr = (void *) (U2_PHY_BASE_P1 + U2_PHYD_CR1);
 	temp = readl(addr);
 	temp &= ~(0x3 << 18);
 	temp |= (1 << 18);
@@ -94,23 +94,30 @@ void setInitialReg(void){
 #endif
 }
 
-void setLatchSel(void)
-{
+
+void setLatchSel(void){
 	__u32 __iomem *latch_sel_addr;
 	u32 latch_sel_value;
-	latch_sel_addr = (__u32 __iomem *)U3_PIPE_LATCH_SEL_ADD;
+	latch_sel_addr = (void *) U3_PIPE_LATCH_SEL_ADD;
 	latch_sel_value = ((U3_PIPE_LATCH_TX)<<2) | (U3_PIPE_LATCH_RX);
 	writel(latch_sel_value, latch_sel_addr);
 }
 
-void reinitIP(void)
-{
+void reinitIP(void){
 	enableAllClockPower();
 
 #ifdef CONFIG_MT7621_FPGA
 	setLatchSel();
 #endif
 	mtk_xhci_scheduler_init();
+#ifdef PERF_PROBE
+	mtk_probe_init(0x38383838);
+	mtk_probe_out(0x0);
+#endif
+#ifdef WEB_CAM_PROBE
+	mtk_probe_init(0x70707070);
+	mtk_probe_out(0x0);
+#endif
 }
 
 void dbg_prb_out(void){
@@ -132,16 +139,23 @@ void dbg_prb_out(void){
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#define RET_SUCCESS 0
+#define RET_FAIL 1
+
 static int dbg_u3w(int argc, char**argv)
 {
 	int u4TimingValue;
 	char u1TimingValue;
 	int u4TimingAddress;
+#ifdef CONFIG_MT7621_ASIC
+	u32 __iomem *addr;
+#endif
 
-	if (argc < 3) {
-		printk(KERN_ERR "Arg: address value\n");
-		return RET_FAIL;
-	}
+	if (argc<3)
+    {
+        printk(KERN_ERR "Arg: address value\n");
+        return RET_FAIL;
+    }
 	u3phy_init();
 	
 	u4TimingAddress = (int)simple_strtol(argv[1], &argv[1], 16);
@@ -149,7 +163,8 @@ static int dbg_u3w(int argc, char**argv)
 	u1TimingValue = u4TimingValue & 0xff;
 #ifdef CONFIG_MT7621_ASIC
 /* access MMIO directly */
-	writel(u1TimingValue, (__u32 __iomem *)u4TimingAddress);
+	addr = (void *) u4TimingAddress;
+	writel(u1TimingValue, addr);
 #else
 /* access through I2C or GPIO window */
 	_U3Write_Reg(u4TimingAddress, u1TimingValue);
@@ -163,6 +178,9 @@ static int dbg_u3r(int argc, char**argv)
 {
 	char u1ReadTimingValue;
 	int u4TimingAddress;
+#ifdef CONFIG_MT7621_ASIC
+	u32 __iomem *addr;
+#endif
 	if (argc<2)
     {
         printk(KERN_ERR "Arg: address\n");
@@ -173,7 +191,8 @@ static int dbg_u3r(int argc, char**argv)
 	u4TimingAddress = (int)simple_strtol(argv[1], &argv[1], 16);
 #ifdef CONFIG_MT7621_ASIC
 /* access MMIO directly */
-	u1ReadTimingValue = readl((__u32 __iomem *)u4TimingAddress);
+	addr = (void *) u4TimingAddress;
+	u1ReadTimingValue = readl(addr);
 #else
 /* access through I2C or GPIO window */
 	u1ReadTimingValue = _U3Read_Reg(u4TimingAddress);
@@ -185,39 +204,39 @@ static int dbg_u3r(int argc, char**argv)
 static int dbg_u3init(int argc, char**argv)
 {
 	u3phy_init();
+
 	printk(KERN_ERR "phy registers and operations initial done\n");
-	if (u3phy_ops->u2_slew_rate_calibration) {
+
+	if(u3phy_ops->u2_slew_rate_calibration){
 		u3phy_ops->u2_slew_rate_calibration(u3phy);
 	}
-	else {
+	else{
 		printk(KERN_ERR "WARN: PHY doesn't implement u2 slew rate calibration function\n");
 	}
-	if (u3phy_ops->init(u3phy) == PHY_TRUE)
+	if(u3phy_ops->init(u3phy) == PHY_TRUE)
 		return RET_SUCCESS;
 	return RET_FAIL;
 }
 
-int dbg_setU1U2(int argc, char**argv)
-{
+void dbg_setU1U2(int argc, char**argv){
 	int u1_value;
 	int u2_value;
 	u32 temp;
 	u32 __iomem *addr;
 	
-	if (argc < 3) {
-		printk(KERN_ERR "Arg: u1value u2value\n");
-		return RET_FAIL;
-	}
+	if (argc<3)
+    {
+        printk(KERN_ERR "Arg: u1value u2value\n");
+        return;
+    }
 
 	u1_value = (int)simple_strtol(argv[1], &argv[1], 10);
 	u2_value = (int)simple_strtol(argv[2], &argv[2], 10);
-	addr = (u32 __iomem *)(SSUSB_U3_XHCI_BASE + 0x424);
+	addr = (void *) (SSUSB_U3_XHCI_BASE + 0x424);
 	temp = readl(addr);
 	temp = temp & (~(0x0000ffff));
 	temp = temp | u1_value | (u2_value<<8);
 	writel(temp, addr);
-
-	return RET_SUCCESS;
 }
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -227,7 +246,8 @@ int call_function(char *buf)
 	char *argv[80];
 
 	argc = 0;
-	do {
+	do
+	{
 		argv[argc] = strsep(&buf, " ");
 		printk(KERN_DEBUG "[%d] %s\r\n", argc, argv[argc]);
 		argc++;
@@ -245,26 +265,27 @@ int call_function(char *buf)
 	return 0;
 }
 
+char w_buf[200];
+char r_buf[200] = "this is a test";
+
 long xhci_mtk_test_unlock_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
-	char w_buf[200];
-	char r_buf[200];
 	int len = 200;
 
 	switch (cmd) {
-		case IOCTL_READ:
-			copy_to_user((char *)arg, r_buf, len);
-			printk(KERN_DEBUG "IOCTL_READ: %s\r\n", r_buf);
-			break;
-		case IOCTL_WRITE:
-			copy_from_user(w_buf, (char *) arg, len);
-			printk(KERN_DEBUG "IOCTL_WRITE: %s\r\n", w_buf);
+	case IOCTL_READ:
+		copy_to_user((char *) arg, r_buf, len);
+		printk(KERN_DEBUG "IOCTL_READ: %s\r\n", r_buf);
+		break;
 
-			//invoke function
-			return call_function(w_buf);
-			break;
-		default:
-			return -ENOTTY;
+	case IOCTL_WRITE:
+		copy_from_user(w_buf, (char *) arg, len);
+		printk(KERN_DEBUG "IOCTL_WRITE: %s\r\n", w_buf);
+
+		//invoke function
+		return call_function(w_buf);
+	default:
+		return -ENOTTY;
 	}
 
 	return len;

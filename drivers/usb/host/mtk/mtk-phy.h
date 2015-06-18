@@ -10,22 +10,16 @@
 #include <linux/delay.h>
 
 /* Choose PHY R/W implementation */
+//#define CONFIG_U3_PHY_GPIO_SUPPORT	//SW I2C implemented by GPIO
+#define CONFIG_U3_PHY_AHB_SUPPORT	//AHB, only on SoC
+
 /* Choose PHY version */
 //Select your project by defining one of the followings
-#if defined (CONFIG_RALINK_MT7621)
-#define CONFIG_PROJECT_7621 //7621
-#define CONFIG_U3_PHY_AHB_SUPPORT	//AHB, only on SoC
-#elif defined (CONFIG_RALINK_MT7628)
-#define CONFIG_PROJECT_7628 //7628
-#define CONFIG_U3_PHY_AHB_SUPPORT	//AHB, only on SoC
-#else
 //#define CONFIG_PROJECT_7662 //7662, 7603
 //#define CONFIG_PROJECT_5399 //5399
-//#define CONFIG_U3_PHY_GPIO_SUPPORT	//SW I2C implemented by GPIO
-#endif
+#define CONFIG_PROJECT_7621 //7621
 
-
-#if defined CONFIG_PROJECT_7662 || defined CONFIG_PROJECT_5399 || defined CONFIG_PROJECT_7621 || defined CONFIG_PROJECT_7628
+#if defined CONFIG_PROJECT_7662 || defined CONFIG_PROJECT_5399 || defined CONFIG_PROJECT_7621
 #define CONFIG_PROJECT_PHY
 #endif
 
@@ -37,7 +31,6 @@
 #endif
 
 /* BASE ADDRESS DEFINE, should define this on ASIC */
-#if defined (CONFIG_RALINK_MT7621)
 #define PHY_BASE		0xBE1D0000
 #define SIFSLV_FM_FEG_BASE	(PHY_BASE+0x100)
 #define SIFSLV_CHIP_BASE	(PHY_BASE+0x700)
@@ -47,6 +40,7 @@
 #define U3_PHYA_BASE		(PHY_BASE+0xb00)
 #define U3_PHYA_DA_BASE		(PHY_BASE+0xc00)
 
+#if defined (CONFIG_RALINK_MT7621)
 #define SIFSLV_FM_FEG_BASE_P1	(PHY_BASE+0x100)
 #define SIFSLV_CHIP_BASE_P1	(PHY_BASE+0x700)
 #define U2_PHY_BASE_P1		(PHY_BASE+0x1000)
@@ -54,12 +48,6 @@
 #define U3_PHYD_B2_BASE_P1	(PHY_BASE+0x1200)
 #define U3_PHYA_BASE_P1		(PHY_BASE+0x1300)
 #define U3_PHYA_DA_BASE_P1	(PHY_BASE+0x1400)
-
-#elif defined (CONFIG_RALINK_MT7628)
-#define PHY_BASE		0xB0120000
-#define SIFSLV_FM_FEG_BASE	(PHY_BASE+0xf00)
-#define U2_PHY_BASE		(PHY_BASE+0x800)
-
 #endif
 
 /*
@@ -87,9 +75,6 @@ typedef PHY_UINT32 __bitwise	PHY_LE32;
 /* CONSTANT DEFINE */
 #define PHY_FALSE	0
 #define PHY_TRUE	1
-
-#define RET_SUCCESS 0
-#define RET_FAIL 1
 
 /* MACRO DEFINE */
 #define DRV_WriteReg32(addr,data)       ((*(volatile PHY_UINT32 *)(addr)) = (unsigned long)(data))
@@ -221,8 +206,6 @@ struct strucTestCycle
 #define MIN_Y                 0
 
 PHY_INT32 u3phy_init(void);
-PHY_INT32 mt7628_phy_init(void);
-PHY_INT32 mt7628_phy_down(void);
 
 AUTOEXT struct strucScanRegion           _rEye1;
 AUTOEXT struct strucScanRegion           _rEye2;
