@@ -3,9 +3,9 @@
  * routes not supported by the standard kernel routing table.
  *
  * Copyright (C) 2002 Cedric de Launois <delaunois@info.ucl.ac.be>
+ * Fixed to compile with kernels >=2.6.24 by m0sia (m0sia@m0sia.ru)
  *
- * v 1.11 2004/11/23
- *
+ * v 1.12 2009/03/20
  * This software is distributed under GNU GPL v2, 1991
  */
 
@@ -93,15 +93,16 @@ static int route(struct sk_buff *skb,
 	skb_dst_drop(skb);
 
 	if (!ifindex || rt->dst.dev->ifindex == ifindex) {
-		struct dst_entry *dst;
-
 		skb_dst_set(skb, &rt->dst);
-		dst = skb_dst(skb);
-		skb->dev = dst->dev;
+		skb->dev = skb_dst(skb)->dev;
 		skb->protocol = htons(ETH_P_IP);
 		return 1;
 	}
 
+	/* The interface selected by the routing table is not the one
+	 * specified by the user. This may happen because the dst address
+	 * is one of our own addresses.
+	 */
 	if (net_ratelimit()) 
 		DEBUGP("ipt_ROUTE: failed to route as desired gw=%u.%u.%u.%u oif=%i (got oif=%i)\n", 
 		       NIPQUAD(route_info->gw), ifindex, rt->dst.dev->ifindex);
@@ -121,10 +122,9 @@ static void ip_direct_send(struct sk_buff *skb)
 	struct hh_cache *hh = dst->hh;
 	struct net_device *dev = dst->dev;
 	int hh_len = LL_RESERVED_SPACE(dev);
-	unsigned seq;
 
 	/* Be paranoid, rather than too clever. */
-	if (unlikely(skb_headroom(skb) < hh_len && dev->header_ops->create)) {
+	if (unlikely(skb_headroom(skb) < hh_len)) {
 		struct sk_buff *skb2;
 
 		skb2 = skb_realloc_headroom(skb, LL_RESERVED_SPACE(dev));
@@ -139,13 +139,12 @@ static void ip_direct_send(struct sk_buff *skb)
 	}
 
 	if (hh) {
-		do {
-			int hh_alen;
+		int hh_alen;
 
-			seq = read_seqbegin(&hh->hh_lock);
-			hh_alen = HH_DATA_ALIGN(hh->hh_len);
-			memcpy(skb->data - hh_alen, hh->hh_data, hh_alen);
-		} while (read_seqretry(&hh->hh_lock, seq));
+		write_seqlock_bh(&hh->hh_lock);
+		hh_alen = HH_DATA_ALIGN(hh->hh_len);
+		memcpy(skb->data - hh_alen, hh->hh_data, hh_alen);
+		write_sequnlock_bh(&hh->hh_lock);
 		skb_push(skb, hh->hh_len);
 		hh->hh_output(skb);
 	} else if (dst->neighbour)
@@ -351,14 +350,13 @@ static unsigned int ipt_route_target (struct sk_buff *skb,
 	}
 
 	if ((route_info->flags & IPT_ROUTE_TEE)) {
-		struct sk_buff *pskb = skb;
 		/*
 		 * Copy the *pskb, and route the copy. Will later return
 		 * IPT_CONTINUE for the original skb, which should continue
 		 * on its way as if nothing happened. The copy should be
 		 * independantly delivered to the ROUTE --gw.
 		 */
-		skb = skb_copy(pskb, GFP_ATOMIC);
+		skb = skb_copy(skb, GFP_ATOMIC);
 		if (!skb) {
 			if (net_ratelimit()) 
 				DEBUGP(KERN_DEBUG "ipt_ROUTE: copy failed!\n");
@@ -413,6 +411,7 @@ static struct xt_target xt_route_reg = {
 	.targetsize = sizeof(struct ipt_route_target_info),
 #endif
 	.checkentry = ipt_route_checkentry,
+	.table	= "mangle",
 	.me = THIS_MODULE,
 };
 
