@@ -158,6 +158,11 @@ config MTD_NDM_STORAGE_SIZE
 	default 0x100000
 	depends on MTD_NDM_PARTS
 
+config MTD_NDM_FLASH_SIZE_LIMIT
+	hex "Limit of flash size"
+	default 0x0
+	depends on MTD_NDM_PARTS
+
 config MTD_AFS_PARTS
 	tristate "ARM Firmware Suite partition parsing"
 	depends on ARM && MTD_PARTITIONS

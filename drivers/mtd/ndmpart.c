@@ -166,12 +166,16 @@ static int create_mtd_partitions(struct mtd_info *master,
 				 struct mtd_partition **pparts,
 				 unsigned long origin)
 {
-	unsigned int offset,flash_size;
+	unsigned int offset, flash_size, flash_size_lim;
 	size_t len;
 	size_t i, delete = 0;
 	__le32 magic;
 
 	flash_size = master->size;
+
+	flash_size_lim = CONFIG_MTD_NDM_FLASH_SIZE_LIMIT;
+	if (!flash_size_lim)
+		flash_size_lim = flash_size;
 
 	printk(KERN_INFO "Current flash size = 0x%x\n", flash_size);
 
@@ -199,8 +203,8 @@ static int create_mtd_partitions(struct mtd_info *master,
 	ndm_parts[PART_RF_EEPROM].offset = ndm_parts[PART_U_CONFIG].offset +
 					   ndm_parts[PART_U_CONFIG].size;
 
-	for (offset = ndm_parts[PART_RF_EEPROM].offset; offset < flash_size;
-	     offset += master->erasesize) {
+	for (offset = ndm_parts[PART_RF_EEPROM].offset;
+	     offset < flash_size_lim; offset += master->erasesize) {
 		
 		master->read(master, offset, sizeof(magic), &len,
 		             (uint8_t *) &magic);
@@ -226,24 +230,25 @@ static int create_mtd_partitions(struct mtd_info *master,
 	}
 	
 	/* Backup */
-	ndm_parts[PART_BACKUP].size = flash_size - ndm_parts[PART_BACKUP].offset;
+	ndm_parts[PART_BACKUP].size = flash_size_lim -
+				      ndm_parts[PART_BACKUP].offset;
 
 	/* Delete Storage if flash size less then 8M, or 
 	 * NDM_STORAGE_SIZE set to zero
 	 */
-	if ((flash_size < 0x800000) || (ndm_parts[PART_STORAGE].size == 0)) {
+	if (flash_size_lim < 0x800000 || ndm_parts[PART_STORAGE].size == 0) {
 		delete = 1;
 		for (i = PART_STORAGE; i < PART_MAX - 1; i++) {
 			ndm_parts[i] = ndm_parts[i + 1];
 		}
 #if defined(CONFIG_RALINK_MT7621)
 		if (master->type == MTD_NANDFLASH)
-			offset = flash_size - (master->erasesize << 1);
+			offset = flash_size_lim - (master->erasesize << 1);
 		else
 #endif
-		offset = flash_size - master->erasesize;
+		offset = flash_size_lim - master->erasesize;
 	} else {
-		ndm_parts[PART_STORAGE].offset = flash_size -
+		ndm_parts[PART_STORAGE].offset = flash_size_lim -
 			ndm_parts[PART_STORAGE].size;
 #if defined(CONFIG_RALINK_MT7621)
 		if (master->type == MTD_NANDFLASH)
