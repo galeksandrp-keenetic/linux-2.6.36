@@ -197,7 +197,7 @@ static inline unsigned part_config_size(struct mtd_info *master)
 
 #ifdef CONFIG_RALINK_MT7621
 	if (master->type == MTD_NANDFLASH)
-		size = master->erasesize << 1;
+		size = master->erasesize << 2;
 	else
 #endif
 	size = master->erasesize;
