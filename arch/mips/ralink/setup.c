@@ -57,7 +57,7 @@
 #define sysRegRead(phys) (*(volatile unsigned int *)PHYS_TO_K1(phys))
 #define sysRegWrite(phys, val)  ((*(volatile unsigned int *)PHYS_TO_K1(phys)) = (val))
 
-#if !defined (CONFIG_RALINK_MT7621)
+#if !defined (CONFIG_RALINK_MT7621) && !defined (CONFIG_RALINK_MT7628)
 #if defined(CONFIG_RALINK_RT3052)
 #define TESTSTAT     RALINK_SYSCTL_BASE + 0x18
 #elif defined(CONFIG_RALINK_MT7620) || defined(CONFIG_RALINK_RT5350) || defined(CONFIG_RALINK_RT3352)
@@ -93,7 +93,7 @@ extern void mips_timer_setup(struct irqaction *irq);
 
 static void __init set_reset_flag(void)
 {
-#if !defined (CONFIG_RALINK_MT7621)
+#if !defined (CONFIG_RALINK_MT7621) && !defined (CONFIG_RALINK_MT7628)
 	unsigned int value;
 
 	value = sysRegRead(TESTSTAT);

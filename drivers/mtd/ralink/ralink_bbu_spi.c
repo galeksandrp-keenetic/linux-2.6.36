@@ -35,63 +35,8 @@
 #else
 #include "ralink_spi.h"
 #endif
-#include "../maps/ralink-flash.h"
 
-
-static struct mtd_partition rt2880_partitions[] = {
-	{
-                name:           "ALL",
-                size:           MTDPART_SIZ_FULL,
-                offset:         0,
-        },
-	/* Put your own partition definitions here */
-        {
-                name:           "Bootloader",
-                size:           MTD_BOOT_PART_SIZE,
-                offset:         0,
-        }, {
-                name:           "Config",
-                size:           MTD_CONFIG_PART_SIZE,
-                offset:         MTDPART_OFS_APPEND
-        }, {
-                name:           "Factory",
-                size:           MTD_FACTORY_PART_SIZE,
-                offset:         MTDPART_OFS_APPEND
-#ifdef CONFIG_RT2880_ROOTFS_IN_FLASH
-        }, {
-                name:           "Kernel",
-                size:           MTD_KERN_PART_SIZE,
-                offset:         MTDPART_OFS_APPEND,
-        }, {
-                name:           "RootFS",
-                size:           MTD_ROOTFS_PART_SIZE,
-                offset:         MTDPART_OFS_APPEND,
-#ifdef CONFIG_ROOTFS_IN_FLASH_NO_PADDING
-        }, {
-                name:           "Kernel_RootFS",
-                size:           MTD_KERN_PART_SIZE + MTD_ROOTFS_PART_SIZE,
-                offset:         MTD_BOOT_PART_SIZE + MTD_CONFIG_PART_SIZE + MTD_FACTORY_PART_SIZE,
-#endif
-#else //CONFIG_RT2880_ROOTFS_IN_RAM
-        }, {
-                name:           "Kernel",
-                size:           MTD_KERN_PART_SIZE,
-                offset:         MTDPART_OFS_APPEND,
-#endif
-#ifdef CONFIG_DUAL_IMAGE
-        }, {
-                name:           "Kernel2",
-                size:           MTD_KERN2_PART_SIZE,
-                offset:         MTD_KERN2_PART_OFFSET,
-#ifdef CONFIG_RT2880_ROOTFS_IN_FLASH
-        }, {
-                name:           "RootFS2",
-                size:           MTD_ROOTFS2_PART_SIZE,
-                offset:         MTD_ROOTFS2_PART_OFFSET,
-#endif
-#endif
-        }
-};
+static const char *part_probes[] __initdata = { "ndmpart", NULL };
 
 //#define TEST_CS1_FLASH
 //#define RD_MODE_DIOR
@@ -640,7 +585,6 @@ static int raspi_read_rg(u8 code, u8 *val)
 		return -EIO;
 	}
 
-
 	return 0;
 }
 
@@ -938,7 +882,7 @@ struct chip_info *chip_prob(void)
 	jedec = (u32)((u32)(buf[1] << 24) | ((u32)buf[2] << 16) | ((u32)buf[3] <<8) | (u32)buf[4]);
 
 #ifdef BBU_MODE
-	printk("flash manufacture id: %x, device id %x %x\n", buf[0], buf[1], buf[2]);
+	printk(KERN_INFO "flash manufacture id: %x, device id %x %x\n", buf[0], buf[1], buf[2]);
 #else
 	printk(KERN_INFO "device ID: %x %x %x %x %x (%x)\n", buf[0], buf[1], buf[2], buf[3], buf[4], jedec);
 #endif
@@ -1480,41 +1424,27 @@ static int ramtd_write(struct mtd_info *mtd, loff_t to, size_t len,
 static struct mtd_info *raspi_probe(struct map_info *map)
 {
 	struct chip_info		*chip;
-	unsigned			i;
-#ifdef CONFIG_ROOTFS_IN_FLASH_NO_PADDING
-	loff_t offs;
-	struct __image_header {
-		uint8_t unused[60];
-		uint32_t ih_ksz;
-	} hdr;
-#endif
+	unsigned				i, np;
+	struct mtd_partition	*mtd_parts;
 
-#if  0
+#if 0
 	spic_init();
-#endif	
-	if(ra_check_flash_type()!=BOOT_FROM_SPI) { /* SPI */
-	    return 0;
-	}
+#endif
 
 #if defined(CONFIG_RALINK_MT7621)
 	// set default clock to hclk/5
-        ra_and(SPI_REG_MASTER, ~(0xfff << 16));
-        ra_or(SPI_REG_MASTER, (0x5 << 16));	//work-around 3-wire SPI issue (3 for RFB, 5 for EVB)
+	ra_and(SPI_REG_MASTER, ~(0xfff << 16));
+	ra_or(SPI_REG_MASTER, (0x5 << 16));	//work-around 3-wire SPI issue (3 for RFB, 5 for EVB)
 #elif defined(CONFIG_RALINK_MT7628)
 	// set default clock to hclk/8
-        ra_and(SPI_REG_MASTER, ~(0xfff << 16));
-        ra_or(SPI_REG_MASTER, (0x6 << 16));
+	ra_and(SPI_REG_MASTER, ~(0xfff << 16));
+	ra_or(SPI_REG_MASTER, (0x6 << 16));
 #endif
-
-#ifdef TEST_CS1_FLASH
-        ra_and(RALINK_SYSCTL_BASE + 0x60, ~(1 << 12));
-        ra_or(SPI_REG_MASTER, (1 << 29));
-#endif
-
 
 	chip = chip_prob();
-	
+
 	flash = kzalloc(sizeof *flash, GFP_KERNEL);
+
 	if (!flash)
 		return NULL;
 
@@ -1535,36 +1465,31 @@ static struct mtd_info *raspi_probe(struct map_info *map)
 	flash->mtd.unlock = ramtd_unlock;
 
 	printk(KERN_INFO "%s(%02x %04x) (%d Kbytes)\n",
-	       chip->name, chip->id, chip->jedec_id, (int)(flash->mtd.size / 1024));
+		chip->name, chip->id, chip->jedec_id, (int)(flash->mtd.size / 1024));
 
-	printk(KERN_INFO "mtd .name = %s, .size = 0x%.8x (%uM) "
+	printk(KERN_INFO "mtd .name = %s, .size = 0x%.8x (%lluM) "
 			".erasesize = 0x%.8x (%uK) .numeraseregions = %d\n",
 		flash->mtd.name,
-		(unsigned int)flash->mtd.size, (unsigned int)(flash->mtd.size / (1024*1024)),
-		(unsigned int)flash->mtd.erasesize, (unsigned int)(flash->mtd.erasesize / 1024),
-		(int)flash->mtd.numeraseregions);
+		flash->mtd.size, flash->mtd.size / (1024*1024),
+		flash->mtd.erasesize, flash->mtd.erasesize / 1024,
+		flash->mtd.numeraseregions);
 
 	if (flash->mtd.numeraseregions)
 		for (i = 0; i < flash->mtd.numeraseregions; i++)
 			printk(KERN_INFO "mtd.eraseregions[%d] = { .offset = 0x%.8x, "
 				".erasesize = 0x%.8x (%uK), "
-				".numblocks = %d }\n",
-				i, (unsigned int)flash->mtd.eraseregions[i].offset,
-				(unsigned int)flash->mtd.eraseregions[i].erasesize,
-				(unsigned int)(flash->mtd.eraseregions[i].erasesize / 1024),
-				(int)flash->mtd.eraseregions[i].numblocks);
+				".numblocks = %llu }\n",
+				i, flash->mtd.eraseregions[i].offset,
+				flash->mtd.eraseregions[i].erasesize,
+				flash->mtd.eraseregions[i].erasesize / 1024,
+				flash->mtd.eraseregions[i].numblocks);
 
-#if defined (CONFIG_RT2880_ROOTFS_IN_FLASH) && defined (CONFIG_ROOTFS_IN_FLASH_NO_PADDING)
-	offs = MTD_BOOT_PART_SIZE + MTD_CONFIG_PART_SIZE + MTD_FACTORY_PART_SIZE;
-	ramtd_read(NULL, offs, sizeof(hdr), (size_t *)&i, (u_char *)(&hdr));
-	if (hdr.ih_ksz != 0) {
-		rt2880_partitions[4].size = ntohl(hdr.ih_ksz);
-		rt2880_partitions[5].size = IMAGE1_SIZE - (MTD_BOOT_PART_SIZE +
-				MTD_CONFIG_PART_SIZE + MTD_FACTORY_PART_SIZE +
-				ntohl(hdr.ih_ksz));
+	np = parse_mtd_partitions(&flash->mtd, part_probes, &mtd_parts, 0);
+	if (np > 0) {
+		add_mtd_partitions(&flash->mtd, mtd_parts, np);
+	} else {
+		printk("No partitions found on a flash.");
 	}
-#endif
-	add_mtd_partitions(&flash->mtd, rt2880_partitions, ARRAY_SIZE(rt2880_partitions));
 
 	return &flash->mtd;
 }
@@ -1582,10 +1507,10 @@ static void raspi_destroy(struct mtd_info *mtd)
 }
 
 static struct mtd_chip_driver raspi_chipdrv = {
-        .probe   = raspi_probe,
-        .destroy = raspi_destroy,
-        .name    = "raspi_probe",
-        .module  = THIS_MODULE
+	.probe   = raspi_probe,
+	.destroy = raspi_destroy,
+	.name    = "raspi_probe",
+	.module  = THIS_MODULE
 };
 
 static int __init raspi_init(void)
@@ -1599,15 +1524,14 @@ static int __init raspi_init(void)
 #endif
 
 	register_mtd_chip_driver(&raspi_chipdrv);
-	
-        raspi_chipdrv.probe(NULL);
+	raspi_chipdrv.probe(NULL);
 
 	return 0;
 }
 
 static void __exit raspi_exit(void)
 {
-    unregister_mtd_chip_driver(&raspi_chipdrv);
+	unregister_mtd_chip_driver(&raspi_chipdrv);
 }
 
 

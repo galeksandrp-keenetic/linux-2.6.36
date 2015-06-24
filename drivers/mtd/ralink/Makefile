@@ -21,7 +21,7 @@ else
 
 ifeq ($(CONFIG_RALINK_MT7628),y)
 rt_nand-objs = 
-rt_spi-objs = ralink_bbu_spi.o
+ralink_spi-objs = ralink_bbu_spi.o
 else
 rt_spi-objs = ralink_spi.o
 endif
