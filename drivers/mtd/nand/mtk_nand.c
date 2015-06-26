@@ -102,7 +102,7 @@ unsigned int CFG_BLOCKSIZE;
 #endif
 
 #if defined(SKIP_BAD_BLOCK)
-static unsigned storage_offset;
+static uint32_t storage_offset_begin, storage_offset_end;
 static int shift_on_bbt = 0;
 static int is_skip_bad_block(struct mtd_info *mtd, int page);
 extern void nand_bbt_set(struct mtd_info *mtd, int page, int flag);
@@ -2465,7 +2465,9 @@ static int is_skip_bad_block(struct mtd_info *mtd, int page)
 	offset = page << chip->page_shift;
 
 	/* Disable skip bad block for storage. */
-	if (storage_offset && offset >= storage_offset)
+	if (storage_offset_begin &&
+	    offset >= storage_offset_begin &&
+	    offset <= storage_offset_end)
 		return 0;
 
 	return 1;
@@ -4148,6 +4150,20 @@ static int load_fact_bbt(struct mtd_info *mtd)
 
 #endif
 
+static struct mtd_partition *mtd_part_find_by_name(const char *name)
+{
+	int i;
+
+	for (i = 0; i < part_num; i++) {
+		struct mtd_partition *mp = mtd_parts + i;
+
+		if (mp->name && !strcmp(name, mp->name))
+			return mp;
+	}
+
+	return NULL;
+}
+
 /******************************************************************************
  * mtk_nand_probe
  * 
@@ -4550,11 +4566,17 @@ int mtk_nand_probe()
     /* Successfully!! */
     if (!err)
     {
+	struct mtd_partition *mp;
+
         MSG(INIT, "[mtk_nand] probe successfully!\n");
         nand_disable_clock();
 #if defined(SKIP_BAD_BLOCK)
 #ifdef CONFIG_MTD_NDM_PARTS
-	storage_offset = mtd->size - CONFIG_MTD_NDM_STORAGE_SIZE;
+	mp = mtd_part_find_by_name("Storage");
+	if (mp) {
+		storage_offset_begin = mp->offset;
+		storage_offset_end = mp->offset + mp->size - 1;
+	}
 #endif
 	shift_on_bbt = 1;
 	// for debug
