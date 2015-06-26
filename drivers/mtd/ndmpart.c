@@ -29,14 +29,18 @@
 #include <linux/magic.h>
 
 #ifndef SQUASHFS_MAGIC
-#define SQUASHFS_MAGIC	0x73717368
+#define SQUASHFS_MAGIC			0x73717368
 #endif
-#define NDMS_MAGIC	0x736D646E
-#define CONFIG_MAGIC	cpu_to_be32(0x2e6e646d)
-#define CONFIG_MAGIC_V1	cpu_to_be32(0x1f8b0801)
 
-#define KERNEL_MAGIC	be32_to_cpu(0x27051956)
-#define ROOTFS_MAGIC	SQUASHFS_MAGIC
+#define NDMS_MAGIC			0x736D646E
+#define CONFIG_MAGIC			cpu_to_be32(0x2e6e646d)
+#define CONFIG_MAGIC_V1			cpu_to_be32(0x1f8b0801)
+
+#define KERNEL_MAGIC			be32_to_cpu(0x27051956)
+#define ROOTFS_MAGIC			SQUASHFS_MAGIC
+#define PART_OPTIONAL_NUM		2		/* storage and dump */
+
+#define MIN_FLASH_SIZE_FOR_STORAGE	0x800000	/* 8 MB */
 
 enum {
 	PART_U_BOOT,
@@ -46,7 +50,8 @@ enum {
 	PART_ROOTFS,
 	PART_FIRMWARE,
 	PART_CONFIG,
-	PART_STORAGE,
+	PART_STORAGE,	/* optional */
+	PART_DUMP,	/* optional */
 	PART_BACKUP,
 	PART_FULL,
 	PART_MAX
@@ -55,12 +60,12 @@ enum {
 struct mtd_partition ndm_parts[PART_MAX] = {
 	[PART_U_BOOT] = {
 		name:			"U-Boot",  	/* mtdblock0 */
-		size:			0,  		/* 3 blocks */
+		size:			0,
 		offset:			0
 	},
 	[PART_U_CONFIG] = {
 		name:			"U-Config", 	/* mtdblock1 */
-		size:			0x10000,  	/* 1 block */
+		size:			0,
 		offset:			0
 	},
 	[PART_RF_EEPROM] = {
@@ -88,27 +93,19 @@ struct mtd_partition ndm_parts[PART_MAX] = {
 		name:			"Config", 	/* mtdblock6 */
 		size:			0,
 		offset:			0
-	},
-	[PART_STORAGE] = {
-		name:			"Storage", 	/* mtdblock7 */
-		size:			CONFIG_MTD_NDM_STORAGE_SIZE,
-		offset:			0
-	},
-	[PART_BACKUP] = {
-		/* kernel, rootfs, config and storage */
-		name:			"Backup", 	/* mtdblock8 */
-		size:			0,
-		offset:			0
-	},
-	[PART_FULL] = {
-		/* full flash */
-		name:			"Full", 	/* mtdblock9 */
-		size:			MTDPART_SIZ_FULL,
-		offset:			0
 	}
+#if 0
+	[PART_STORAGE]
+	[PART_DUMP]
+	[PART_BACKUP]	/* kernel, rootfs, config and storage */
+	[PART_FULL]	/* full flash */
+#endif
 };
 
 #ifdef CONFIG_MTD_NDM_CONFIG_TRANSITION
+/*
+ * TODO: Erase full partition and improve error handling.
+ */
 static void config_move(struct mtd_info *master, unsigned int offset)
 {
 	__le32 magic;
@@ -210,9 +207,10 @@ static int create_mtd_partitions(struct mtd_info *master,
 				 struct mtd_partition **pparts,
 				 unsigned long origin)
 {
-	unsigned int offset, flash_size, flash_size_lim;
+	bool use_dump, use_storage;
+	int index, dump_index, part_num, storage_index;
 	size_t len;
-	size_t i, delete = 0;
+	uint32_t config_offset, offset, flash_size, flash_size_lim;
 	__le32 magic;
 
 	flash_size = master->size;
@@ -224,7 +222,6 @@ static int create_mtd_partitions(struct mtd_info *master,
 	printk(KERN_INFO "Current flash size = 0x%x\n", flash_size);
 
 	/* U-Boot */
-	ndm_parts[PART_U_BOOT].offset = 0;
 	ndm_parts[PART_U_BOOT].size = part_u_boot_size(master);
 
 	/* U-Config */
@@ -235,6 +232,9 @@ static int create_mtd_partitions(struct mtd_info *master,
 	ndm_parts[PART_RF_EEPROM].offset = ndm_parts[PART_U_CONFIG].offset +
 					   ndm_parts[PART_U_CONFIG].size;
 
+	/*
+	 * TODO: Move to separate function.
+	 */
 	for (offset = ndm_parts[PART_RF_EEPROM].offset;
 	     offset < flash_size_lim; offset += master->erasesize) {
 		
@@ -247,8 +247,6 @@ static int create_mtd_partitions(struct mtd_info *master,
 			ndm_parts[PART_RF_EEPROM].size = offset -
 				ndm_parts[PART_RF_EEPROM].offset;
 			ndm_parts[PART_KERNEL].offset = offset;
-			ndm_parts[PART_FIRMWARE].offset = offset;
-			ndm_parts[PART_BACKUP].offset = offset;
 		}
 		if ((le32_to_cpu(magic) == ROOTFS_MAGIC) ||
 		    (le32_to_cpu(magic) == NDMS_MAGIC)) {
@@ -261,44 +259,92 @@ static int create_mtd_partitions(struct mtd_info *master,
 		}
 	}
 	
-	/* Backup */
-	ndm_parts[PART_BACKUP].size = flash_size_lim -
-				      ndm_parts[PART_BACKUP].offset;
+	index = PART_CONFIG + 1;
 
-	/* Delete Storage if flash size less then 8M, or 
-	 * NDM_STORAGE_SIZE set to zero
-	 */
-	if (flash_size_lim < 0x800000 || ndm_parts[PART_STORAGE].size == 0) {
-		delete = 1;
-		for (i = PART_STORAGE; i < PART_MAX - 1; i++)
-			ndm_parts[i] = ndm_parts[i + 1];
+	/* Dump & Storage */
+	use_dump = use_storage = false;
+	dump_index = storage_index = 0;
 
-		offset = flash_size_lim - part_config_size(master);
-	} else {
-		ndm_parts[PART_STORAGE].offset = flash_size_lim -
-			ndm_parts[PART_STORAGE].size;
-		offset = ndm_parts[PART_STORAGE].offset -
-			 part_config_size(master);
+	part_num = PART_MAX - PART_OPTIONAL_NUM;
+
+	if (CONFIG_MTD_NDM_DUMP_SIZE)
+		use_dump = true;
+
+	if (CONFIG_MTD_NDM_STORAGE_SIZE &&
+	    flash_size_lim >= MIN_FLASH_SIZE_FOR_STORAGE)
+		use_storage = true;
+
+	if (use_storage) {
+		ndm_parts[index].name = "Storage";
+		ndm_parts[index].size = CONFIG_MTD_NDM_STORAGE_SIZE;
+
+		part_num++;
+		storage_index = index;
+		index++;
 	}
 
-	ndm_parts[PART_CONFIG].offset = offset;
-#ifdef CONFIG_MTD_NDM_CONFIG_TRANSITION
-	config_move(master, offset - CONFIG_MTD_NDM_CONFIG_TRANSITION_DELTA);
-#endif
+	if (use_dump) {
+		ndm_parts[index].name = "Dump";
+		ndm_parts[index].size = CONFIG_MTD_NDM_DUMP_SIZE;
+		ndm_parts[index].offset = flash_size_lim - CONFIG_MTD_NDM_DUMP_SIZE;
 
-	/* Config */
+		part_num++;
+		dump_index = index;
+		index++;
+	}
+
 	ndm_parts[PART_CONFIG].size = part_config_size(master);
 
+	if (use_dump && !use_storage) {
+		config_offset = ndm_parts[dump_index].offset -
+				ndm_parts[PART_CONFIG].size;
+	} else if (!use_dump && use_storage) {
+		ndm_parts[storage_index].offset = flash_size_lim -
+						  CONFIG_MTD_NDM_STORAGE_SIZE;
+		config_offset = ndm_parts[storage_index].offset -
+				ndm_parts[PART_CONFIG].size;
+	} else if (use_dump && use_storage) {
+		ndm_parts[storage_index].offset = ndm_parts[dump_index].offset -
+						  CONFIG_MTD_NDM_STORAGE_SIZE;
+		config_offset = ndm_parts[storage_index].offset -
+				ndm_parts[PART_CONFIG].size;
+	} else {
+		config_offset = flash_size_lim - ndm_parts[PART_CONFIG].size;
+	}
+
+	/* Config */
+	ndm_parts[PART_CONFIG].offset = config_offset;
+#ifdef CONFIG_MTD_NDM_CONFIG_TRANSITION
+	config_move(master, config_offset -
+			    CONFIG_MTD_NDM_CONFIG_TRANSITION_DELTA);
+#endif
+
+	/* Backup */
+	ndm_parts[index].name = "Backup";
+	ndm_parts[index].offset = ndm_parts[PART_KERNEL].offset;
+	ndm_parts[index].size = flash_size_lim - ndm_parts[index].offset;
+
+	if (use_dump)
+		ndm_parts[index].size -= ndm_parts[dump_index].size;
+
+	index++;
+
+	/* Full */
+	ndm_parts[index].name = "Full";
+	ndm_parts[index].size = MTDPART_SIZ_FULL;
+	ndm_parts[index].offset = 0;
+
 	/* Firmware */
+	ndm_parts[PART_FIRMWARE].offset = ndm_parts[PART_KERNEL].offset;
 	ndm_parts[PART_FIRMWARE].size = ndm_parts[PART_CONFIG].offset -
 					ndm_parts[PART_FIRMWARE].offset;
 
-	/* RootFS */
+	/* Rootfs */
 	ndm_parts[PART_ROOTFS].size = ndm_parts[PART_CONFIG].offset -
 				      ndm_parts[PART_ROOTFS].offset;
 
 	*pparts = ndm_parts;
-	return (PART_MAX - delete);
+	return part_num;
 }
 
 static struct mtd_part_parser ndm_parser = {
