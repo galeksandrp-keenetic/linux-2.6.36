@@ -29,7 +29,7 @@
 #define OOB_INDEX_SIZE          (2)
 
 #if	!defined(TCSUPPORT_CPU_MT7510)&& !defined(TCSUPPORT_CPU_MT7520)
-#if 1
+#if 0
 #define MSG(args...) printk(args)
 #else
 #define MSG(args...) do{}while(0)

@@ -38,7 +38,6 @@
 #include <linux/interrupt.h>
 #include <linux/dma-mapping.h>
 #include <linux/mtd/partitions.h>
-#include <linux/platform_device.h>
 #include <asm/io.h>
 #include <linux/delay.h>
 #include <linux/sched.h>
@@ -65,8 +64,6 @@
 #define NFC_BIG_ENDIAN			0x02
 #define NFC_LITTLE_ENDIAN 		0x0
 
-static const char *part_probes[] __initdata = { "ndmpart", NULL };
-
 /* frankliao modify 20101215 */
 struct mtd_info *ranfc_mtd = NULL;
 struct ra_nand_chip *ra = NULL;
@@ -87,7 +84,6 @@ static int addr_cycle = 0;
 #define SLAVE_IMAGE_OFFSET 0xf00000
 #define SIZE_2KiB_BYTES (2048)
 #define SIZE_64iB_BYTES (64)
-static char dat[SIZE_2KiB_BYTES + SIZE_64iB_BYTES];
 static int bmt_pool_size = 0;
 static bmt_struct *g_bmt = NULL;
 static init_bbt_struct *g_bbt = NULL;
@@ -115,11 +111,21 @@ extern void prom_printf(const char *fmt, ...);
 #define CLEAR_INT_STATUS() 	ra_outl(NFC_INT_ST, ra_inl(NFC_INT_ST))
 #define NFC_TRANS_DONE() 	(ra_inl(NFC_INT_ST) & INT_ST_ND_DONE)
 
+#ifdef TCSUPPORT_DUAL_IMAGE_ENHANCE
+extern int offset;
+#endif
+
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+static int block_table[1024];
+int nand_erase_next_goodblock(struct ra_nand_chip *ra, int block, unsigned long addr_l);
+int nand_write_next_goodblock(struct ra_nand_chip *ra, int page_u, int page_l);
+int nand_partition_check(int block);
+#endif
+
 #ifdef TCSUPPORT_NAND_RT63368
 int calc_bmt_pool_size(struct ra_nand_chip *ra);
 #endif
 
-#if 0
 static struct mtd_partition rt63165_test_partitions[] = {
 	{									 	/* First partition */
 		  name 	     : "NAND Flash",	 	/* Section */
@@ -127,7 +133,7 @@ static struct mtd_partition rt63165_test_partitions[] = {
 		  offset     : 0				 	/* Offset from start of flash- location 0x0*/
 	},
 };
-#endif
+
 
 static struct nand_opcode opcode_tables[] = {
 	{
@@ -187,6 +193,19 @@ static struct nand_info flash_tables[] = {
 		opcode_type: STANDARD_SMALL_FLASH,
 	},
 	{
+		mfr_id: MANUFACTURER_ZENTEL,
+		dev_id: A5U1GA31ATS,
+		name:   "ZENTEL NAND1GA31ATS",
+		numchips: (1),
+		chip_shift: SIZE_128MiB_BIT,
+		page_shift: SIZE_2KiB_BIT,
+		erase_shift: SIZE_128KiB_BIT,
+		oob_shift: SIZE_64iB_BIT,
+		badblockpos: (51),
+		opcode_type: STANDARD_LARGE_FLASH,
+
+	},
+	{
 		mfr_id: MANUFACTURER_MIRCON,
 		dev_id: MT29F2G08AAD,
 		name:	"MICRON NAND2G08AAD",
@@ -219,7 +238,7 @@ static struct nand_info flash_tables[] = {
 		page_shift: SIZE_2KiB_BIT,
 		erase_shift: SIZE_128KiB_BIT,
 		oob_shift: SIZE_64iB_BIT,
-		badblockpos: (51),
+		badblockpos: (0),
 		opcode_type: STANDARD_LARGE_FLASH,
 	},
 	{
@@ -231,7 +250,7 @@ static struct nand_info flash_tables[] = {
 		page_shift: SIZE_2KiB_BIT,
 		erase_shift: SIZE_128KiB_BIT,
 		oob_shift: SIZE_64iB_BIT,
-		badblockpos: (51),
+		badblockpos: (0),
 		opcode_type: STANDARD_LARGE_FLASH,
 	},
 };
@@ -253,7 +272,7 @@ static struct nand_ecclayout oob_layout_tables[] = {
 	/* 2K page size flash */
 	{
 		.eccbytes = LARGE_FLASH_ECC_BYTES,
-#ifdef CONFIG_MIPS_RT63365
+		#ifdef CONFIG_MIPS_RT63365		
 		.eccpos = { 
 					LARGE_FLASH_ECC_OFFSET,   LARGE_FLASH_ECC_OFFSET+1,  LARGE_FLASH_ECC_OFFSET+2,
 					LARGE_FLASH_ECC_OFFSET+16, LARGE_FLASH_ECC_OFFSET+17,  LARGE_FLASH_ECC_OFFSET+18,
@@ -261,18 +280,18 @@ static struct nand_ecclayout oob_layout_tables[] = {
 					LARGE_FLASH_ECC_OFFSET+48, LARGE_FLASH_ECC_OFFSET+49, LARGE_FLASH_ECC_OFFSET+50
 		},
 		.oobfree = {
-#ifdef TCSUPPORT_NAND_RT63368
-			{.offset = 4, .length = 1},
-#else
+		#ifdef TCSUPPORT_NAND_RT63368
+             {.offset = 4, .length = 1},
+		#else
 			 {.offset = 0, .length = 5},
-#endif
+		#endif	 
 			 {.offset = 8, .length = 13},
 			 {.offset = 24, .length = 13},
 			 {.offset = 40, .length = 11},
 			 {.offset = 52, .length = 1},
 			 {.offset = 56, .length = 8}
 		},
-#else
+		#else	
 		.eccpos = { 
 					LARGE_FLASH_ECC_OFFSET,   LARGE_FLASH_ECC_OFFSET+1,  LARGE_FLASH_ECC_OFFSET+2,
 					LARGE_FLASH_ECC_OFFSET+3, LARGE_FLASH_ECC_OFFSET+4,  LARGE_FLASH_ECC_OFFSET+5,
@@ -284,11 +303,12 @@ static struct nand_ecclayout oob_layout_tables[] = {
 			 {.offset = 0, .length = 0}
 		},
 		#endif
-#ifdef TCSUPPORT_NAND_RT63368
+
+		#ifdef TCSUPPORT_NAND_RT63368
 		.oobavail = 47,
-#else
+		#else
 		.oobavail = 51,
-#endif
+		#endif
 		// 2009th byte is bad-block flag.
 	}
 };
@@ -385,7 +405,7 @@ static int
 _nfc_read_status(struct ra_nand_chip *ra, char *status)
 {
 	unsigned long cmd1, conf;
-//	unsigned int endian = 0;
+	unsigned int endian = 0;
 	int int_st, nfc_st;
 	long retry;
 
@@ -1022,6 +1042,7 @@ nfc_write_oob(struct ra_nand_chip *ra, int page, unsigned int offs, unsigned cha
 		conf = 0x001243 | ((addr_cycle)<<16) | ((len) << 20); 
 	} else if (ra->flash->page_shift == SIZE_2KiB_BIT) {
 		conf = 0x001103 | ((addr_cycle)<<16) | ((len) << 20); 
+		column_addr |= (1<<11);
 	} else {
 		printk("Undefined Write Page Command\n");
 		return -EIO;
@@ -1060,16 +1081,88 @@ int nfc_read_page(struct ra_nand_chip *ra, unsigned char *buf, int page, int fla
 int nfc_write_page(struct ra_nand_chip *ra, unsigned char *buf, int page, int flags);
 	
 
+/*nfc_ecc_err_handler
+for 512 byte/page
+	return:
+		ECC_NO_ERR: no error
+		ECC_CODE_ERR: ECC code error
+		ECC_DATA_ERR: more than 1 bit error, un-correctable
+		ECC_ONE_BIT_ERR: 1 bit correctable error
+		ECC_NFC_CONFLICT: software check result conflict with HW check result
+*/
+int nfc_ecc_err_handler(int page_index , unsigned char *ecc_from_oob, 
+unsigned char *ecc_from_nfc, unsigned long *error_byte_index, unsigned long *error_bit_index){
+	unsigned long old_ecc = 0;
+	unsigned long new_ecc = 0;
+	unsigned long ecc_rst = 0;
+	int ecc_bit_index = 0;
+	int ecc_bit1_cnt = 0;
+	unsigned long temp = 0;
+
+	memcpy((unsigned char *)&old_ecc + 1 , ecc_from_oob , 3);
+	memcpy((unsigned char *)&new_ecc + 1 , ecc_from_nfc , 3);
+
+
+	ecc_rst = old_ecc^new_ecc;
+
+
+	if(ecc_rst == 0){//no ecc error
+		return ECC_NO_ERR;
+	}else{
+		for(ecc_bit_index = 0; ecc_bit_index< 24; ecc_bit_index++ ){
+			if((ecc_rst&(1<<ecc_bit_index)) != 0){
+				ecc_bit1_cnt++;
+			}
+		}
+		printk("\r\n ecc_rst= 0x%08x, ecc_bit1_cnt=%d ", ecc_rst, ecc_bit1_cnt);
+		if(ecc_bit1_cnt == 1){//ECC code error
+			return ECC_CODE_ERR;
+		}else if(ecc_bit1_cnt != 12){//more than 1 bit error, un-correctable
+			printk("\r\n more than one bit ECC error \r\n");
+			return ECC_DATA_ERR;
+		}else if(ecc_bit1_cnt == 12){// 1 bit correctable error, get error bit
+			temp = ra_inl(NFC_ECC_ST + page_index*4);
+			if(unlikely((temp&0x1) == 0)){
+				printk("\r\n ECC result conflict!! \r\n");
+				return ECC_NFC_CONFLICT;
+			}
+			*error_byte_index = ((temp>>6)&0x1ff);
+			*error_bit_index = ((temp>>2)&0x7);
+			printk("\r\n correctable ECC error   error_byte_index=%d, error_bit_index=%d", 
+					*error_byte_index, *error_bit_index);
+			return ECC_ONE_BIT_ERR;
+		}
+	}
+	return ECC_NO_ERR;
+}
+
+
+
 #if !defined (WORKAROUND_RX_BUF_OV)	
+
+/**
+ * nfc_ecc_verify 
+ return value:
+ 	0:    data OK or data correct OK
+ 	-1:  data ECC fail
+ */
 int nfc_ecc_verify(struct ra_nand_chip *ra, unsigned char *buf, int page, int mode)
 {
 	int ret, i, j, ecc_num;
 	unsigned char *p, *e;
-
+	unsigned long err_byte_index = 0;
+	unsigned long err_bit_index = 0;
+	int ecc_error_code = ECC_DATA_ERR;
+	int ecc_ret = -1;
+	
+	
 	/* 512 bytes data has a ecc value */
 	int ecc_bytes, ecc_offset, ecc[4];
+	unsigned char ecc_swap[3] = {0};
+	unsigned char correct_byte = 0;
 	
-//	printk("%s, page:%x mode:%d\n", __func__, page, mode);
+		
+	//	printk("%s, page:%x mode:%d\n", __func__, page, mode);
 
 	if (mode == FL_WRITING) {
 		int len = (1 << ra->flash->page_shift) + (1 << ra->flash->oob_shift);
@@ -1079,7 +1172,7 @@ int nfc_ecc_verify(struct ra_nand_chip *ra, unsigned char *buf, int page, int mo
 			conf = 0x000141; 
 		else
 			conf = 0x000511;
-
+	
 		conf |= ((addr_cycle) << 16) | (len << 20);
 		conf |= (1<<3); //(ecc_en) 
 //		conf |= (1<<2); // (use_gdma)
@@ -1116,7 +1209,7 @@ ecc_check:
 	ecc[0] = ra_inl(NFC_ECC); 
 	
 	if (ecc[0] == 0) {
-//		printk("clean page.\n");
+		//printk("clean page.\n");
 		return 0;
 	}	
 
@@ -1134,36 +1227,64 @@ ecc_check:
 	ecc_num = ecc_bytes/3;
 	for (i=0; i<ecc_num; i++) {
 		e = (unsigned char*)&ecc[i];
-#if defined (TCSUPPORT_NAND_RT63368)
+		ecc_swap[0] = *((unsigned char*)&ecc[i]+3);
+		ecc_swap[1] = *((unsigned char*)&ecc[i]+2);
+		ecc_swap[2] = *((unsigned char*)&ecc[i]+1);
+  #if defined (TCSUPPORT_NAND_BADBLOCK_CHECK) || defined (TCSUPPORT_NAND_RT63368)
 		ecc_offset = ra->oob->eccpos[i * 3];
-#endif
-
+  #endif
+		err_byte_index = 0;
+		err_bit_index = 0;
 		/* each ecc register store 3 bytes ecc value */
+		ecc_ret = 0;
 		for (j=0; j<3; j++) {
 
-#ifdef __LITTLE_ENDIAN
+		#ifdef __LITTLE_ENDIAN
 			int eccpos = ecc_offset + j + i*3;
-#else
-#if defined (TCSUPPORT_NAND_RT63368)
-			int eccpos = ecc_offset - j + 2;
-#else
-
-			int eccpos = ecc_offset - j + 2 + i*3;
-#endif
-#endif
+		#else
+		  #if defined (TCSUPPORT_NAND_BADBLOCK_CHECK) || defined (TCSUPPORT_NAND_RT63368)
+				int eccpos = ecc_offset - j + 2;
+		  #else
+				int eccpos = ecc_offset - j + 2 + i*3;
+		  #endif
+		#endif
 
 			if (*(p + eccpos) != *(e + j + 1)) {
 
-			#ifdef __LITTLE_ENDIAN
+		#ifdef __LITTLE_ENDIAN
 				printk("%s mode:%s, invalid ecc, page: %x read:%x %x %x, ecc:%x \n",
-				       __func__, (mode == FL_READING)?"read":"write", page,	
-				       *(p+ecc_offset), *(p+ecc_offset+1), *(p+ecc_offset+2), ecc[i]);
-			#else
+					   __func__, (mode == FL_READING)?"read":"write", page, 
+					   *(p+ecc_offset), *(p+ecc_offset+1), *(p+ecc_offset+2), ecc[i]);
+		#else
 				printk("%s mode:%s, invalid ecc, page: %x read:%x %x %x, ecc:%x \n",
-				       __func__, (mode == FL_READING)?"read":"write", page,	
-				       *(p+ecc_offset+2), *(p+ecc_offset+1), *(p+ecc_offset), ecc[i]);
-			#endif
-				return -1;
+					   __func__, (mode == FL_READING)?"read":"write", page, 
+					   *(p+ecc_offset+2), *(p+ecc_offset+1), *(p+ecc_offset), ecc[i]);
+		#endif
+				ecc_ret =-1;
+				break;
+			}
+		}
+		if(ecc_ret == -1){
+			ecc_error_code = nfc_ecc_err_handler(i , p+ecc_offset, ecc_swap, &err_byte_index, 
+				&err_bit_index );
+			if(ecc_error_code != ECC_NO_ERR){
+					printk("\r\n ecc_error_code= %d, page=%d ,i=%d", ecc_error_code, page, i);
+					if(ecc_error_code == ECC_ONE_BIT_ERR){
+						//correct the error
+						printk("\r\n  err_byte_index= %d, err_bit_index=%d", 
+								 err_byte_index , err_bit_index);
+						correct_byte = buf[err_byte_index + i*512];
+						if((correct_byte&(1<<err_bit_index)) != 0){
+							correct_byte &= (~(1<<err_bit_index));
+						}else{
+							correct_byte |= (1<<err_bit_index);
+						}
+						buf[err_byte_index + i*512] = correct_byte;
+						ecc_ret = 0;
+						ecc_error_code = ECC_NO_ERR;
+						continue;
+				}
+				return ecc_error_code;
 			}
 		}
 	}
@@ -1173,6 +1294,7 @@ ecc_check:
 bad_block:
 	return -1;
 }
+
 
 
 #else
@@ -1362,7 +1484,7 @@ nfc_read_page(struct ra_nand_chip *ra, unsigned char *buf, int page, int flags)
 		if (status != 0) {
 			printk("%s: fail, buf:%x, page:%x, flag:%x\n", 
 			       __func__, (unsigned int)buf, page, flags);
-			return -EBADMSG;
+			return status;
 		}
 	}
 	else {
@@ -1387,7 +1509,7 @@ nfc_write_page(struct ra_nand_chip *ra, unsigned char *buf, int page, int flags)
 	unsigned int ecc_en;
 	int use_gdma;
 	int pagesize;
-//	int i;
+	int i;
 	char status;
 //	uint8_t *oob = buf + (1 << ra->flash->page_shift);
 
@@ -1402,9 +1524,9 @@ nfc_write_page(struct ra_nand_chip *ra, unsigned char *buf, int page, int flags)
 	/* frankliao added 20101029 */
 	if (ecc_en) {
 		// frank added 20110421
-#if !defined(TCSUPPORT_NAND_RT63368)
+		#if !defined(TCSUPPORT_NAND_BADBLOCK_CHECK) && !defined(TCSUPPORT_NAND_RT63368)
 		memset(ra->buffers + pagesize, 0xff, (1 << ra->flash->oob_shift));
-#endif
+		#endif		
 		pagesize = pagesize + (1 << ra->flash->oob_shift);
 	}	
 	
@@ -1575,7 +1697,7 @@ nand_block_checkbad(struct ra_nand_chip *ra, loff_t offs
 	page = offs >> ra->flash->page_shift;
 	block = offs >> ra->flash->erase_shift;
 #ifdef TCSUPPORT_NAND_RT63368
-	if(bmt_block == 0){
+    if(bmt_block == 0){
 #endif
 	tag = nand_bbt_get(ra, block);
 
@@ -1603,19 +1725,20 @@ nand_block_checkbad(struct ra_nand_chip *ra, loff_t offs
 		return 0;
 	}
 #ifdef TCSUPPORT_NAND_RT63368
-	}
-	else{
+    }
+    else{
 
-		ret = nfc_read_oob(ra, page, BMT_BAD_BLOCK_INDEX_OFFSET, (char*)&tag, 1, FLAG_NONE);
+        ret = nfc_read_oob(ra, page, BMT_BAD_BLOCK_INDEX_OFFSET, (char*)&tag, 1, FLAG_NONE);
 
-		tag = tag >> 24;
-		if (ret == 0 && ((tag & 0xff) == 0xff)) 
-			return 0;
-		else
-			return 1;
+        tag = tag >> 24;
+    	if (ret == 0 && ((tag & 0xff) == 0xff)) 
+    		return 0;
+    	else
+    		return 1;
 
-	}
+    }
 #endif
+
 }
 
 
@@ -1632,7 +1755,7 @@ nand_block_markbad(struct ra_nand_chip *ra, loff_t offs
 	int page, block;
 	int start_page, end_page;
 	int ret = 4;
-	unsigned int tag = BBT_TAG_UNKNOWN;
+	unsigned int tag;
 	char *ecc;
 
 	// align with chip
@@ -1645,7 +1768,7 @@ nand_block_markbad(struct ra_nand_chip *ra, loff_t offs
 	start_page = block * (1<<(ra->flash->erase_shift - ra->flash->page_shift));
 	end_page = (block+1) * (1<<(ra->flash->erase_shift - ra->flash->page_shift));
 #ifdef TCSUPPORT_NAND_RT63368
-	if(bmt_block == 0){
+    if(bmt_block == 0){
 #endif
 
 	tag = nand_bbt_get(ra, block);
@@ -1656,9 +1779,8 @@ nand_block_markbad(struct ra_nand_chip *ra, loff_t offs
 	}
 
 #ifdef TCSUPPORT_NAND_RT63368
-	}
+    }
 #endif
-
 	for (page=start_page; page<end_page; page++) {
 		// new tag as bad
 		tag = BBT_TAG_BAD;
@@ -1667,13 +1789,14 @@ nand_block_markbad(struct ra_nand_chip *ra, loff_t offs
 			printk("%s: fail to read bad block tag \n", __func__);
 			goto tag_bbt;
 		}
+
 #ifdef TCSUPPORT_NAND_RT63368    
-		if(bmt_block)
-			ecc = &ra->buffers[(1<<ra->flash->page_shift) + BMT_BAD_BLOCK_INDEX_OFFSET];
-		else
+    if(bmt_block)
+        ecc = &ra->buffers[(1<<ra->flash->page_shift) + BMT_BAD_BLOCK_INDEX_OFFSET];
+    else
 #endif 
 		ecc = &ra->buffers[(1<<ra->flash->page_shift)+ra->flash->badblockpos];
-
+	
 		if (*ecc == (char)0xff) {
 			//tag into flash
 			*ecc = (char)tag;
@@ -1683,21 +1806,24 @@ nand_block_markbad(struct ra_nand_chip *ra, loff_t offs
 				printk("%s: fail to write bad block tag \n", __func__);	
 				break;
 			}
-		}
-#if defined(TCSUPPORT_NAND_RT63368)
-		break;
-#endif
+		}	
+    #if defined(TCSUPPORT_NAND_BADBLOCK_CHECK) || defined(TCSUPPORT_NAND_RT63368)
+        break;
+    #endif
+		
 	}
 tag_bbt:
-#ifdef TCSUPPORT_NAND_RT63368
-	if(bmt_block == 0){
-#endif
+
+    #ifdef TCSUPPORT_NAND_RT63368
+        if(bmt_block == 0){
+    #endif
 	//update bbt
 	nand_bbt_set(ra, block, tag);
-#ifdef TCSUPPORT_NAND_RT63368
-	}
-#endif
 
+    #ifdef TCSUPPORT_NAND_RT63368
+        }
+    #endif
+    
 	return 0;
 }
 
@@ -1745,10 +1871,16 @@ nand_erase_nand(struct ra_nand_chip *ra, struct erase_info *instr)
 	unsigned long long addr;
 	unsigned int blocksize = 1<<ra->flash->erase_shift;
 
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+    int block;
+    int srcblock;
+    unsigned long srcaddr;
+#endif
+
 #ifdef TCSUPPORT_NAND_RT63368
-	int physical_block;
-	unsigned long logic_addr;
-	unsigned short phy_block_bbt;
+    int physical_block;
+    unsigned long logic_addr;
+    unsigned short phy_block_bbt;
 #endif
 
 	ra_dbg("%s: start:%llx, len:%x \n", __func__, instr->addr, (unsigned int)instr->len);
@@ -1763,18 +1895,46 @@ nand_erase_nand(struct ra_nand_chip *ra, struct erase_info *instr)
 	instr->fail_addr = -1;
 
 	len = instr->len;
-	addr = instr->addr;
+	addr = instr->addr;	    //logic address
 	instr->state = MTD_ERASING;
+
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+	srcblock = addr >> ra->flash->erase_shift;
+	srcaddr = addr;
+
+	addr += (block_table[srcblock] - srcblock) << ra->flash->erase_shift;
+
+	if(nand_partition_check(srcblock)){
+		printk("%s: address over partition size, erase fail \n", __func__);
+		instr->state = MTD_ERASE_FAILED; 
+		return -EIO;
+	}
+#endif
 
 #ifdef TCSUPPORT_NAND_RT63368
 	logic_addr = addr;  //logic address
 #endif
-
+	
 	while (len) {
 
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+	block = srcaddr >> ra->flash->erase_shift;
+	if(srcblock != block)
+	{
+		srcblock = block;
+		addr = srcaddr + ((block_table[block] - block) << ra->flash->erase_shift);
+
+		if(nand_partition_check(srcblock)){
+			printk("%s: address over partition size, erase fail \n", __func__);
+			instr->state = MTD_ERASE_FAILED;
+			return -EIO;
+		}
+	}
+#endif
+
 #ifdef TCSUPPORT_NAND_RT63368
-		physical_block = get_mapping_block_index(logic_addr >> ra->flash->erase_shift, &phy_block_bbt); //physical block
-		addr = (physical_block << ra->flash->erase_shift);  //physical address
+	physical_block = get_mapping_block_index(logic_addr >> ra->flash->erase_shift, &phy_block_bbt); //physical block
+	addr = (physical_block << ra->flash->erase_shift);  //physical address
 #endif
 
 //		page = (int)(addr >> ra->flash->page_shift);
@@ -1816,7 +1976,11 @@ nand_erase_nand(struct ra_nand_chip *ra, struct erase_info *instr)
 
 		/* See if block erase succeeded */
 		if (status) {
-#if defined(TCSUPPORT_NAND_RT63368)
+		#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+
+			nand_erase_next_goodblock(ra, block, addr);
+
+		#elif defined(TCSUPPORT_NAND_RT63368)
 			if (update_bmt(addr,
 				UPDATE_ERASE_FAIL, NULL, NULL))
 			{
@@ -1827,22 +1991,31 @@ nand_erase_nand(struct ra_nand_chip *ra, struct erase_info *instr)
 				printk("Erase fail at block, update BMT fail\n");
 				return -1;
 			}
-#else
+
+		#else
 			printk("%s: failed erase, block 0x%08x\n", __func__, page);
 			instr->state = MTD_ERASE_FAILED;
 //			instr->fail_addr = (block << ra->flash->erase_shift);
 			instr->fail_addr = (page << ra->flash->page_shift);
 			goto erase_exit;
-#endif
+		#endif
+
+
 		}
+
 
 		/* Increment page address and decrement length */
 		len -= blocksize;
-		addr += blocksize;
+		addr += blocksize;  //physical address
 
-#ifdef TCSUPPORT_NAND_RT63368
+	#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+		srcaddr += blocksize;
+	#endif
+
+	#ifdef TCSUPPORT_NAND_RT63368
 		logic_addr += blocksize;    //logic address
-#endif
+	#endif
+
 	}
 	instr->state = MTD_ERASE_DONE;
 
@@ -1989,6 +2162,306 @@ nand_read_oob_buf(struct ra_nand_chip *ra, uint8_t *oob, size_t size,
 }
 
 
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+int nandflash_scan_badblock(void)
+{
+    int i, j, badblock;
+    int addr = 0;
+    int blocksize = 1 << ra->flash->erase_shift;
+    int totalblock = 1024;
+ 
+
+    for(i = 0; i < totalblock; i++)
+    {
+        block_table[i] = i;
+    }
+
+    for(j = 0; j < totalblock; j++)
+    {
+
+        if(nand_block_checkbad(ra, addr))
+        {
+            badblock = addr/blocksize;
+
+            if(badblock >= TCROMFILE_START && badblock < TCROMFILE_END)
+            {
+
+                for(i = TCROMFILE_START; i < TCROMFILE_END; i++)
+                {
+                    if(block_table[i] == badblock)
+                    {
+                        break;
+                    }
+
+                }
+
+                for(; i < TCROMFILE_END; i++)
+                {
+                     block_table[i]++;
+                }
+            
+            }else if(badblock >= TCLINUX_BLOCK_START && badblock < TCLINUX_BLOCK_END){
+ 
+                for(i = TCLINUX_BLOCK_START; i < TCLINUX_BLOCK_END; i++)
+                {
+                    if(block_table[i] == badblock)
+                    {
+                        break;
+                    }
+
+                }
+
+                for(; i < TCLINUX_BLOCK_END; i++)
+                {
+                     block_table[i]++;
+                }
+
+
+            
+            }
+            else if(badblock >= TCLINUX_SLAVE_BLOCK_START && badblock < TCLINUX_SLAVE_BLOCK_END){
+
+                for(i = TCLINUX_SLAVE_BLOCK_START; i < TCLINUX_SLAVE_BLOCK_END; i++)
+                {
+                    if(block_table[i] == badblock)
+                    {
+                        break;
+                    }
+
+                }
+
+                for(; i < TCLINUX_SLAVE_BLOCK_END; i++)
+                {
+                     block_table[i]++;
+                }
+
+
+            }else if(badblock >= TCSYSLOG_START && badblock < TCSYSLOG_END){
+
+                for(i = TCSYSLOG_START; i < TCSYSLOG_END; i++)
+                {
+                    if(block_table[i] == badblock)
+                    {
+                        break;
+                    }
+
+                }
+
+                for(; i < TCSYSLOG_END; i++)
+                {
+                     block_table[i]++;
+                }
+
+            }else if(badblock >= TCBKROMFILE_START && badblock < TCBKROMFILE_END){
+
+                for(i = TCBKROMFILE_START; i < TCBKROMFILE_END; i++)
+                {
+                    if(block_table[i] == badblock)
+                    {
+                        break;
+                    }
+
+                }
+
+                for(; i < TCBKROMFILE_END; i++)
+                {
+                     block_table[i]++;
+                }
+
+            }else if(badblock >= TCWIFI_START && badblock < TCWIFI_END){
+            
+                for(i = TCWIFI_START; i < TCWIFI_END; i++)
+                {
+                    if(block_table[i] == badblock)
+                    {
+                        break;
+                    }
+
+                }
+
+                for(; i < TCWIFI_END; i++)
+                {
+                     block_table[i]++;
+                }
+
+            }
+
+        }
+        
+        addr += blocksize;
+
+    }
+
+    return 0;
+
+}
+
+
+int nand_partition_check(int block)
+{
+    int ret = 0;
+
+    if(block >= TCROMFILE_START && block < TCROMFILE_END){
+        if(block_table[block] >= TCROMFILE_END){
+            ret = -1;
+            goto done;
+        }
+
+    }else if(block >= TCLINUX_BLOCK_START && block < TCLINUX_BLOCK_END){
+        if(block_table[block] >= TCLINUX_BLOCK_END){
+            ret = -1;
+            goto done;
+        }
+
+    }else if(block >= TCLINUX_SLAVE_BLOCK_START && block < TCLINUX_SLAVE_BLOCK_END){
+        if(block_table[block] >= TCLINUX_SLAVE_BLOCK_END){
+            ret = -1;
+            goto done;
+        }
+
+    }else if(block >= TCSYSLOG_START && block < TCSYSLOG_END){
+        if(block_table[block] >= TCSYSLOG_END){
+            ret = -1;
+            goto done;
+        }
+
+    }else if(block >= TCBKROMFILE_START && block < TCBKROMFILE_END){
+        if(block_table[block] >= TCBKROMFILE_END){
+            ret = -1;
+            goto done;
+        }
+    }else if(block >= TCWIFI_START && block < TCWIFI_END){
+        if(block_table[block] >= TCWIFI_END){
+            ret = -1;
+            goto done;
+        }
+    }
+
+done:
+    return ret;
+    
+}
+
+int nand_erase_next_goodblock(struct ra_nand_chip *ra, int block, unsigned long addr_l)
+{
+    unsigned int blocksize = 1 << ra->flash->erase_shift;
+    unsigned int pagesize = 1 << ra->flash->page_shift;
+    unsigned long offset;
+    int page;
+    nand_block_markbad(ra, addr_l);
+    
+    block++;
+    offset = block * blocksize;
+    offset += (block_table[block] - block) << ra->flash->erase_shift;
+    
+    page = (unsigned long)(offset >> ra->flash->page_shift);
+
+    while(nfc_erase_block(ra, page))
+    {
+        
+        nand_block_markbad(ra, offset);
+        
+        block++;
+        offset = block * blocksize;
+        offset += (block_table[block] - block) << ra->flash->erase_shift;
+        
+        page = (unsigned long)(offset >> ra->flash->page_shift);
+
+    }
+
+    nandflash_scan_badblock();
+
+    return 0;
+
+}
+
+int nand_write_next_goodblock(struct ra_nand_chip *ra, int page_u, int page_l)
+{
+    int src_page, npage, nextblk_startaddr, nextblk_writeaddr, ret, block, addr;
+    int readstart_page, writestart_page, last_page, readtotal_page, to_page, erase_blk, erase_addr;
+    uint8_t *pbuf = NULL;
+    uint32_t pagesize = (1 << ra->flash->page_shift);
+    uint32_t blocksize = (1 << ra->flash->erase_shift);
+    uint8_t page_data[pagesize + (1 << ra->flash->oob_shift)];
+
+    src_page = page_l >> (ra->flash->erase_shift - ra->flash->page_shift);
+    src_page = src_page << (ra->flash->erase_shift - ra->flash->page_shift);
+
+    readstart_page = src_page;
+
+    npage = page_l - src_page + 1;
+    readtotal_page = npage;
+    
+    block = page_u >> (ra->flash->erase_shift - ra->flash->page_shift);
+    addr = block << ra->flash->erase_shift;
+
+    block++;
+    addr += blocksize;
+    
+    nextblk_startaddr = addr + ((block_table[block] - block) << ra->flash->erase_shift);
+    nextblk_writeaddr = nextblk_startaddr + (page_l - src_page) * pagesize;
+    
+    writestart_page = nextblk_startaddr >> ra->flash->page_shift;
+
+    memcpy(page_data, ra->buffers, pagesize + (1 << ra->flash->oob_shift));
+
+    nfc_erase_block(ra, writestart_page);
+
+    while(readtotal_page > 0)
+    {
+        if(readtotal_page > 1){
+
+            memset(ra->buffers, 0xff, pagesize + (1 << ra->flash->oob_shift));
+            
+            ret = nfc_read_page(ra, ra->buffers, readstart_page, 0); 
+            if(ret)
+            {
+                ret = nfc_read_page(ra, ra->buffers, readstart_page, 0); 
+                if(ret)
+                    printk("%s: read page fail", __func__);
+
+            }
+            to_page = writestart_page;
+            pbuf = ra->buffers;
+        }
+        else{
+            to_page = nextblk_writeaddr >> ra->flash->page_shift;
+            pbuf = page_data;
+
+        }
+        
+        ret = nfc_write_page(ra, pbuf, to_page, FLAG_ECC_EN | FLAG_VERIFY);
+        if(ret)
+        {
+            nfc_erase_block(ra, writestart_page);
+            nand_block_markbad(ra, nextblk_startaddr);    
+            
+            block++;
+            addr += blocksize;
+            nextblk_startaddr = addr + (block_table[block] - block) << ra->flash->erase_shift;
+            writestart_page = nextblk_startaddr >> ra->flash->page_shift;
+            nextblk_writeaddr = nextblk_startaddr + (page_l - src_page) * pagesize;
+            readstart_page = src_page;
+            readtotal_page = npage;
+            continue;
+
+        }
+        writestart_page++;
+        readstart_page++;
+        readtotal_page--;
+
+    }
+
+    nfc_erase_block(ra, src_page);  
+    nand_block_markbad(ra, src_page * pagesize);
+
+    nandflash_scan_badblock();
+
+    return to_page;
+
+}
+
+#endif
 /**
  * nand_do_write_ops - [Internal] NAND write with ECC
  * @mtd:	MTD device structure
@@ -2005,12 +2478,17 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 	uint32_t datalen = ops->len;
 	uint32_t ooblen = ops->ooblen;
 	uint8_t *oob = ops->oobbuf;
-	uint8_t *data = ops->datbuf;
+	uint8_t *data = ops->datbuf; 
 
 	int pagesize = (1 << ra->flash->page_shift);
 	int pagemask = (pagesize -1);
 	int oobsize = 1 << ra->flash->oob_shift;
-//	int i;
+	int i;
+	#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+	unsigned int blocksize = (1 << ra->flash->erase_shift);
+	int block;
+	int srcpage;
+	#endif
 
 #ifdef TCSUPPORT_NAND_RT63368
 	int physical_block;
@@ -2018,9 +2496,22 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 	unsigned long addr_offset_in_block;
 	unsigned long logic_addr;
 	unsigned short phy_block_bbt;
+	char dat[SIZE_2KiB_BYTES + SIZE_64iB_BYTES];
 #endif
 
-	loff_t addr = to;
+	loff_t addr = to;   //logic address
+
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+	int srcblock = addr >> ra->flash->erase_shift;
+	unsigned long srcaddr = addr;
+
+	addr += (block_table[srcblock] - srcblock) << ra->flash->erase_shift;
+
+	if(nand_partition_check(srcblock)){
+		printk("%s: address over partition size, write fail \n", __func__);
+		return -EFAULT;
+	}
+#endif
 
 #ifdef TCSUPPORT_NAND_RT63368
 	logic_addr = addr;        //logic address
@@ -2038,6 +2529,7 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 	if (data ==0)
 		datalen = 0;
 	
+#if 0
 	// oob sequential (burst) write
 	if (datalen == 0 && ooblen) {
 		int len = ((ooblen + ops->ooboffs) + (ra->oob->oobavail - 1)) / ra->oob->oobavail * oobsize;
@@ -2052,12 +2544,12 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 
 		/* frankliao added 20101029 */
 		if (nand_block_checkbad(ra, addr
-#ifdef TCSUPPORT_NAND_RT63368
+		#ifdef TCSUPPORT_NAND_RT63368
 			,BAD_BLOCK_RAW
-#endif
+		#endif
 		)) {
 			printk(KERN_WARNING "nand_do_write_ops: attempt to write a "
-					"bad block at 0x%08x\n", page);
+			       "bad block at 0x%08x\n", page);
 			return -EFAULT;
 		}	
 		// frankliao added 20110304, clear write buffer 
@@ -2076,6 +2568,7 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 		ops->oobretlen = ooblen;
 		ooblen = 0;
 	}
+#endif
 
 	// data sequential (burst) write
 	if (datalen && ooblen == 0) {
@@ -2096,13 +2589,32 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 		ra_dbg("%s : addr:%llx, ops data:%p, oob:%p datalen:%x ooblen:%x, ooboffs:%x \n", 
 		       __func__, addr, data, oob, datalen, ooblen, ops->ooboffs);
 
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+	block = srcaddr >> ra->flash->erase_shift;
+	if(srcblock != block)
+	{
+		srcblock = block;
+		addr = srcaddr + ((block_table[block] - block) << ra->flash->erase_shift);
+
+		if(nand_partition_check(srcblock)){
+			printk("%s: address over partition size, write fail \n", __func__);
+			return -EFAULT;
+		}
+	}
+#endif
+
 #ifdef TCSUPPORT_NAND_RT63368
+
 		addr_offset_in_block = logic_addr % (1 << ra->flash->erase_shift);  //logic address offset
 		physical_block = get_mapping_block_index(logic_addr >> ra->flash->erase_shift, &phy_block_bbt); //physical block
 		addr = (physical_block << ra->flash->erase_shift) + addr_offset_in_block;   //physical address offset
 #endif
 
 		page = (int)((addr & (((loff_t)1<<ra->flash->chip_shift)-1)) >> ra->flash->page_shift); //chip boundary
+
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+		srcpage = (int)((srcaddr & ((1<<ra->flash->chip_shift)-1)) >> ra->flash->page_shift); 
+#endif
 
 #ifdef TCSUPPORT_NAND_RT63368
 		logic_page = (int)((logic_addr & ((1<<ra->flash->chip_shift)-1)) >> ra->flash->page_shift); //logic page
@@ -2115,9 +2627,8 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 			printk(KERN_WARNING "nand_do_write_ops: attempt to write a "
 			       "bad block at 0x%08x\n", page);
 			return -EFAULT;
-		}
+		}	
 #endif
-
 		/* select chip, and check if it is write protected */
 		if (nfc_enable_chip(ra, addr, 0))
 			return -EIO;
@@ -2129,7 +2640,7 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 		}	
 */		
 		if (oob && ooblen > 0) {
-			memset(ra->buffers + pagesize, 0xff, ooblen);
+			memset(ra->buffers + pagesize, 0xff, oobsize);
 			len = nand_write_oob_buf(ra, ra->buffers + pagesize, oob, ooblen, ops->mode, ops->ooboffs);
 			if (len < 0) 
 				return -EINVAL;
@@ -2146,11 +2657,11 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 		if (data && len > 0) {
 			/* frankliao modify 20110208, reset buffer */
 //			memset(ra->buffers, 0xff, len);
-#if defined(TCSUPPORT_NAND_RT63368)
+			#if defined(TCSUPPORT_NAND_BADBLOCK_CHECK) || defined(TCSUPPORT_NAND_RT63368)
 			memset(ra->buffers, 0xff, pagesize + oobsize);
-#else
+			#else
 			memset(ra->buffers, 0xff, pagesize);
-#endif
+			#endif
 			memcpy(ra->buffers + offs, data, len);	// we can not sure ops->buf wether is DMA-able.
 /*			
 			printk("In nand_do_write_ops\n");
@@ -2167,12 +2678,12 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 			}
 			printk("\n\n\n");
 */
-#ifdef TCSUPPORT_NAND_RT63368
+			#ifdef TCSUPPORT_NAND_RT63368
 			if(block_is_in_bmt_region(physical_block))
 			{
 				memcpy(ra->buffers + pagesize + OOB_INDEX_OFFSET, &phy_block_bbt, OOB_INDEX_SIZE);
 			}
-#endif
+			#endif
 			data += len;
 			datalen -= len;
 			ops->retlen += len;
@@ -2186,50 +2697,62 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 //				     ((ops->mode == MTD_OOB_RAW || ops->mode == MTD_OOB_PLACE) ? 0 : ecc_en ));
 		
 //		ret = nfc_write_page(ra, ra->buffers, page, FLAG_VERIFY | ranfc_flags);
-#if defined(TCSUPPORT_NAND_RT63368)
+    #ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+        ranfc_flags = (FLAG_VERIFY | ecc_en);
+        //ranfc_flags = 0;
+    #elif defined(TCSUPPORT_NAND_RT63368)
 		ranfc_flags = (FLAG_VERIFY | ecc_en);
-#endif
+    #endif
 
-#ifdef TCSUPPORT_NAND_RT63368
-		if(!(data && len > 0))
-		{
-			ret = nfc_write_oob(ra, page, 0, ra->buffers + pagesize, oobsize, ranfc_flags);
-			if(ret)
-				nfc_read_page(ra, ra->buffers, page, ranfc_flags); 
-		}
-		else{
-#endif
+    #ifdef TCSUPPORT_NAND_RT63368
+        if(!(data && len > 0))
+        {
+            ret = nfc_write_oob(ra, page, 0, ra->buffers + pagesize, oobsize, ranfc_flags);
+            if(ret)
+                nfc_read_page(ra, ra->buffers, page, ranfc_flags); 
+        }    
+        else{
+    #endif
 		ret = nfc_write_page(ra, ra->buffers, page, ranfc_flags);
-#ifdef TCSUPPORT_NAND_RT63368
-		}
-#endif
-
+	#ifdef TCSUPPORT_NAND_RT63368
+        }
+	#endif
+		
 		if (ret) {
-#if defined(TCSUPPORT_NAND_RT63368)  
-			printk("write fail at page: %d \n", page);
-			memcpy(dat, ra->buffers, SIZE_2KiB_BYTES + SIZE_64iB_BYTES);
-			if (update_bmt(page << ra->flash->page_shift, 
-					UPDATE_WRITE_FAIL, dat, dat + SIZE_2KiB_BYTES))
-			{
-				printk("Update BMT success\n");
-			}
-			else
-			{
-				printk("Update BMT fail\n");
-				return -1;
-			}
-#else
-			nand_bbt_set(ra, addr >> ra->flash->erase_shift, BBT_TAG_BAD);
-			return ret;
-#endif
+	#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+            page = nand_write_next_goodblock(ra, srcpage, page);
+    #elif defined(TCSUPPORT_NAND_RT63368)  
+    		printk("write fail at page: %d \n", page);
+		    memcpy(dat, ra->buffers, SIZE_2KiB_BYTES + SIZE_64iB_BYTES);
+            if (update_bmt(page << ra->flash->page_shift, 
+                        UPDATE_WRITE_FAIL, dat, dat + SIZE_2KiB_BYTES))
+            {
+                printk("Update BMT success\n");
+           
+            }
+            else
+            {
+                printk("Update BMT fail\n");
+                return -1;
+            }
+    #else
+            nand_bbt_set(ra, addr >> ra->flash->erase_shift, BBT_TAG_BAD);
+            return ret;
+    #endif
+    
 		}
 
 //		nand_bbt_set(ra, addr >> ra->flash->erase_shift, BBT_TAG_GOOD);
 
-		addr = (page+1) << ra->flash->page_shift;
-#ifdef TCSUPPORT_NAND_RT63368
-		logic_addr = (logic_page + 1) << ra->flash->page_shift; //logic address
-#endif
+		addr = (page+1) << ra->flash->page_shift;   //physical address
+		
+	    #ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+		srcaddr = (srcpage+1) << ra->flash->page_shift;
+        #endif
+
+        #ifdef TCSUPPORT_NAND_RT63368
+        logic_addr = (logic_page + 1) << ra->flash->page_shift; //logic address
+        #endif
 	}
 
 	return 0;
@@ -2257,15 +2780,30 @@ nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
 	int pagesize = (1 << ra->flash->page_shift);
 	int oobsize = (1 << ra->flash->oob_shift);
 	int pagemask = (pagesize -1);
-	loff_t addr = from;
-#ifdef TCSUPPORT_NAND_RT63368
-	int physical_block;
-	int logic_page;
-	unsigned long addr_offset_in_block;
-	unsigned long logic_addr = addr;
-	unsigned short phy_block_bbt;
-#endif
+	loff_t addr = from; //logic address
+	
+	#ifdef TCSUPPORT_NAND_RT63368
+    int physical_block;
+    int logic_page;
+    unsigned long addr_offset_in_block;
+    unsigned long logic_addr = addr;
+    unsigned short phy_block_bbt;
+    #endif
+	
+	#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+	int block;
+    unsigned int blocksize = (1 << ra->flash->erase_shift);
+    int srcblock = addr >> ra->flash->erase_shift;
+    unsigned long srcaddr = addr;
+    int srcpage;
 
+    addr += (block_table[srcblock] - srcblock) << ra->flash->erase_shift;
+
+    if(nand_partition_check(srcblock)){
+        printk("%s: address over partition size, read fail \n", __func__);
+        return -EIO;
+    }
+    #endif
 //	ra_dbg("READ FROM\n");
 //	ra_dbg("read from %llx\n\n", from);
 
@@ -2279,7 +2817,7 @@ nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
 		datalen = 0;
 
 	while(datalen || ooblen) {
-		int len = 0, ret, offs;
+		int len, ret, offs;
 
 //		ra_dbg("%s : addr:%llx, ops data:%p, oob:%p datalen:%x ooblen:%x, ooboffs:%x \n", 
 //		       __func__, (unsigned long long)addr, data, oob, datalen, ooblen, ops->ooboffs);
@@ -2287,25 +2825,44 @@ nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
 		/* select chip */
 		if (nfc_enable_chip(ra, addr, 1) < 0)
 			return -EIO;
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+        block = srcaddr >> ra->flash->erase_shift;
+        if(srcblock != block)
+		{   
+            srcblock = block;
+            addr = srcaddr + ((block_table[block] - block) << ra->flash->erase_shift);	
+
+            if(nand_partition_check(srcblock)){
+                printk("%s: address over partition size, read fail \n", __func__);
+                return -EIO;
+            }
+        }
+#endif
 
 #ifdef TCSUPPORT_NAND_RT63368
-		addr_offset_in_block = logic_addr % (1 << ra->flash->erase_shift);  //logic address offset
-		physical_block = get_mapping_block_index(logic_addr >> ra->flash->erase_shift, &phy_block_bbt); //physical block
-		addr = (physical_block << ra->flash->erase_shift) + addr_offset_in_block;   //physical address
+
+        addr_offset_in_block = logic_addr % (1 << ra->flash->erase_shift);  //logic address offset
+        physical_block = get_mapping_block_index(logic_addr >> ra->flash->erase_shift, &phy_block_bbt); //physical block
+        addr = (physical_block << ra->flash->erase_shift) + addr_offset_in_block;   //physical address
+        
 #endif
 
 		page = (int)((addr & (((loff_t)1<<ra->flash->chip_shift)-1)) >> ra->flash->page_shift); 
 
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+        srcpage = (int)((srcaddr & ((1<<ra->flash->chip_shift)-1)) >> ra->flash->page_shift); 
+#endif
+
 #ifdef TCSUPPORT_NAND_RT63368
-		logic_page = (int)((logic_addr & ((1<<ra->flash->chip_shift)-1)) >> ra->flash->page_shift); //logic page
+        logic_page = (int)((logic_addr & ((1<<ra->flash->chip_shift)-1)) >> ra->flash->page_shift); //logic page
 #endif
 
 #if 0
 		/* frankliao added 20101029 */
 		if (nand_block_checkbad(ra, addr)) {
-			printk(KERN_WARNING "nand_do_read_ops: attempt to read a "
-			       "bad block at 0x%08x\n", page);
-			return -EFAULT;
+    			printk(KERN_WARNING "nand_do_read_ops: attempt to read a "
+    			       "bad block at 0x%08x\n", page);
+    			return -EFAULT;
 		}	
 #endif
 		ranfc_page = page;
@@ -2313,11 +2870,14 @@ nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
 //		ret = nfc_read_page(ra, ra->buffers, page, FLAG_USE_GDMA | FLAG_VERIFY | 
 //				    ((ops->mode == MTD_OOB_RAW || ops->mode == MTD_OOB_PLACE) ? 0: FLAG_ECC_EN ));  
 
-#if defined(TCSUPPORT_NAND_RT63368)
-		//ranfc_flags = (FLAG_VERIFY | FLAG_ECC_EN);
-		ranfc_flags = (FLAG_ECC_EN | FLAG_VERIFY);
-#endif
+        #if defined(TCSUPPORT_NAND_BADBLOCK_CHECK) || defined(TCSUPPORT_NAND_RT63368)
+            //ranfc_flags = (FLAG_VERIFY | FLAG_ECC_EN);
+            ranfc_flags = (FLAG_ECC_EN | FLAG_VERIFY);
+        #endif
 
+#ifdef TCSUPPORT_NAND_RT63368
+        if(data && len > 0) {
+#endif
 		/* frankliao test delete */
 		ret = nfc_read_page(ra, ra->buffers, page, ranfc_flags); 
 		//FIXME, something strange here, some page needs 2 more tries to guarantee read success.
@@ -2329,27 +2889,33 @@ nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
 //					    ((ops->mode == MTD_OOB_RAW || ops->mode == MTD_OOB_PLACE) ? 0: FLAG_ECC_EN ));
 			if (ret) {
 //				printk("read again fail \n");
-#if !defined(TCSUPPORT_NAND_RT63368)
-				nand_bbt_set(ra, addr >> ra->flash->erase_shift, BBT_TAG_BAD);
-				if ((ret != -EUCLEAN) && (ret != -EBADMSG)) {
-					return ret;
-				} else {
-					/* ecc verification fail, but data need to be returned. */
-				}
-#else
+            #if !defined(TCSUPPORT_NAND_BADBLOCK_CHECK) && !defined(TCSUPPORT_NAND_RT63368)
+    				nand_bbt_set(ra, addr >> ra->flash->erase_shift, BBT_TAG_BAD);
+    				if ((ret != -EUCLEAN) && (ret != -EBADMSG)) {
+    					return ret;
+    				} else {
+    					/* ecc verification fail, but data need to be returned. */
+    				}
+			#else
 				return ret;
-#endif
+			#endif
 			} else {
 //				printk(" read again susccess \n");
 			}
 		}
 
+#ifdef TCSUPPORT_NAND_RT63368
+        }
+#endif		
+
 		// oob read
 		if (oob && ooblen > 0) {
+
 #ifdef TCSUPPORT_NAND_RT63368
-			memset(ra->buffers + pagesize, 0xff, oobsize);
-			nfc_read_oob(ra, page, 0, ra->buffers + pagesize, oobsize, FLAG_NONE);
+            memset(ra->buffers + pagesize, 0xff, oobsize);
+            nfc_read_oob(ra, page, 0, ra->buffers + pagesize, oobsize, FLAG_NONE);
 #endif
+            
 			len = nand_read_oob_buf(ra, oob, ooblen, ops->mode, ops->ooboffs);
 			if (len < 0) {
 				printk("nand_read_oob_buf: fail return %x \n", len);
@@ -2377,10 +2943,15 @@ nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
 
 //		nand_bbt_set(ra, addr >> ra->flash->erase_shift, BBT_TAG_GOOD);
 		// address go further to next page, instead of increasing of length of write. This avoids some special cases wrong.
-		addr = ((loff_t)(page+1) << ra->flash->page_shift);
-#ifdef TCSUPPORT_NAND_RT63368
-		logic_addr = (logic_page + 1) << ra->flash->page_shift; //logic address
-#endif
+		addr = ((loff_t)(page+1) << ra->flash->page_shift); //physical address
+
+		#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+		    srcaddr = (srcpage+1) << ra->flash->page_shift;
+        #endif	
+
+        #ifdef TCSUPPORT_NAND_RT63368
+            logic_addr = (logic_page + 1) << ra->flash->page_shift; //logic address
+        #endif
 	}
 
 	return 0;
@@ -2438,9 +3009,9 @@ nand_setup(void)
 
 	for (i=0; i < ARRAY_SIZE(flash_tables); i++) {
 
-		ra_dbg("index %d\n", i);
-		ra_dbg("mfr_id : %2x\n", flash_tables[i].mfr_id);
-		ra_dbg("dev_id : %2x\n", flash_tables[i].dev_id);
+//		radbg("index %d\n", i);
+//		radbg("mfr_id : %2x\n", flash_tables[i].mfr_id);
+//		radbg("dev_id : %2x\n", flash_tables[i].dev_id);
 
 		if ((mfr_id == flash_tables[i].mfr_id) && (dev_id == flash_tables[i].dev_id)) {
 			flash = &flash_tables[i];
@@ -2525,6 +3096,7 @@ nand_setup(void)
 	ra->flash = flash;
 	ra->opcode = opcode;
 
+
 #ifdef TCSUPPORT_NAND_RT63368
     bmt_pool_size = calc_bmt_pool_size(ra);
     printk("bmt pool size: %d \n", bmt_pool_size);
@@ -2558,8 +3130,9 @@ nand_setup(void)
         printk("Error: create bad block table failed \n");
         return -1;
     }
+    
 #endif
-
+	
 
 	return 0;
 }
@@ -2861,9 +3434,9 @@ ramtd_nand_block_isbad(struct mtd_info *mtd, loff_t offs)
 		return -EINVAL;
 	return 0;
 	return nand_block_checkbad((struct ra_nand_chip *)mtd->priv, offs
-#ifdef TCSUPPORT_NAND_RT63368
-	, BAD_BLOCK_RAW
-#endif
+    #ifdef TCSUPPORT_NAND_RT63368
+    , BAD_BLOCK_RAW
+    #endif
 	);
 }
 
@@ -2879,18 +3452,17 @@ ramtd_nand_block_markbad(struct mtd_info *mtd, loff_t ofs)
 	int ret;
 	struct ra_nand_chip *ra = mtd->priv;
 
-	return 0;
+    return 0;
 
 	ra_dbg("%s: \n", __func__);
 
 	nand_get_device(ra, FL_WRITING);
 
 	ret = nand_block_markbad(ra, ofs
-#ifdef TCSUPPORT_NAND_RT63368
-	, BAD_BLOCK_RAW
-#endif
+    #ifdef TCSUPPORT_NAND_RT63368
+    , BAD_BLOCK_RAW
+    #endif
 	);
-
 
 	nand_release_device(ra);
 	return ret; 
@@ -3146,17 +3718,22 @@ int calc_bmt_pool_size(struct ra_nand_chip *ra)
 }
 #endif
 
-//static struct mtd_info *nandflash_probe(struct map_info *map)
-int __devinit ra_nand_init(void) 
+
+static struct mtd_info *nandflash_probe(struct map_info *map)
+//int __devinit ra_nand_init(void) 
 {
-	int ret, np;
-//	int num;
-	struct mtd_partition *mtd_parts;
+	int ret, num;
 
 	/* frankliao added for nand flash test */
     struct proc_dir_entry *nand_flags_proc;
     struct proc_dir_entry *nand_regchk_proc;
     struct proc_dir_entry *nand_access_page_proc;
+
+	/* frank */
+	if ( (ra_inl(CR_AHB_BASE+0x64) >> 16) == 0x4){
+		ra_outl(0xbfb00860, ra_inl(0xbfb00860) | (0x00000100));
+	}
+
 
 	// frank modify 20110425
 	ra_outl(NFC_CTRL, ra_inl(NFC_CTRL) | 0x01); //set wp to high
@@ -3182,7 +3759,7 @@ int __devinit ra_nand_init(void)
 	}
 
 	ra_outl(NFC_CTRLII, ra_inl(NFC_CTRLII) | 0x02); //big endian for rt63365
-#endif
+#endif	
 
 //	nfc_all_reset(ra);
 
@@ -3205,10 +3782,10 @@ int __devinit ra_nand_init(void)
 	ranfc_mtd->type				= MTD_NANDFLASH;
 	ranfc_mtd->flags			= MTD_CAP_NANDFLASH;
 #ifdef TCSUPPORT_NAND_RT63368
-	ranfc_mtd->size             = nand_logic_size;
+    ranfc_mtd->size             = nand_logic_size;
 #else
 	ranfc_mtd->size				= CONFIG_NUMCHIPS * (1<<ra->flash->chip_shift);
-#endif
+#endif	
 	ranfc_mtd->erasesize		= (1<<ra->flash->erase_shift);
 	ranfc_mtd->writesize		= (1<<ra->flash->page_shift);
 	ranfc_mtd->oobsize 			= (1<<ra->flash->oob_shift);
@@ -3239,26 +3816,26 @@ int __devinit ra_nand_init(void)
 	//ranfc_mtd->get_device; ranfc_mtd->put_device
 	ranfc_mtd->priv = ra;
 	/* frankliao added 20101222 frank*/
-/*
 	if (IS_NANDFLASH) {
 		map->fldrv_priv = ra;
-	}
-*/
+	}	
 	ranand_read_byte = ra_nand_read_byte;
 	ranand_read_dword = ra_nand_read_dword;
+	
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+	nandflash_scan_badblock();
+#endif
 
-
+#if !defined (__UBOOT__)
 	ranfc_mtd->owner = THIS_MODULE;
 	ra->controller = &ra->hwcontrol;
 	mutex_init(ra->controller);
 
 	/* Register the partitions */
-
-	np = parse_mtd_partitions(ranfc_mtd, part_probes, &mtd_parts, 0);
-	if (np > 0) {
-		add_mtd_partitions(ranfc_mtd, mtd_parts, np);
-	} else {
-		printk("No partitions found on a flash.");
+	if (IS_SPIFLASH) {
+		num = ARRAY_SIZE(rt63165_test_partitions);
+		rt63165_test_partitions[ num-1 ].size = ranfc_mtd->size;
+		add_mtd_partitions(ranfc_mtd, rt63165_test_partitions, num);
 	}
 
     nand_flags_proc = create_proc_entry("nand_flag", 0, NULL);
@@ -3270,13 +3847,30 @@ int __devinit ra_nand_init(void)
 
     nand_access_page_proc = create_proc_entry("nand_access_page", 0, NULL);
     nand_access_page_proc->read_proc = nand_access_page_read_proc;
+    
 
 
-	return 0;
+	if (IS_NANDFLASH){
+
+	#ifdef TCSUPPORT_DUAL_IMAGE_ENHANCE
+	  #ifdef TCSUPPORT_NAND_RT63368
+	    offset = SLAVE_IMAGE_OFFSET;
+	  #else
+		offset = (1 << ra->flash->chip_shift)/2;
+	  #endif
+	#endif
+		return ranfc_mtd;
+	}	
+	else	
+		return 0;
+#else
+	return ranfc_mtd;
+#endif
+
 }
 
-//static void nandflash_destroy(struct mtd_info *mtd)
-static void __devexit ra_nand_remove(void)
+static void nandflash_destroy(struct mtd_info *mtd)
+//static void __devexit ra_nand_remove(void)
 {
 	struct ra_nand_chip *ra;
 	
@@ -3293,7 +3887,6 @@ static void __devexit ra_nand_remove(void)
 	}
 }
 
-/*
 int __devinit ra_nand_init(void) 
 {
 	nandflash_probe(NULL);
@@ -3312,23 +3905,10 @@ static struct mtd_chip_driver nandflash_chipdrv = {
 	.module  = THIS_MODULE
 };
 
-static struct platform_driver mtk_nand_driver = {
-	.probe = nandflash_probe,
-	.remove = nandflash_destroy,
-	//.suspend = mtk_nand_suspend,
-	//.resume = mtk_nand_resume,
-	.driver = {
-		.name = "mtk-nand",
-		.owner = THIS_MODULE,
-	},
-};
 
 static int __init nandflash_probe_init(void)
 {
-	platform_driver_register(&mtk_nand_driver);
-
-//	register_mtd_chip_driver(&nandflash_chipdrv);
-	printk("MTK NAND FLash Driver loaded.\n");
+	register_mtd_chip_driver(&nandflash_chipdrv);
 	return 0;
 }
 
@@ -3337,12 +3917,12 @@ static void __exit nandflash_probe_exit(void)
 	unregister_mtd_chip_driver(&nandflash_chipdrv);
 }
 
+
+#if !defined (__UBOOT__)
 module_init(nandflash_probe_init);
 module_exit(nandflash_probe_exit);
-*/
-
-module_init(ra_nand_init);
-module_exit(ra_nand_remove);
+//rootfs_initcall(ra_nand_init);
+//module_exit(ra_nand_remove);
 
 MODULE_LICENSE("GPL");
-
+#endif

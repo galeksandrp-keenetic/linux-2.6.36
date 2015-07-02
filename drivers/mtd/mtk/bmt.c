@@ -47,14 +47,16 @@ static char MAIN_SIGNATURE[] = "BMT";
 static u8 need_write_bmt_to_nand = 0;
 static u8 need_write_bbt_to_nand = 0;
 
-//#define __UBOOT_NAND__
-
+#define __UBOOT_NAND__
 #if	defined(TCSUPPORT_CPU_MT7510)||defined(TCSUPPORT_CPU_MT7520)
 #if 1
 #define MSG(args...) printk(args)
 #else
 #define MSG(args...) do{}while(0)
 #endif
+
+
+
 static struct mtd_info *mtd_bmt;
 static struct nand_chip *nand_chip_bmt;
 #define BLOCK_SIZE_BMT          (1 << nand_chip_bmt->phys_erase_shift)

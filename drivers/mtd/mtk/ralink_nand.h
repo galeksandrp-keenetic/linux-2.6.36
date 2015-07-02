@@ -14,10 +14,15 @@
 #define EUCLEAN     117 /* Structure needs cleaning */
 #endif
 
+#define ECC_NO_ERR 0
+#define ECC_ONE_BIT_ERR -6
+#define ECC_DATA_ERR -7
+#define ECC_CODE_ERR -8
+#define ECC_NFC_CONFLICT -9
 
 
 /* frankliao deleted 20100916 */
-//1#include "gdma.h"
+//#include "gdma.h"
 
 #define ra_inl(addr)  (*(volatile unsigned int *)(addr))
 #define ra_outl(addr, value)  (*(volatile unsigned int *)(addr) = (value))
@@ -43,6 +48,7 @@
 #define	MANUFACTURER_MIRCON		0x2c
 #define MANUFACTURER_SAMSUNG		0xec
 #define MANUFACTURER_SPANSION		0x01
+#define MANUFACTURER_ZENTEL		0x92
 
 /* ST Device ID */
 #define ST128W3A			0x73
@@ -54,6 +60,7 @@
 
 #define K9F1G08U0D			0xf1
 #define S34ML01G1			0xf1
+#define A5U1GA31ATS			0xf1
 
 /* SIZE BIT*/
 #define SIZE_512MiB_BIT			(29)
@@ -111,6 +118,35 @@
 #define NFC_ADDRII						(NFC_BASE + 0x60)
 
 #endif
+
+#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
+
+#define TCROMFILE_BLOCK_NUM 13
+#define TCBKROMFILE_BLOCK_NUM 13
+#define TCLINUX_BLOCK_NUM  256
+#define TCSYSLOG_BLOCK_NUM 11
+#define TCWIFI_BLOCK_NUM 2
+
+#define TCROMFILE_START 7
+#define TCROMFILE_END   (TCROMFILE_START + TCROMFILE_BLOCK_NUM)
+
+#define TCLINUX_BLOCK_START  20
+#define TCLINUX_BLOCK_END    (TCLINUX_BLOCK_START + TCLINUX_BLOCK_NUM)
+
+#define TCLINUX_SLAVE_BLOCK_START  276
+#define TCLINUX_SLAVE_BLOCK_END    (TCLINUX_SLAVE_BLOCK_START + TCLINUX_BLOCK_NUM)
+
+#define TCSYSLOG_START 996
+#define TCSYSLOG_END (TCSYSLOG_START + TCSYSLOG_BLOCK_NUM)
+
+#define TCBKROMFILE_START 1007
+#define TCBKROMFILE_END   (TCBKROMFILE_START + TCBKROMFILE_BLOCK_NUM)
+
+#define TCWIFI_START 1022
+#define TCWIFI_END   (TCWIFI_START + TCWIFI_BLOCK_NUM)
+
+#endif
+
 
 enum _int_stat {
 	INT_ST_ND_DONE 	= 1<<0,
