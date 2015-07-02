@@ -12,13 +12,6 @@ static int __init raeth_device_init(void)
 	if (!pdev)
 		return -ENOMEM;
 
-//	pdev->id = PLAT8250_DEV_PLATFORM;
-//	pdev->dev.platform_data = lasat_serial8250_port;
-
-//	retval = platform_device_add_resources(pdev, lasat_serial_res, ARRAY_SIZE(lasat_serial_res));
-//	if (retval)
-//		goto err_free_device;
-
 	retval = platform_device_add(pdev);
 	if (retval)
 		goto err_free_device;
