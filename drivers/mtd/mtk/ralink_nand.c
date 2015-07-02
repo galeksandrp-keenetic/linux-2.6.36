@@ -64,6 +64,8 @@
 #define NFC_BIG_ENDIAN			0x02
 #define NFC_LITTLE_ENDIAN 		0x0
 
+static const char *part_probes[] __initdata = { "ndmpart", NULL };
+
 /* frankliao modify 20101215 */
 struct mtd_info *ranfc_mtd = NULL;
 struct ra_nand_chip *ra = NULL;
@@ -126,6 +128,7 @@ int nand_partition_check(int block);
 int calc_bmt_pool_size(struct ra_nand_chip *ra);
 #endif
 
+#if 0
 static struct mtd_partition rt63165_test_partitions[] = {
 	{									 	/* First partition */
 		  name 	     : "NAND Flash",	 	/* Section */
@@ -133,7 +136,7 @@ static struct mtd_partition rt63165_test_partitions[] = {
 		  offset     : 0				 	/* Offset from start of flash- location 0x0*/
 	},
 };
-
+#endif
 
 static struct nand_opcode opcode_tables[] = {
 	{
@@ -3722,7 +3725,8 @@ int calc_bmt_pool_size(struct ra_nand_chip *ra)
 static struct mtd_info *nandflash_probe(struct map_info *map)
 //int __devinit ra_nand_init(void) 
 {
-	int ret, num;
+	int ret, np;
+	struct mtd_partition *mtd_parts;
 
 	/* frankliao added for nand flash test */
     struct proc_dir_entry *nand_flags_proc;
@@ -3832,11 +3836,20 @@ static struct mtd_info *nandflash_probe(struct map_info *map)
 	mutex_init(ra->controller);
 
 	/* Register the partitions */
+	np = parse_mtd_partitions(ranfc_mtd, part_probes, &mtd_parts, 0);
+	if (np > 0) {
+		add_mtd_partitions(ranfc_mtd, mtd_parts, np);
+	} else {
+		printk("No partitions found on a flash.");
+	}
+
+/*
 	if (IS_SPIFLASH) {
 		num = ARRAY_SIZE(rt63165_test_partitions);
 		rt63165_test_partitions[ num-1 ].size = ranfc_mtd->size;
 		add_mtd_partitions(ranfc_mtd, rt63165_test_partitions, num);
 	}
+*/
 
     nand_flags_proc = create_proc_entry("nand_flag", 0, NULL);
     nand_flags_proc->read_proc = nand_flags_read_proc;
