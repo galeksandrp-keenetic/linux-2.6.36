@@ -3820,7 +3820,7 @@ static struct mtd_info *nandflash_probe(struct map_info *map)
 	//ranfc_mtd->get_device; ranfc_mtd->put_device
 	ranfc_mtd->priv = ra;
 	/* frankliao added 20101222 frank*/
-	if (IS_NANDFLASH) {
+	if (IS_NANDFLASH && map) {
 		map->fldrv_priv = ra;
 	}	
 	ranand_read_byte = ra_nand_read_byte;
@@ -3875,7 +3875,7 @@ static struct mtd_info *nandflash_probe(struct map_info *map)
 		return ranfc_mtd;
 	}	
 	else	
-		return 0;
+		return NULL;
 #else
 	return ranfc_mtd;
 #endif
@@ -3900,17 +3900,18 @@ static void nandflash_destroy(struct mtd_info *mtd)
 	}
 }
 
-int __devinit ra_nand_init(void) 
+static int __init ra_nand_init(void)
 {
 	nandflash_probe(NULL);
 	return 0;
 }
 
-void __devexit ra_nand_remove(void)
+static void __exit ra_nand_remove(void)
 {
 	nandflash_destroy(NULL);
 }
 
+/*
 static struct mtd_chip_driver nandflash_chipdrv = {
 	.probe   = nandflash_probe,
 	.destroy = nandflash_destroy,
@@ -3929,11 +3930,11 @@ static void __exit nandflash_probe_exit(void)
 {
 	unregister_mtd_chip_driver(&nandflash_chipdrv);
 }
-
+*/
 
 #if !defined (__UBOOT__)
-module_init(nandflash_probe_init);
-module_exit(nandflash_probe_exit);
+module_init(ra_nand_init);
+module_exit(ra_nand_remove);
 //rootfs_initcall(ra_nand_init);
 //module_exit(ra_nand_remove);
 
