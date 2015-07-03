@@ -103,58 +103,82 @@ struct mtd_partition ndm_parts[PART_MAX] = {
 
 #ifdef CONFIG_MTD_NDM_CONFIG_TRANSITION
 /*
- * TODO: Erase full partition and improve error handling.
+ * TODO:
+ * - erase full partition (?);
+ * - smart detecting size of config.
  */
 static void config_move(struct mtd_info *master, unsigned int offset)
 {
 	__le32 magic;
+	int ret;
 	size_t len;
+	struct erase_info ei;
+	unsigned char *iobuf;
 
-	master->read(master, offset, sizeof(magic), &len,
-		     (uint8_t *) &magic);
+	ret = master->read(master, offset, sizeof magic, &len,
+			   (uint8_t *) &magic);
+	if (ret || len != sizeof magic)
+		goto out;
 
-	if (magic == CONFIG_MAGIC) {
-		unsigned char *iobuf;
-		struct erase_info ei;
-		int err;
+	if (magic != CONFIG_MAGIC)
+		goto out;
 
-		printk(KERN_INFO "found config in old partition at 0x%012llx, move it\n",
-		       (unsigned long long) offset);
-		iobuf = kmalloc(master->erasesize, GFP_KERNEL);
-		master->read(master, offset, master->erasesize,
-						&len, iobuf);
+	printk(KERN_INFO "Found config in old partition at 0x%012llx, move it\n",
+	       (unsigned long long) offset);
 
-		if (len != master->erasesize) {
-			printk(KERN_ERR "read failed at 0x%012llx\n",
-			       (unsigned long long) offset);
-		} else {
-			memset(&ei, 0, sizeof(struct erase_info));
-			ei.mtd  = master;
-			ei.addr = ndm_parts[PART_CONFIG].offset;
-			ei.len  = master->erasesize;
-			err = master->erase(master, &ei);
-
-			err = master->write(master, ndm_parts[PART_CONFIG].offset,
-					    master->erasesize, &len, iobuf);
-
-			if (!err && len != master->erasesize) {
-				printk(KERN_ERR "write failed at 0x%012llx\n",
-				       (unsigned long long) ndm_parts[PART_CONFIG].offset);
-			} else {
-				memset(&ei, 0, sizeof(struct erase_info));
-				ei.mtd  = master;
-				ei.addr = offset;
-				ei.len  = master->erasesize;
-
-				err = master->erase(master, &ei);
-
-				if ((err) || (ei.state == MTD_ERASE_FAILED)) {
-					printk(KERN_ERR "erase failed at 0x%012llx\n",
-					       (unsigned long long) offset);
-				}
-			}
-		}
+	iobuf = kmalloc(master->erasesize, GFP_KERNEL);
+	if (iobuf == NULL) {
+		printk(KERN_ERR "no memory\n");
+		goto out;
 	}
+
+	// Read old config.
+	ret = master->read(master, offset, master->erasesize,
+			   &len, iobuf);
+	if (ret || len != master->erasesize) {
+		printk(KERN_ERR "read failed at 0x%012llx\n",
+		       (unsigned long long) offset);
+		goto out_kfree;
+	}
+
+	// Erase new place.
+	memset(&ei, 0, sizeof(struct erase_info));
+	ei.mtd  = master;
+	ei.addr = ndm_parts[PART_CONFIG].offset;
+	ei.len  = master->erasesize;
+
+	ret = master->erase(master, &ei);
+	if (ret || ei.state == MTD_ERASE_FAILED) {
+		printk(KERN_ERR "erase failed at 0x%012llx\n",
+		       (unsigned long long) ei.addr);
+		goto out_kfree;
+	}
+
+	// Write config to new place.
+	ret = master->write(master, ndm_parts[PART_CONFIG].offset,
+			    master->erasesize, &len, iobuf);
+	if (ret || len != master->erasesize) {
+		printk(KERN_ERR "write failed at 0x%012llx\n",
+		       (unsigned long long) ndm_parts[PART_CONFIG].offset);
+		goto out_kfree;
+	}
+
+	// Erase old place.
+	memset(&ei, 0, sizeof(struct erase_info));
+	ei.mtd  = master;
+	ei.addr = offset;
+	ei.len  = master->erasesize;
+
+	ret = master->erase(master, &ei);
+	if (ret || ei.state == MTD_ERASE_FAILED) {
+		printk(KERN_ERR "erase failed at 0x%012llx\n",
+		       (unsigned long long) ei.addr);
+	}
+
+out_kfree:
+	kfree(iobuf);
+out:
+	return;
 }
 #endif
 
