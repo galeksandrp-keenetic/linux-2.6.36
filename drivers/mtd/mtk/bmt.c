@@ -47,7 +47,7 @@ static char MAIN_SIGNATURE[] = "BMT";
 static u8 need_write_bmt_to_nand = 0;
 static u8 need_write_bbt_to_nand = 0;
 
-#define __UBOOT_NAND__
+//#define __UBOOT_NAND__
 #if	defined(TCSUPPORT_CPU_MT7510)||defined(TCSUPPORT_CPU_MT7520)
 #if 1
 #define MSG(args...) printk(args)
@@ -308,54 +308,54 @@ static bool valid_bbt_data(init_table_struct *bbt_table)
 
 }
 
+static phys_bmt_struct fnbb_phys_bmt;
 
 static void fill_nand_bmt_buffer(bmt_struct *bmt, u8 *dat, u8 *oob)
 {
-    phys_bmt_struct phys_bmt;
-
     dump_bmt_info(bmt);
 
     // fill phys_bmt_struct structure with bmt_struct
-    memset(&phys_bmt, 0xFF, sizeof(phys_bmt));
+    memset(&fnbb_phys_bmt, 0xFF, sizeof(fnbb_phys_bmt));
     
-    memcpy(phys_bmt.header.signature, MAIN_SIGNATURE, SIGNATURE_SIZE);
-    phys_bmt.header.version = BMT_VERSION;
-    phys_bmt.header.mapped_count = bmt->mapped_count;
-    memcpy(phys_bmt.table, bmt->table, sizeof(bmt_entry) * bmt_block_count);
+    memcpy(fnbb_phys_bmt.header.signature, MAIN_SIGNATURE, SIGNATURE_SIZE);
+    fnbb_phys_bmt.header.version = BMT_VERSION;
+    fnbb_phys_bmt.header.mapped_count = bmt->mapped_count;
+    memcpy(fnbb_phys_bmt.table, bmt->table, sizeof(bmt_entry) * bmt_block_count);
 
-    phys_bmt.header.checksum = cal_bmt_checksum(&phys_bmt, bmt_block_count);
+    fnbb_phys_bmt.header.checksum = cal_bmt_checksum(&fnbb_phys_bmt, bmt_block_count);
 
-    memcpy(dat + MAIN_SIGNATURE_OFFSET, &phys_bmt, sizeof(phys_bmt));
+    memcpy(dat + MAIN_SIGNATURE_OFFSET, &fnbb_phys_bmt, sizeof(fnbb_phys_bmt));
 
     return;
 }
+
+static init_table_struct fnbb_init_table;
 
 static void fill_nand_bbt_buffer(init_bbt_struct *bbt, u8 *dat, u8 *oob)
 {
-    init_table_struct init_table;
+    memset(&fnbb_init_table, 0xFF, sizeof(fnbb_init_table));
 
-    memset(&init_table, 0xFF, sizeof(init_table));
-
-    memcpy(init_table.header.signature, BBT_SIGNATURE, BBT_SIGNATURE_SIZE);
+    memcpy(fnbb_init_table.header.signature, BBT_SIGNATURE, BBT_SIGNATURE_SIZE);
     
-    init_table.header.version = BBT_VERSION;
-    init_table.header.badblock_count = bbt->badblock_count;
+    fnbb_init_table.header.version = BBT_VERSION;
+    fnbb_init_table.header.badblock_count = bbt->badblock_count;
 
-    memcpy(init_table.badblock_table, bbt->badblock_table, sizeof(bbt->badblock_table));
+    memcpy(fnbb_init_table.badblock_table, bbt->badblock_table, sizeof(bbt->badblock_table));
 
-    init_table.header.checksum = cal_bbt_checksum(&init_table);
+    fnbb_init_table.header.checksum = cal_bbt_checksum(&fnbb_init_table);
 
-    memcpy(dat + BBT_SIGNATURE_OFFSET, &init_table, sizeof(init_table));
+    memcpy(dat + BBT_SIGNATURE_OFFSET, &fnbb_init_table, sizeof(fnbb_init_table));
 
     return;
 
 }
+
+static phys_bmt_struct lbd_phys_table;
 
 // return valid index if found BMT, else return 0
 static int load_bmt_data(int start, int pool_size)
 {
     int bmt_index = start + pool_size - 1;        // find from the end
-    phys_bmt_struct phys_table;
     int i;
  
     MSG("begin to search BMT from block %d \n", bmt_index);
@@ -381,18 +381,18 @@ static int load_bmt_data(int start, int pool_size)
 
         MSG("Match bmt signature @ block: %d\n", bmt_index);
         
-        memcpy(&phys_table, dat_buf + MAIN_SIGNATURE_OFFSET, sizeof(phys_table));
+        memcpy(&lbd_phys_table, dat_buf + MAIN_SIGNATURE_OFFSET, sizeof(lbd_phys_table));
 
-        if (!valid_bmt_data(&phys_table))
+        if (!valid_bmt_data(&lbd_phys_table))
         {
             MSG("BMT data is not correct: %d\n", bmt_index);
             continue;
         }
         else
         {
-            bmt.mapped_count = phys_table.header.mapped_count;
-            bmt.version = phys_table.header.version;
-            memcpy(bmt.table, phys_table.table, bmt.mapped_count * sizeof(bmt_entry));
+            bmt.mapped_count = lbd_phys_table.header.mapped_count;
+            bmt.version = lbd_phys_table.header.version;
+            memcpy(bmt.table, lbd_phys_table.table, bmt.mapped_count * sizeof(bmt_entry));
 
             MSG("bmt found at block: %d, mapped block: %d\n", bmt_index, bmt.mapped_count);
 
@@ -413,13 +413,14 @@ static int load_bmt_data(int start, int pool_size)
     return 0;
 }
 
+static init_table_struct lbd_init_table;
+
 static int load_bbt_data(int start, int pool_size, init_bbt_struct *init_bbt)
 {
     int i;
     int ret = 0;
 
     int bbt_index = start;
-    init_table_struct init_table;
 
     for(;bbt_index < (start + pool_size); bbt_index++)
     {
@@ -443,24 +444,24 @@ static int load_bbt_data(int start, int pool_size, init_bbt_struct *init_bbt)
 
         MSG("Match bbt signature \n");
 
-        memcpy(&init_table, dat_buf + BBT_SIGNATURE_OFFSET, sizeof(init_table));
+        memcpy(&lbd_init_table, dat_buf + BBT_SIGNATURE_OFFSET, sizeof(lbd_init_table));
 
-        if (!valid_bbt_data(&init_table))
+        if (!valid_bbt_data(&lbd_init_table))
         {
             MSG("BBT data is not correct \n");
             continue;
         }
         else
         {
-            init_bbt->badblock_count = init_table.header.badblock_count;
-            init_bbt->version = init_table.header.version;
-            memcpy(init_bbt->badblock_table, init_table.badblock_table, (init_bbt->badblock_count) * 2);
+            init_bbt->badblock_count = lbd_init_table.header.badblock_count;
+            init_bbt->version = lbd_init_table.header.version;
+            memcpy(init_bbt->badblock_table, lbd_init_table.badblock_table, (init_bbt->badblock_count) * 2);
 
-            MSG("bbt found, bad block count: %d\n", init_bbt->badblock_count);
+            MSG("bbt found, bad block count: %d\n", lbd_init_bbt->badblock_count);
 
             for (i = 0; i < init_bbt->badblock_count; i++)
             {
-                MSG("init_bbt->badblock_table[%d]: %d \n", i, init_bbt->badblock_table[i]);
+                MSG("lbd_init_bbt->badblock_table[%d]: %d \n", i, lbd_init_bbt->badblock_table[i]);
             }
             
             return bbt_index;
@@ -1014,7 +1015,7 @@ int create_badblock_table_by_bbt(void)
 bool update_bmt(u32 offset, update_reason_t reason, u8 *dat, u8 *oob)
 {
     int map_index;
-    int orig_bad_block = -1;
+    int orig_bad_block __attribute__((unused)) = -1;
     int i;
     int bad_index = offset / BLOCK_SIZE_BMT;
 

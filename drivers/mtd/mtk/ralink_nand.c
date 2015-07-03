@@ -125,6 +125,10 @@ int nand_partition_check(int block);
 #endif
 
 #ifdef TCSUPPORT_NAND_RT63368
+static char write_ops_dat[SIZE_2KiB_BYTES + SIZE_64iB_BYTES];
+#endif
+
+#ifdef TCSUPPORT_NAND_RT63368
 int calc_bmt_pool_size(struct ra_nand_chip *ra);
 #endif
 
@@ -408,7 +412,6 @@ static int
 _nfc_read_status(struct ra_nand_chip *ra, char *status)
 {
 	unsigned long cmd1, conf;
-	unsigned int endian = 0;
 	int int_st, nfc_st;
 	long retry;
 
@@ -1117,7 +1120,7 @@ unsigned char *ecc_from_nfc, unsigned long *error_byte_index, unsigned long *err
 				ecc_bit1_cnt++;
 			}
 		}
-		printk("\r\n ecc_rst= 0x%08x, ecc_bit1_cnt=%d ", ecc_rst, ecc_bit1_cnt);
+		printk("\r\n ecc_rst= 0x%08lx, ecc_bit1_cnt=%d ", ecc_rst, ecc_bit1_cnt);
 		if(ecc_bit1_cnt == 1){//ECC code error
 			return ECC_CODE_ERR;
 		}else if(ecc_bit1_cnt != 12){//more than 1 bit error, un-correctable
@@ -1131,7 +1134,7 @@ unsigned char *ecc_from_nfc, unsigned long *error_byte_index, unsigned long *err
 			}
 			*error_byte_index = ((temp>>6)&0x1ff);
 			*error_bit_index = ((temp>>2)&0x7);
-			printk("\r\n correctable ECC error   error_byte_index=%d, error_bit_index=%d", 
+			printk("\r\n correctable ECC error   error_byte_index=%lu, error_bit_index=%lu",
 					*error_byte_index, *error_bit_index);
 			return ECC_ONE_BIT_ERR;
 		}
@@ -1274,7 +1277,7 @@ ecc_check:
 					printk("\r\n ecc_error_code= %d, page=%d ,i=%d", ecc_error_code, page, i);
 					if(ecc_error_code == ECC_ONE_BIT_ERR){
 						//correct the error
-						printk("\r\n  err_byte_index= %d, err_bit_index=%d", 
+						printk("\r\n  err_byte_index=%lu, err_bit_index=%lu",
 								 err_byte_index , err_bit_index);
 						correct_byte = buf[err_byte_index + i*512];
 						if((correct_byte&(1<<err_bit_index)) != 0){
@@ -1512,7 +1515,6 @@ nfc_write_page(struct ra_nand_chip *ra, unsigned char *buf, int page, int flags)
 	unsigned int ecc_en;
 	int use_gdma;
 	int pagesize;
-	int i;
 	char status;
 //	uint8_t *oob = buf + (1 << ra->flash->page_shift);
 
@@ -1758,7 +1760,7 @@ nand_block_markbad(struct ra_nand_chip *ra, loff_t offs
 	int page, block;
 	int start_page, end_page;
 	int ret = 4;
-	unsigned int tag;
+	unsigned int tag = BBT_TAG_UNKNOWN;
 	char *ecc;
 
 	// align with chip
@@ -2486,7 +2488,6 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 	int pagesize = (1 << ra->flash->page_shift);
 	int pagemask = (pagesize -1);
 	int oobsize = 1 << ra->flash->oob_shift;
-	int i;
 	#ifdef TCSUPPORT_NAND_BADBLOCK_CHECK
 	unsigned int blocksize = (1 << ra->flash->erase_shift);
 	int block;
@@ -2499,7 +2500,6 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
 	unsigned long addr_offset_in_block;
 	unsigned long logic_addr;
 	unsigned short phy_block_bbt;
-	char dat[SIZE_2KiB_BYTES + SIZE_64iB_BYTES];
 #endif
 
 	loff_t addr = to;   //logic address
@@ -2726,9 +2726,9 @@ nand_do_write_ops(struct ra_nand_chip *ra, loff_t to,
             page = nand_write_next_goodblock(ra, srcpage, page);
     #elif defined(TCSUPPORT_NAND_RT63368)  
     		printk("write fail at page: %d \n", page);
-		    memcpy(dat, ra->buffers, SIZE_2KiB_BYTES + SIZE_64iB_BYTES);
+		    memcpy(write_ops_dat, ra->buffers, SIZE_2KiB_BYTES + SIZE_64iB_BYTES);
             if (update_bmt(page << ra->flash->page_shift, 
-                        UPDATE_WRITE_FAIL, dat, dat + SIZE_2KiB_BYTES))
+                        UPDATE_WRITE_FAIL, write_ops_dat, write_ops_dat + SIZE_2KiB_BYTES))
             {
                 printk("Update BMT success\n");
            
@@ -2879,7 +2879,7 @@ nand_do_read_ops(struct ra_nand_chip *ra, loff_t from,
         #endif
 
 #ifdef TCSUPPORT_NAND_RT63368
-        if(data && len > 0) {
+        if(data && datalen > 0) {
 #endif
 		/* frankliao test delete */
 		ret = nfc_read_page(ra, ra->buffers, page, ranfc_flags); 
