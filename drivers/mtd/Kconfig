@@ -148,9 +148,9 @@ config MTD_NDM_CONFIG_TRANSITION
 	bool "Partition \"Config\" transition"
 	depends on MTD_NDM_PARTS
 
-config MTD_NDM_CONFIG_TRANSITION_DELTA
-	hex "Delta between new and old partition"
-	default 0x100000
+config MTD_NDM_CONFIG_TRANSITION_OFFSET
+	hex "Offset of old partition"
+	default 0x0
 	depends on MTD_NDM_CONFIG_TRANSITION
 
 config MTD_NDM_DUMP_SIZE
