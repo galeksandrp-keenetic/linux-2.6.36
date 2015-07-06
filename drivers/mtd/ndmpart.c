@@ -339,8 +339,7 @@ static int create_mtd_partitions(struct mtd_info *master,
 	/* Config */
 	ndm_parts[PART_CONFIG].offset = config_offset;
 #ifdef CONFIG_MTD_NDM_CONFIG_TRANSITION
-	config_move(master, config_offset -
-			    CONFIG_MTD_NDM_CONFIG_TRANSITION_DELTA);
+	config_move(master, CONFIG_MTD_NDM_CONFIG_TRANSITION_OFFSET);
 #endif
 
 	/* Backup */
