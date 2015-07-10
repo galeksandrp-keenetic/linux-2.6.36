@@ -52,6 +52,7 @@
 #include <net/ip.h>
 #include <net/tcp.h>
 #include <net/fast_vpn.h>
+#include <linux/ntc_shaper_hooks.h>
 #endif
 #include <linux/netfilter_ipv4.h>
 #ifdef CONFIG_TCSUPPORT_RA_HWNAT
@@ -109,6 +110,7 @@ static unsigned int nf_conntrack_hash_rnd;
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 /* Enable or Disable FastNAT */
 extern int ipv4_fastnat_conntrack;
+
 extern int (*fast_nat_hit_hook_func)(struct sk_buff *skb);
 
 int (*fast_nat_bind_hook_func)(struct nf_conn *ct,
@@ -117,10 +119,14 @@ int (*fast_nat_bind_hook_func)(struct nf_conn *ct,
 	struct nf_conntrack_l3proto *l3proto,
 	struct nf_conntrack_l4proto *l4proto) = NULL;
 EXPORT_SYMBOL(fast_nat_bind_hook_func);
+
 extern void (*prebind_from_fastnat)(struct sk_buff * skb,
 		u32 orig_saddr, u16 orig_sport,
 		struct nf_conn * ct,
 		enum ip_conntrack_info ct_info);
+
+int (*fast_nat_bind_hook_ingress)(struct sk_buff * skb) = NULL;
+EXPORT_SYMBOL(fast_nat_bind_hook_ingress);
 #endif
 
 static u_int32_t __hash_conntrack(const struct nf_conntrack_tuple *tuple,
@@ -1220,6 +1226,37 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 						}
 						rcu_read_unlock();
 					}
+
+					if (NF_FAST_NAT == ret) {
+						int (*fn_bind_ingress)(struct sk_buff * skb) = NULL;
+						ntc_shaper_hook_fn *ntc_ingress = NULL;
+
+						/* from fast_nat.c */
+						fn_bind_ingress = rcu_dereference(fast_nat_bind_hook_ingress);
+						/* from ntc.ko */
+						ntc_ingress = ntc_shaper_ingress_hook_get();
+
+						if ((NULL != fn_bind_ingress) &&
+							(NULL != ntc_ingress) &&
+							(orig_src != new_src)) {
+							/* Fast NAT should not be unloaded in realtime now */
+							unsigned int ntc_retval = ntc_ingress(skb,
+								be32_to_cpu(orig_src), 0, fn_bind_ingress, NULL, NULL);
+
+							if (NF_ACCEPT == ntc_retval) {
+								/* Shaper skipped that packet */
+								ret = NF_FAST_NAT;
+							} else if (NF_DROP == ntc_retval) {
+								/* Shaper tell us to drop it */
+								ret = NF_DROP;
+							} else if (NF_STOLEN == ntc_retval) {
+								/* Shaper queued packet and will handle it's destiny */
+								ret = NF_STOLEN;
+							}
+						}
+						ntc_shaper_ingress_hook_put();
+					}
+
 				} else {
 					printk(KERN_WARNING "Not allowed to do bind_hook without hit_hook");
 				}

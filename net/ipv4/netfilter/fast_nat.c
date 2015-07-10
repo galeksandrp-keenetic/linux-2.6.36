@@ -25,6 +25,7 @@
 #include <linux/netfilter/nf_conntrack_common.h>
 #include <linux/netfilter_ipv4/ip_tables.h>
 #include <linux/rcupdate.h>
+#include <linux/ntc_shaper_hooks.h>
 
 //#define DEBUG
 
@@ -41,6 +42,8 @@ manip_pkt(u_int16_t proto,
 	unsigned int iphdroff,
 	const struct nf_conntrack_tuple *target,
 	enum nf_nat_manip_type maniptype);
+
+extern int (*fast_nat_bind_hook_ingress)(struct sk_buff * skb);
 
 /*
  * check NAT session initialized and ready
@@ -116,8 +119,18 @@ ip_skb_dst_mtu(struct sk_buff *skb)
 	       skb_dst(skb)->dev->mtu : dst_mtu(skb_dst(skb));
 }
 
+int fast_nat_bind_hook_egress(struct sk_buff * skb) {
+	if (skb->len > ip_skb_dst_mtu(skb) && !skb_is_gso(skb))
+		return ip_fragment(skb, fast_nat_path_output);
+	else
+		return fast_nat_path_output(skb);
+}
+
 static int fast_nat_path(struct sk_buff *skb)
 {
+	ntc_shaper_hook_fn * shaper_egress = NULL;
+	int retval = 0;
+
 	if (skb_dst(skb) == NULL) {
 		struct iphdr *iph = ip_hdr(skb);
 		struct net_device *dev = skb->dev;
@@ -131,10 +144,31 @@ static int fast_nat_path(struct sk_buff *skb)
 		skb->dev = skb_dst(skb)->dev;
 	}
 
-	if (skb->len > ip_skb_dst_mtu(skb) && !skb_is_gso(skb))
-		return ip_fragment(skb, fast_nat_path_output);
-	else
-		return fast_nat_path_output(skb);
+	shaper_egress = ntc_shaper_egress_hook_get();
+
+	if ((NULL != shaper_egress) && (NULL != skb)) {
+		unsigned int ntc_retval = shaper_egress(skb, 0, 0, fast_nat_bind_hook_egress, NULL, NULL);
+
+		switch (ntc_retval) {
+			case NF_ACCEPT:
+				retval = fast_nat_bind_hook_egress(skb);
+				break;
+			case NF_DROP:
+				kfree_skb(skb);
+				retval = 0;
+				break;
+			case NF_STOLEN:
+				retval = 0;
+				break;
+		}
+
+	} else {
+		retval = fast_nat_bind_hook_egress(skb);
+	}
+
+	ntc_shaper_egress_hook_put();
+
+	return retval;
 }
 
 static int
@@ -199,10 +233,11 @@ fast_nat_do_bindings(struct nf_conn *ct,
 
 static int __init fast_nat_init(void)
 {
+	rcu_assign_pointer(fast_nat_bind_hook_ingress, fast_nat_path);
 	rcu_assign_pointer(fast_nat_hit_hook_func, fast_nat_path);
 	synchronize_rcu();
 	rcu_assign_pointer(fast_nat_bind_hook_func, fast_nat_do_bindings);
-	printk(KERN_INFO "fast NAT loaded\n");
+	printk(KERN_INFO "Fast NAT loaded\n");
 	return 0;
 }
 
@@ -211,7 +246,8 @@ static void __exit fast_nat_fini(void)
 	rcu_assign_pointer(fast_nat_bind_hook_func, NULL);
 	synchronize_rcu();
 	rcu_assign_pointer(fast_nat_hit_hook_func, NULL);
-	printk(KERN_INFO "fast NAT unloaded\n");
+	rcu_assign_pointer(fast_nat_bind_hook_ingress, NULL);
+	printk(KERN_INFO "Fast NAT unloaded\n");
 }
 
 module_init(fast_nat_init);
