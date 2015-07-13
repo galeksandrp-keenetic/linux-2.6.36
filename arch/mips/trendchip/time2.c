@@ -224,6 +224,7 @@ static struct irqaction perf_irqaction = {
 
 extern struct clocksource clocksource_mips;
 
+#if 0
 #if defined(CONFIG_TCSUPPORT_DYING_GASP) && (defined(CONFIG_MIPS_RT63365))
 irqreturn_t real_watchdog_timer_interrupt(int irq, void *dev_id)
 #else
@@ -282,6 +283,7 @@ static void watchdog_timer_dispatch(void)
 {
 	do_IRQ(TIMER5_INT);
 }
+#endif
 
 /************************************************************************
 *                   B U S  T I M E O U T  I N T E R R U P T  
@@ -290,7 +292,7 @@ static void watchdog_timer_dispatch(void)
 
 irqreturn_t bus_timeout_interrupt(int irq, void *dev_id)
 {
-	uint32 reg;
+	//uint32 reg;
 	uint32 addr;
 	
 	/* read to clear interrupt */
@@ -312,7 +314,7 @@ irqreturn_t bus_timeout_interrupt(int irq, void *dev_id)
 	}
 	else
 	{
-	reg = regRead32(CR_PRATIR);
+	//reg = regRead32(CR_PRATIR);
 	
 	printk("bus timeout interrupt ERR ADDR=%08lx\n", regRead32(CR_ERR_ADDR));
 	dump_stack();	
@@ -401,6 +403,7 @@ void __init tc3162_time_init(void)
 	if (isRT63165 || isRT63365 || isMT751020) {
 		/* watchdog timer */
 		/* set count down 3 seconds to issue interrupt */
+#if 0
 		regWrite32(CR_WDOG_THSLD, ((3 * TIMERTICKS_1S * SYS_HCLK) * 500)); // (3 * TIMERTICKS_1S * SYS_HCLK) * 1000 / 2
 		if (cpu_has_vint)
 			set_vi_handler(TIMER5_INT, watchdog_timer_dispatch);
@@ -408,6 +411,7 @@ void __init tc3162_time_init(void)
 		setup_irq_smtc(TIMER5_INT, &watchdog_timer_irqaction, 0x0);
 #else
 		setup_irq(TIMER5_INT, &watchdog_timer_irqaction);
+#endif
 #endif
 
 		/* setup bus timeout interrupt */
