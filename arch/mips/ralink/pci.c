@@ -1264,14 +1264,14 @@ int init_rt2880pci(void)
 	{
 		//RALINK_RSTCTRL = (RALINK_RSTCTRL | RALINK_PCIE0_RST);
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE0_CLK_EN);
-		printk("PCIE0 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE0 no card, disable it(RST&CLK)\n");
 		pcie0_disable=1;
 	}
 	if(( RALINK_PCI1_STATUS & 0x1) == 0)
 	{
 		//RALINK_RSTCTRL = (RALINK_RSTCTRL | RALINK_PCIE1_RST);
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE1_CLK_EN);
-		printk("PCIE1 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE1 no card, disable it(RST&CLK)\n");
 		pcie1_disable=1;
 	}else{
 		if(pcie0_disable==1){
@@ -1312,7 +1312,7 @@ int init_rt2880pci(void)
 #if defined (CONFIG_PCIE_PORT1)
 	if(( RALINK_PCI1_STATUS & 0x1) == 0)
 	{
-		printk("PCIE1 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE1 no card, disable it(RST&CLK)\n");
 		ASSERT_SYSRST_PCIE(RALINK_PCIE1_RST);
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE1_CLK_EN);
 		pcie_link_status &= ~(1<<1);
@@ -1323,7 +1323,7 @@ int init_rt2880pci(void)
 #endif
 #if defined (CONFIG_PCIE_PORT2)
 	if (( RALINK_PCI2_STATUS & 0x1) == 0) {
-		printk("PCIE2 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE2 no card, disable it(RST&CLK)\n");
 		ASSERT_SYSRST_PCIE(RALINK_PCIE2_RST);
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE2_CLK_EN);
 		pcie_link_status &= ~(1<<2);
@@ -1383,7 +1383,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 	{
 		RALINK_RSTCTRL = (RALINK_RSTCTRL | RALINK_PCIE0_RST);
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE0_CLK_EN);
-		printk("PCIE0 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE0 no card, disable it(RST&CLK)\n");
 		pcie0_disable=1;
 		return 0;
 	}
@@ -1465,7 +1465,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 	RALINK_PCI0_CLASS = 0x06040001;
 	//RALINK_PCI0_SUBID = 0x28801814;
 	//}
-	printk("PCIE0 enabled\n");
+	printk(KERN_INFO "PCIE0 enabled\n");
 #elif defined(CONFIG_RALINK_MT7621)
 #if defined (CONFIG_PCIE_PORT0)
 	//PCIe0
@@ -1473,7 +1473,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 		RALINK_PCI0_BAR0SETUP_ADDR = 0x7FFF0001;	//open 7FFF:2G; ENABLE
 		RALINK_PCI0_IMBASEBAR0_ADDR = MEMORY_BASE;
 		RALINK_PCI0_CLASS = 0x06040001;
-		printk("PCIE0 enabled\n");
+		printk(KERN_INFO "PCIE0 enabled\n");
 	}
 #endif
 #if defined (CONFIG_PCIE_PORT1)
@@ -1482,7 +1482,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 		RALINK_PCI1_BAR0SETUP_ADDR = 0x7FFF0001;	//open 7FFF:2G; ENABLE
 		RALINK_PCI1_IMBASEBAR0_ADDR = MEMORY_BASE;
 		RALINK_PCI1_CLASS = 0x06040001;
-		printk("PCIE1 enabled\n");
+		printk(KERN_INFO "PCIE1 enabled\n");
 	}
 #endif
 #if defined (CONFIG_PCIE_PORT2)
@@ -1491,7 +1491,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 		RALINK_PCI2_BAR0SETUP_ADDR = 0x7FFF0001;	//open 7FFF:2G; ENABLE
 		RALINK_PCI2_IMBASEBAR0_ADDR = MEMORY_BASE;
 		RALINK_PCI2_CLASS = 0x06040001;
-		printk("PCIE2 enabled\n");
+		printk(KERN_INFO "PCIE2 enabled\n");
 	}
 #endif
 #endif
@@ -1510,7 +1510,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 	RALINK_PCI_PCIMSK_ADDR |= (1<<20); // enable pcie0 interrupt
 	//}
 #elif defined (CONFIG_RALINK_MT7621)
-	printk("interrupt enable status: %x\n", RALINK_PCI_PCIMSK_ADDR);
+	printk(KERN_INFO "interrupt enable status: %x\n", RALINK_PCI_PCIMSK_ADDR);
 #else
 	RALINK_PCI_PCIMSK_ADDR = 0x000c0000; // enable pci interrupt
 #endif
