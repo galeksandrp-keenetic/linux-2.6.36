@@ -1267,14 +1267,14 @@ int init_rt2880pci(void)
 	{
 		//RALINK_RSTCTRL = (RALINK_RSTCTRL | RALINK_PCIE0_RST);
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE0_CLK_EN);
-		printk("PCIE0 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE0 no card, disable it(RST&CLK)\n");
 		pcie0_disable=1;
 	}
 	if(( RALINK_PCI1_STATUS & 0x1) == 0)
 	{
 		//RALINK_RSTCTRL = (RALINK_RSTCTRL | RALINK_PCIE1_RST);
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE1_CLK_EN);
-		printk("PCIE1 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE1 no card, disable it(RST&CLK)\n");
 		pcie1_disable=1;
 	}else{
 		if(pcie0_disable==1){
@@ -1315,7 +1315,7 @@ int init_rt2880pci(void)
 #if defined (CONFIG_PCIE_PORT1)
 	if(( RALINK_PCI1_STATUS & 0x1) == 0)
 	{
-		printk("PCIE1 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE1 no card, disable it(RST&CLK)\n");
 		ASSERT_SYSRST_PCIE(RALINK_PCIE1_RST);
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE1_CLK_EN);
 		pcie_link_status &= ~(1<<1);
@@ -1386,7 +1386,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 	{
 		RALINK_RSTCTRL = (RALINK_RSTCTRL | RALINK_PCIE0_RST);
 		RALINK_CLKCFG1 = (RALINK_CLKCFG1 & ~RALINK_PCIE0_CLK_EN);
-		printk("PCIE0 no card, disable it(RST&CLK)\n");
+		printk(KERN_INFO "PCIE0 no card, disable it(RST&CLK)\n");
 		pcie0_disable=1;
 		return 0;
 	}
