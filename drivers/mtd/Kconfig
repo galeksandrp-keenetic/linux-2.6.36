@@ -144,6 +144,10 @@ config MTD_NDM_PARTS
 	bool "NDM partitions parser"
 	depends on MTD_PARTITIONS = "y" && MTD = "y"
 
+config MTD_NDM_BOOT_UPDATE
+	bool "Update bootloader"
+	depends on MTD_NDM_PARTS
+
 config MTD_NDM_CONFIG_TRANSITION
 	bool "Partition \"Config\" transition"
 	depends on MTD_NDM_PARTS
