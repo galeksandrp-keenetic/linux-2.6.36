@@ -65,6 +65,12 @@
 #include <net/netlink.h>
 #include <net/fib_rules.h>
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+#include <net/fast_vpn.h>
+
+extern void (*prebind_from_mc_preroute)(struct sk_buff * skb);
+#endif // #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+
 #if defined(CONFIG_IP_PIMSM_V1) || defined(CONFIG_IP_PIMSM_V2)
 #define CONFIG_IP_PIMSM	1
 #endif
@@ -1678,6 +1684,19 @@ static int ip_mr_forward(struct net *net, struct mr_table *mrt,
 
 	mrt->vif_table[vif].pkt_in++;
 	mrt->vif_table[vif].bytes_in += skb->len;
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	rcu_read_lock();
+	if (!SWNAT_MC_PROBE_CHECK_MARK(skb)) {
+		void (*prebind)(struct sk_buff * skb);
+
+		if (NULL != (prebind = rcu_dereference(prebind_from_mc_preroute))) {
+			prebind(skb);
+			SWNAT_MC_SET_MARK(skb);
+		}
+	}
+	rcu_read_unlock();
+#endif // #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
 	/*
 	 *	Forward the frame
