@@ -99,7 +99,7 @@
 
 #define	INFINITY_LIFE_TIME	0xFFFFFFFF
 #define TIME_DELTA(a, b) ((unsigned long)((long)(a) - (long)(b)))
-#define DAD_MIN_SOLICIT_DELAY_MS	2000
+#define DAD_MIN_SOLICIT_DELAY_MS	0
 
 #define ADDRCONF_TIMER_FUZZ_MINUS	(HZ > 50 ? HZ/50 : 1)
 #define ADDRCONF_TIMER_FUZZ		(HZ / 4)
