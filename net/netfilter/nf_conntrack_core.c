@@ -1073,18 +1073,12 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 		u32 orig_saddr, u16 orig_sport,
 		struct nf_conn * ct,
 		enum ip_conntrack_info ct_info) = NULL;
-#endif // #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-
-	struct nf_conntrack_helper *helper;
-	int is_helper = 0;
-
-#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
-	int (*fast_nat_bind_hook)	(struct nf_conn *ct,
+	int (*fast_nat_bind_hook)(struct nf_conn *ct,
 		enum ip_conntrack_info ctinfo,
 		struct sk_buff *skb,
 		struct nf_conntrack_l3proto *l3proto,
 		struct nf_conntrack_l4proto *l4proto);
-#endif
+#endif // #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
 	if (skb->nfct) {
 		/* Previously seen (loopback or untracked)?  Ignore. */
@@ -1169,7 +1163,6 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 		ct->fast_ext = 1;
 #endif
-		is_helper = 1;
 	}
 
 
