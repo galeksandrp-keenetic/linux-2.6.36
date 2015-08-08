@@ -532,11 +532,19 @@ static bool tcp_in_window(const struct nf_conn *ct,
 			  const struct tcphdr *tcph,
 			  u_int8_t pf)
 {
+#if !(defined(CONFIG_TCSUPPORT_HWNAT) || \
+	defined(CONFIG_TCSUPPORT_RA_HWNAT) || \
+	defined(CONFIG_RA_HW_NAT) || \
+	defined(CONFIG_RA_HW_NAT_MODULE) || \
+	defined(CONFIG_FAST_NAT) || \
+	defined(CONFIG_FAST_NAT_MODULE))
 	struct net *net = nf_ct_net(ct);
+	__u32 swin;
+#endif
 	struct ip_ct_tcp_state *sender = &state->seen[dir];
 	struct ip_ct_tcp_state *receiver = &state->seen[!dir];
 	const struct nf_conntrack_tuple *tuple = &ct->tuplehash[dir].tuple;
-	__u32 seq, ack, sack, end, win, swin;
+	__u32 seq, ack, sack, end, win;
 	s16 receiver_offset;
 	bool res;
 
