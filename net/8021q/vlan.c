@@ -236,7 +236,6 @@ int vlan_check_real_dev(struct net_device *real_dev, u16 vlan_id)
 struct net_device * get_vlan_dev_by_real(struct net_device *real_dev, u16 vlan_id)
 {
 	const char *name = real_dev->name;
-	const struct net_device_ops *ops = real_dev->netdev_ops;
 
 	if (real_dev->features & NETIF_F_VLAN_CHALLENGED) {
 		pr_info("8021q: VLANs not supported on %s\n", name);
