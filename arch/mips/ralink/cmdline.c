@@ -69,7 +69,7 @@ void  __init prom_init_cmdline(void)
 	}
 
 	if (*p == '\0')
-		return 0;
+		return;
 
 	if (replace) {
 		strlcpy(arcs_cmdline, p, sizeof(arcs_cmdline));
