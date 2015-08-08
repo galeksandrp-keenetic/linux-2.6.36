@@ -199,7 +199,8 @@ next_hook:
 	}
 #if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 	else if (verdict == NF_FAST_NAT) {
-		if (fast_nat_hit_hook = rcu_dereference(fast_nat_hit_hook_func))
+		fast_nat_hit_hook = rcu_dereference(fast_nat_hit_hook_func);
+		if (fast_nat_hit_hook != NULL)
 			ret = fast_nat_hit_hook(skb);
 		else {
 			kfree_skb(skb);
