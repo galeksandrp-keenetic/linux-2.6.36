@@ -644,6 +644,7 @@ static int raspi_write_sr(u8 *val)
 	return 0;
 }
 
+#if 0
 static int raspi_clear_sr(void)
 {
 	u8 code = OPCODE_CLSR;
@@ -655,7 +656,7 @@ static int raspi_clear_sr(void)
 #endif
 	return 0;
 }
-
+#endif
 
 static int raspi_4byte_mode(int enable)
 {
