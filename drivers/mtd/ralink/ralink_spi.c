@@ -581,7 +581,10 @@ static int raspi_write_rg(u8 *val, u8 opcode)
 {
 	ssize_t retval;
 	u8 code = opcode;
-	u32 user, dr;
+	u32 dr;
+#ifdef COMMAND_MODE
+	u32 user;
+#endif
 
 	if (!val)
 		printk("NULL pointer\n");
@@ -976,7 +979,10 @@ static int ramtd_erase(struct mtd_info *mtd, struct erase_info *instr)
 static int ramtd_read(struct mtd_info *mtd, loff_t from, size_t len,
 	size_t *retlen, u_char *buf)
 {
-	size_t readlen, code;
+	size_t readlen;
+#ifdef COMMAND_MODE
+	size_t code;
+#endif
 
 	//printk("%s: from:%llx len:%x\n", __func__, from, len);
 	/* sanity checks */
