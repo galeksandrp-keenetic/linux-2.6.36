@@ -1357,10 +1357,10 @@ static struct mtd_info *raspi_probe(struct map_info *map)
 	flash->mtd.lock = ramtd_lock;
 	flash->mtd.unlock = ramtd_unlock;
 
-	printk(KERN_INFO "%s(%02x %04x) (%d Kbytes)\n",
+	printk(KERN_INFO "%s(%02x %04x) (%llu Kbytes)\n",
 	       chip->name, chip->id, chip->jedec_id, flash->mtd.size / 1024);
 
-	printk(KERN_INFO "mtd .name = %s, .size = 0x%.8x (%lluM) "
+	printk(KERN_INFO "mtd .name = %s, .size = 0x%.8llx (%lluM) "
 			".erasesize = 0x%.8x (%uK) .numeraseregions = %d\n",
 		flash->mtd.name,
 		flash->mtd.size, flash->mtd.size / (1024*1024),
@@ -1369,9 +1369,9 @@ static struct mtd_info *raspi_probe(struct map_info *map)
 
 	if (flash->mtd.numeraseregions)
 		for (i = 0; i < flash->mtd.numeraseregions; i++)
-			printk(KERN_INFO "mtd.eraseregions[%d] = { .offset = 0x%.8x, "
+			printk(KERN_INFO "mtd.eraseregions[%d] = { .offset = 0x%.8llx, "
 				".erasesize = 0x%.8x (%uK), "
-				".numblocks = %llu }\n",
+				".numblocks = %u }\n",
 				i, flash->mtd.eraseregions[i].offset,
 				flash->mtd.eraseregions[i].erasesize,
 				flash->mtd.eraseregions[i].erasesize / 1024,
