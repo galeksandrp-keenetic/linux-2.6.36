@@ -759,7 +759,7 @@ static inline int raspi_write_disable(void)
  * Set all sectors (global) unprotected if they are protected.
  * Returns negative if error occurred.
  */
-static inline void raspi_unprotect(void)
+static inline int raspi_unprotect(void)
 {
 	u8 sr = 0;
 
@@ -770,9 +770,11 @@ static inline void raspi_unprotect(void)
 
 	if ((sr & (SR_BP0 | SR_BP1 | SR_BP2)) != 0) {
 		sr = 0;
-		raspi_write_sr(&sr);
+		if (raspi_write_sr(&sr))
+			return -1;
 	}
 
+	return 0;
 }
 
 /*
@@ -848,7 +850,8 @@ static int raspi_erase_sector(u32 offset)
 
 	/* Send write enable, then erase commands. */
 	raspi_write_enable();
-	raspi_unprotect();
+	if (raspi_unprotect())
+		return -EIO;
 
 #ifdef COMMAND_MODE
 	if (flash->chip->addr4b)
@@ -1226,7 +1229,8 @@ static int ramtd_write(struct mtd_info *mtd, loff_t to, size_t len,
 
 		raspi_wait_ready(3);
 		raspi_write_enable();
-		raspi_unprotect();
+		if (raspi_unprotect())
+			return -EIO;
 
 #ifdef COMMAND_MODE
 
