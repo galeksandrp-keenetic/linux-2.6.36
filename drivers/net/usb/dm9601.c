@@ -733,7 +733,9 @@ static void dm9620_set_multicast(struct net_device *net)
  {
          struct sockaddr *addr = p;
          struct usbnet *dev = netdev_priv(net);
+#ifdef DEBUG
 	 int i;
+#endif
  
 #ifdef DEBUG
 	 printk("[dm96] Set mac addr %pM\n", addr->sa_data);  // %x:%x:...
@@ -778,10 +780,13 @@ static const struct net_device_ops vm_netdev_ops= { // new kernel 2.6.31  (20091
 static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
 {
   u16 *tmpwPtr2;
-	int ret,mdio_val,i;
+	int ret,mdio_val;
 	struct dm96xx_priv* priv;
 	u8 temp;
+#ifdef DEBUG
+	int i;
 	u8 tmp;
+#endif
 
 	ret = usbnet_get_endpoints(dev, intf);
 	if (ret)
