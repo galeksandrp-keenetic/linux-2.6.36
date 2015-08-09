@@ -24,7 +24,7 @@ static inline u32 rt_readl(unsigned long reg)
     return (*(volatile u32 *)reg);
 }
 
-static int rt_set_host(void)
+static void rt_set_host(void)
 {
 	u32 val = rt_readl(SYSCFG1);
 	// host mode
