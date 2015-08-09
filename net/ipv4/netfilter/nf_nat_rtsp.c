@@ -55,7 +55,11 @@ static char*    destaction = NULL;
 
 static u_int32_t extip = 0;
 static int       dstact = 0;
+
+#ifdef pr_debug
+#undef pr_debug
 #define pr_debug(fmt, ...) 	printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
+#endif
 
 MODULE_AUTHOR("Tom Marshall <tmarshall at real.com>");
 MODULE_DESCRIPTION("RTSP network address translation module");

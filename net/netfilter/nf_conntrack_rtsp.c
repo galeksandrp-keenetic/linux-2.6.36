@@ -56,8 +56,10 @@ static int num_ports = 0;
 static int max_outstanding = 8;
 static unsigned int setup_timeout = 300;
 
+#ifdef pr_debug
+#undef pr_debug
 #define pr_debug(fmt, ...) 	printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__)
-
+#endif
 
 MODULE_AUTHOR("Tom Marshall <tmarshall at real.com>");
 MODULE_DESCRIPTION("RTSP connection tracking module");
