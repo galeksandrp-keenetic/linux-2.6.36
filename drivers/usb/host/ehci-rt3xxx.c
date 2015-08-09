@@ -32,6 +32,7 @@ static void rt_set_host(void)
 	rt_writel(val, SYSCFG1);
 }
 
+#if 0
 static int rt_usbhost_reset(void)
 {
 	u32 val = rt_readl(RT2880_RSTCTRL_REG);
@@ -41,6 +42,7 @@ static int rt_usbhost_reset(void)
 	rt_writel(val, RT2880_RSTCTRL_REG);
 	mdelay (100);
 }
+#endif
 
 static int rt3xxx_ehci_init(struct usb_hcd *hcd)
 {
