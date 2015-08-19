@@ -267,7 +267,7 @@ static struct net_bridge_mdb_entry *__br_mdb_ip_get(
 	return NULL;
 }
 
-static struct net_bridge_mdb_entry *br_mdb_ip_get(
+struct net_bridge_mdb_entry *br_mdb_ip_get(
 	struct net_bridge_mdb_htable *mdb, struct br_ip *dst)
 {
 	if (!mdb)
@@ -275,6 +275,8 @@ static struct net_bridge_mdb_entry *br_mdb_ip_get(
 
 	return __br_mdb_ip_get(mdb, dst, br_ip_hash(mdb, dst));
 }
+
+EXPORT_SYMBOL(br_mdb_ip_get);
 
 static struct net_bridge_mdb_entry *br_mdb_ip4_get(
 	struct net_bridge_mdb_htable *mdb, __be32 dst)
