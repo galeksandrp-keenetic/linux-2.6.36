@@ -61,6 +61,9 @@ register struct thread_info *__current_thread_info __asm__("$28");
 #define current_thread_info()  __current_thread_info
 
 /* thread information allocation */
+#if defined(CONFIG_THREAD_STACK_SIZE_ADJUSTMENT)
+#define THREAD_SIZE_ORDER (CONFIG_THREAD_SIZE_ORDER)
+#else
 #if defined(CONFIG_PAGE_SIZE_4KB) && defined(CONFIG_32BIT)
 #if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
 #define THREAD_SIZE_ORDER (2)
@@ -82,6 +85,7 @@ register struct thread_info *__current_thread_info __asm__("$28");
 #endif
 #ifdef CONFIG_PAGE_SIZE_64KB
 #define THREAD_SIZE_ORDER (0)
+#endif
 #endif
 
 #define THREAD_SIZE (PAGE_SIZE << THREAD_SIZE_ORDER)
