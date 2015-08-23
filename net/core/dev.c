@@ -3562,7 +3562,7 @@ void (*prebind_from_fastnat)(struct sk_buff * skb,
 	enum ip_conntrack_info ctinfo) = NULL;
 EXPORT_SYMBOL(prebind_from_fastnat);
 
-void (*prebind_from_l2tptx)(struct sk_buff * skb,
+void (*prebind_from_l2tptx)(struct sk_buff * skb, struct sock * sock,
 	u16 l2w_tid, u16 l2w_sid, u16 w2l_tid, u16 w2l_sid,
 	u32 saddr, u32 daddr, u16 sport, u16 dport) = NULL;
 EXPORT_SYMBOL(prebind_from_l2tptx);
