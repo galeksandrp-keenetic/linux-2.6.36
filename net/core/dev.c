@@ -3470,7 +3470,7 @@ void (*prebind_from_fastnat)(struct sk_buff * skb,
 	enum ip_conntrack_info ctinfo) = NULL;
 EXPORT_SYMBOL(prebind_from_fastnat);
 
-void (*prebind_from_l2tptx)(struct sk_buff * skb,
+void (*prebind_from_l2tptx)(struct sk_buff * skb, struct sock * sock,
 	u16 l2w_tid, u16 l2w_sid, u16 w2l_tid, u16 w2l_sid,
 	u32 saddr, u32 daddr, u16 sport, u16 dport) = NULL;
 EXPORT_SYMBOL(prebind_from_l2tptx);
@@ -3485,10 +3485,6 @@ EXPORT_SYMBOL(prebind_from_pppoetx);
 
 void (*prebind_from_raeth)(struct sk_buff * skb) = NULL;
 EXPORT_SYMBOL(prebind_from_raeth);
-
-void (*swnat_add_stats_l2tp)(u32 saddr, u32 daddr, u16 sport, u16 dport,
-	u32 sent_bytes, u32 sent_packets, u32 recv_bytes, u32 recv_packets) = NULL;
-EXPORT_SYMBOL(swnat_add_stats_l2tp);
 
 #endif //#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
