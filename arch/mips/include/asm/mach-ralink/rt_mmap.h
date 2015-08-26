@@ -792,6 +792,13 @@
 #define CPLL_DIV_RATIO                  (0x3UL << CPLL_DIV_RATIO_SHIFT)
 #define BASE_CLOCK                      40      /* Mhz */
 
+//AGPIO
+#define MT7628_P0_EPHY_AIO_EN          (0x1<<16)
+#define MT7628_P1_EPHY_AIO_EN          (0x1<<17)
+#define MT7628_P2_EPHY_AIO_EN          (0x1<<18)
+#define MT7628_P3_EPHY_AIO_EN          (0x1<<19)
+#define MT7628_P4_EPHY_AIO_EN          (0x1<<20)
+
 #elif defined (CONFIG_MIPS_RT63365) 
 
 #define RALINK_SYSCTL_BASE              0xBFB00000
