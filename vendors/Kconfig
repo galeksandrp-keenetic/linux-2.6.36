@@ -6,3 +6,5 @@ source "vendors/Kconfig.ralink"
 source "vendors/Kconfig.atel"
 
 source "vendors/Kconfig.wifi"
+
+source "vendors/Kconfig.mt7628"
