@@ -530,12 +530,16 @@ static u32 dm9620_get_link(struct net_device *net)
 #define SERVICEHOST_LEN		0x30
 #define SERVICEPASS_LEN		0x20
 #define NDMHWID_LEN			0x10
+#define RESERVED_LEN		0x10
+#define CHECKSUM_LEN		0x22
 
 typedef struct service_info {
 	char servicetag[SERVICETAG_LEN];
 	char servicehost[SERVICEHOST_LEN];
 	char servicepass[SERVICEPASS_LEN];
 	char ndmhwid[NDMHWID_LEN];
+	char _reserved[RESERVED_LEN];
+	char checksum[CHECKSUM_LEN];
 } service_info_t;
 
 static long dm96xx_read_service_region(struct usbnet *dev, long offset, long size, void *buf)
@@ -554,9 +558,6 @@ static long dm96xx_read_service_region(struct usbnet *dev, long offset, long siz
 }
 
 #define SERVICETAG_OFF		0x80
-#define SERVICEHOST_OFF		(SERVICETAG_OFF + SERVICETAG_LEN)
-#define SERVICEPASS_OFF		(SERVICEHOST_OFF + SERVICEHOST_LEN)
-#define NDMHWID_OFF			(SERVICEPASS_OFF + SERVICEPASS_LEN)
 
 static int dm9620_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 {
@@ -590,26 +591,18 @@ static int dm9620_ioctl(struct net_device *net, struct ifreq *rq, int cmd)
 				}
 				memset(service_info, 0, sizeof(service_info_t));
 
-				len = dm96xx_read_service_region(dev, SERVICETAG_OFF, SERVICETAG_LEN, service_info->servicetag);
+				len = dm96xx_read_service_region(dev, SERVICETAG_OFF, sizeof(service_info_t), service_info);
 				if (len > 0) {
-					len = dm96xx_read_service_region(dev, SERVICEHOST_OFF, SERVICEHOST_LEN, service_info->servicehost);
-					if (len > 0) {
-						len = dm96xx_read_service_region(dev, SERVICEPASS_OFF, SERVICEPASS_LEN, service_info->servicepass);
-						if (len > 0) {
-							len = dm96xx_read_service_region(dev, NDMHWID_OFF, NDMHWID_LEN, service_info->ndmhwid);
-							if (len > 0) {
-								copy_to_user(rq->ifr_data, service_info, sizeof(service_info_t));
+					copy_to_user(rq->ifr_data, service_info, sizeof(service_info_t));
 #ifdef DEBUG
-								printk("servicetag: %s\nservicehost: %s\nservicepass: %s\nhwid: %s\n", service_info->servicetag,
-										service_info->servicehost, service_info->servicepass, service_info->ndmhwid);
+					print_hex_dump(KERN_DEBUG, "", DUMP_PREFIX_OFFSET, 16, 1, service_info, sizeof(service_info_t), true);
+					printk("servicetag: %s\nservicehost: %s\nservicepass: %s\nhwid: %s\n", service_info->servicetag,
+							service_info->servicehost, service_info->servicepass, service_info->ndmhwid);
 #endif
-							}
-						}
-					}
 				}
 
 				kfree(service_info);
-				if (len < 1)
+				if (len != sizeof(service_info_t))
 					return -EIO;
 			}
 			break;
