@@ -2329,7 +2329,7 @@ void xhci_cleanup_stalled_ring(struct xhci_hcd *xhci,
  * zero after the halt condition is cleared.
  * Context: in_interrupt
  */
-void xhci_endpoint_reset(struct usb_hcd *hcd,
+int xhci_endpoint_reset(struct usb_hcd *hcd,
 		struct usb_host_endpoint *ep)
 {
 	struct xhci_hcd *xhci;
@@ -2345,17 +2345,17 @@ void xhci_endpoint_reset(struct usb_hcd *hcd,
 	 * with xhci_add_endpoint()
 	 */
 	if (!ep->hcpriv)
-		return;
+		return 1;
 	ep_index = xhci_get_endpoint_index(&ep->desc);
 	virt_ep = &xhci->devs[udev->slot_id]->eps[ep_index];
 	if (!virt_ep->stopped_td) {
 		xhci_dbg(xhci, "Endpoint 0x%x not halted, refusing to reset.\n",
 				ep->desc.bEndpointAddress);
-		return;
+		return 1;
 	}
 	if (usb_endpoint_xfer_control(&ep->desc)) {
 		xhci_dbg(xhci, "Control endpoint stall already handled.\n");
-		return;
+		return 1;
 	}
 
 	xhci_dbg(xhci, "Queueing reset endpoint command\n");
@@ -2376,8 +2376,12 @@ void xhci_endpoint_reset(struct usb_hcd *hcd,
 	virt_ep->stopped_stream = 0;
 	spin_unlock_irqrestore(&xhci->lock, flags);
 
-	if (ret)
+	if (ret) {
 		xhci_warn(xhci, "FIXME allocate a new ring segment\n");
+		return ret;
+	}
+
+	return 0;
 }
 
 static int xhci_check_streams_endpoint(struct xhci_hcd *xhci,

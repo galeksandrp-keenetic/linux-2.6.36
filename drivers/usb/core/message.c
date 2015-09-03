@@ -1090,7 +1090,7 @@ void usb_disable_endpoint(struct usb_device *dev, unsigned int epaddr,
  * Resets any host-side endpoint state such as the toggle bit,
  * sequence number or current window.
  */
-void usb_reset_endpoint(struct usb_device *dev, unsigned int epaddr)
+int usb_reset_endpoint(struct usb_device *dev, unsigned int epaddr)
 {
 	unsigned int epnum = epaddr & USB_ENDPOINT_NUMBER_MASK;
 	struct usb_host_endpoint *ep;
@@ -1101,6 +1101,8 @@ void usb_reset_endpoint(struct usb_device *dev, unsigned int epaddr)
 		ep = dev->ep_in[epnum];
 	if (ep)
 		usb_hcd_reset_endpoint(dev, ep);
+
+	return 0;
 }
 EXPORT_SYMBOL_GPL(usb_reset_endpoint);
 

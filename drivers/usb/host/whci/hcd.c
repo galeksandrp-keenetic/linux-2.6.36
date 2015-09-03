@@ -186,7 +186,7 @@ static void whc_endpoint_disable(struct usb_hcd *usb_hcd,
 	}
 }
 
-static void whc_endpoint_reset(struct usb_hcd *usb_hcd,
+static int whc_endpoint_reset(struct usb_hcd *usb_hcd,
 			       struct usb_host_endpoint *ep)
 {
 	struct wusbhc *wusbhc = usb_hcd_to_wusbhc(usb_hcd);
@@ -209,6 +209,7 @@ static void whc_endpoint_reset(struct usb_hcd *usb_hcd,
 	}
 
 	spin_unlock_irqrestore(&whc->lock, flags);
+	return 0;
 }
 
 

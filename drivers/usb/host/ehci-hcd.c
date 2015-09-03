@@ -1147,7 +1147,7 @@ done:
 	return;
 }
 
-static void
+static int
 ehci_endpoint_reset(struct usb_hcd *hcd, struct usb_host_endpoint *ep)
 {
 	struct ehci_hcd		*ehci = hcd_to_ehci(hcd);
@@ -1158,7 +1158,7 @@ ehci_endpoint_reset(struct usb_hcd *hcd, struct usb_host_endpoint *ep)
 	unsigned long		flags;
 
 	if (eptype != USB_ENDPOINT_XFER_BULK && eptype != USB_ENDPOINT_XFER_INT)
-		return;
+		return 0;
 
 	spin_lock_irqsave(&ehci->lock, flags);
 	qh = ep->hcpriv;
@@ -1186,6 +1186,8 @@ ehci_endpoint_reset(struct usb_hcd *hcd, struct usb_host_endpoint *ep)
 		}
 	}
 	spin_unlock_irqrestore(&ehci->lock, flags);
+
+	return 0;
 }
 
 static int ehci_get_frame (struct usb_hcd *hcd)
