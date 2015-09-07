@@ -35,6 +35,7 @@ inline static void try_wake_up(void)
 	udelay(10000);	// toggle reset bit 25 & 22 to 0
 }
 
+#if defined (CONFIG_RALINK_MT7620)
 inline static void try_wake_up_20(void)
 {
 	u32 val;
@@ -64,6 +65,7 @@ inline static void try_wake_up_11(void)
 	*(volatile u_long *)(RT2880_RSTCTRL_REG) = cpu_to_le32(val);
 	udelay(10000);	// toggle reset bit 25 & 22 to 0
 }
+#endif
 
 inline static void try_sleep(void)
 {
