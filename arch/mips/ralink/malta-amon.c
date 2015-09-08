@@ -32,17 +32,17 @@ int amon_cpu_avail(int cpu)
 	struct cpulaunch *launch = (struct cpulaunch *)CKSEG0ADDR(CPULAUNCH);
 
 	if (cpu < 0 || cpu >= NCPULAUNCH) {
-		printk("avail: cpu%d is out of range\n", cpu);
+		pr_debug("avail: cpu%d is out of range\n", cpu);
 		return 0;
 	}
 
 	launch += cpu;
 	if (!(launch->flags & LAUNCH_FREADY)) {
-		printk("avail: cpu%d is not ready\n", cpu);
+		pr_debug("avail: cpu%d is not ready\n", cpu);
 		return 0;
 	}
 	if (launch->flags & (LAUNCH_FGO|LAUNCH_FGONE)) {
-		printk("avail: too late.. cpu%d is already gone\n", cpu);
+		pr_debug("avail: too late.. cpu%d is already gone\n", cpu);
 		return 0;
 	}
 
@@ -60,7 +60,7 @@ void amon_cpu_start(int cpu,
 		return;
 	}
 	if (cpu == smp_processor_id()) {
-		printk("launch: I am cpu%d!\n", cpu);
+		pr_debug("launch: I am cpu%d!\n", cpu);
 		return;
 	}
 	launch += cpu;
