@@ -3251,6 +3251,8 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 	//printk("SET USB 11 OPERATION\n");	
 #endif
 #endif
+
+	char first_time_boot = !(portchange & USB_PORT_STAT_C_CONNECTION);
 	for (i = 0; i < SET_CONFIG_TRIES; i++) {
 
 		/* reallocate for each attempt, since references
@@ -3301,6 +3303,7 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 
 		/* reset (non-USB 3.0 devices) and get descriptor */
 		status = hub_port_init(hub, udev, port1, i);
+
 		if (status < 0)
 			goto loop;
 
@@ -3365,6 +3368,20 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 		/* Run it through the hoops (find a driver, etc) */
 		if (!status) {
 			status = usb_new_device(udev);
+
+			if (first_time_boot) { // Fix wrong behavior of some plugged USB-modems at reboot
+				dev_dbg(&udev->dev, "reinit device at first boot\n");
+
+				/* To avoid races, first unconfigure and then remove */
+				usb_set_configuration(udev, -1);
+				usb_remove_device(udev);
+
+				device_del(&udev->dev);
+				first_time_boot = 0;
+				msleep(100);
+				goto loop;
+			}
+
 			if (status) {
 				spin_lock_irq(&device_state_lock);
 				hdev->children[port1-1] = NULL;
