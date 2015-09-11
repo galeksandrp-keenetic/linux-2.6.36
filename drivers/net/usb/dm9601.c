@@ -41,10 +41,13 @@
  * v2.59.2 - Add "DM962XA EXT MII"
  *           correct the report of "ifconfig  eth1 up" ( loc==4: res= 0x05e1;  loc==5: res= 0x45e1;)
  * v2.59.2s - Add ServiceTag reading ioctl call
+ * v2.59.2m - Modify "MTU" parameter
+ * v2.59.2m2 - Modify "rx_urb_size" parameter
+ * v2.59.2m3r - Modify "rx_urb_size" parameter
  */
 
 //#define DEBUG
-#define LNX_DM9620_VER_STR  "V2.59.2s"
+#define LNX_DM9620_VER_STR  "V2.59.2m3r"
 
 
 #include <linux/module.h>
@@ -785,6 +788,9 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
 	if (ret)
 		goto out;
 
+/* ETH_HLEN is 14 */
+#define URB_SIZ_ENLARGE 22
+
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,31) 
 	dev->net->netdev_ops = &vm_netdev_ops; // new kernel 2.6.31  (20091217JJ)
 	dev->net->ethtool_ops = &dm9620_ethtool_ops;
@@ -796,6 +802,7 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->net->hard_header_len += DM_TX_OVERHEAD;
 	dev->hard_mtu = dev->net->mtu + dev->net->hard_header_len;
 	dev->rx_urb_size = dev->net->mtu + ETH_HLEN + DM_RX_OVERHEAD+1; // ftp fail fixed
+	dev->rx_urb_size += URB_SIZ_ENLARGE; // larger for rx urb size
 
 	dev->mii.dev = dev->net;
 	dev->mii.mdio_read = dm9620_mdio_read;
