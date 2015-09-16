@@ -50,11 +50,7 @@ static int usb_hcd_rt3xxx_probe(const struct hc_driver *driver, struct platform_
 //	usb_host_clock = clk_get(&pdev->dev, "usb_host");
 //	ep93xx_start_hc(&pdev->dev);
 
-#if defined (CONFIG_RALINK_MT7620)
-	try_wake_up_11();
-#else
 	try_wake_up();
-#endif
 
 	ohci_hcd_init(hcd_to_ohci(hcd));
 

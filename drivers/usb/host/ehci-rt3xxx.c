@@ -143,11 +143,7 @@ static int rt3xxx_ehci_probe(struct platform_device *pdev)
 	//rt_usbhost_reset();
 
 	// wake up usb module from power saving mode...
-#if defined (CONFIG_RALINK_MT7620)
-	try_wake_up_20();
-#else
 	try_wake_up();
-#endif
 
 #ifdef CONFIG_USB_GADGET_RT
 #warning	"*********************************************************"
