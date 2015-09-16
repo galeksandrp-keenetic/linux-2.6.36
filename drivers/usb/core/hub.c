@@ -3252,9 +3252,10 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 #endif
 #endif
 
-	char first_time_boot = !(portchange & USB_PORT_STAT_C_CONNECTION);
+	char first_time_boot = (portchange == 0x0000);
 	for (i = 0; i < SET_CONFIG_TRIES; i++) {
 
+		printk("%s: Try config %d\n", __func__, i);
 		/* reallocate for each attempt, since references
 		 * to the previous one can escape in various ways
 		 */
@@ -3369,7 +3370,11 @@ static void hub_port_connect_change(struct usb_hub *hub, int port1,
 		if (!status) {
 			status = usb_new_device(udev);
 
-			if (first_time_boot) { // Fix wrong behavior of some plugged USB-modems at reboot
+			// Fix wrong behavior of Alcatel X602 USB-modem at reboot
+			if (first_time_boot &&
+					udev->descriptor.iManufacturer == 0x03 && // If modem initialized properly, iManufacturer = 0x02
+					udev->descriptor.idVendor == 0x1bbb &&
+					udev->descriptor.idProduct == 0x022c) {
 				dev_dbg(&udev->dev, "reinit device at first boot\n");
 
 				/* To avoid races, first unconfigure and then remove */
