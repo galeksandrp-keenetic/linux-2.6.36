@@ -8,6 +8,7 @@ struct sk_buff;
 typedef unsigned int ntc_shaper_hook_fn(struct sk_buff *skb,
 										uint32_t saddr,
 										uint32_t daddr,
+										uint32_t *disable_hwacc,
 										int (*okfn_nf)(struct sk_buff *),
 										int (*okfn_custom)(struct sk_buff *, void *),
 										void * data);

@@ -147,7 +147,7 @@ static int fast_nat_path(struct sk_buff *skb)
 	shaper_egress = ntc_shaper_egress_hook_get();
 
 	if ((NULL != shaper_egress) && (NULL != skb)) {
-		unsigned int ntc_retval = shaper_egress(skb, 0, 0, fast_nat_bind_hook_egress, NULL, NULL);
+		unsigned int ntc_retval = shaper_egress(skb, 0, 0, NULL, fast_nat_bind_hook_egress, NULL, NULL);
 
 		switch (ntc_retval) {
 			case NF_ACCEPT:

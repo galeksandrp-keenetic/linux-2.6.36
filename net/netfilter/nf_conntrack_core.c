@@ -1234,7 +1234,7 @@ nf_conntrack_in(struct net *net, u_int8_t pf, unsigned int hooknum,
 							(orig_src != new_src)) {
 							/* Fast NAT should not be unloaded in realtime now */
 							unsigned int ntc_retval = ntc_ingress(skb,
-								be32_to_cpu(orig_src), 0, fn_bind_ingress, NULL, NULL);
+								be32_to_cpu(orig_src), 0, NULL, fn_bind_ingress, NULL, NULL);
 
 							if (NF_ACCEPT == ntc_retval) {
 								/* Shaper skipped that packet */
