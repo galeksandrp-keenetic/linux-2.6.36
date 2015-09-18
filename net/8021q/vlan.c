@@ -186,6 +186,7 @@ void unregister_vlan_dev(struct net_device *dev, struct list_head *head)
 		del_hw_vlan_vid(vlan_id);
 	rcu_read_unlock();
 #endif
+
 	grp->nr_vlans--;
 
 	vlan_group_set_device(grp, vlan_id, NULL);
@@ -404,9 +405,7 @@ static int register_vlan_device(struct net_device *real_dev, u16 vlan_id)
 	vlan_dev_info(new_dev)->flags = VLAN_FLAG_REORDER_HDR;
 
 	new_dev->rtnl_link_ops = &vlan_link_ops;
-	err = register_vlan_dev(new_dev);
-	if (err < 0)
-		goto out_free_newdev;
+
 #if defined (CONFIG_RAETH_HW_VLAN_TX)
 	rcu_read_lock();
 	if (rcu_dereference(add_hw_vlan_vid))
@@ -416,10 +415,24 @@ static int register_vlan_device(struct net_device *real_dev, u16 vlan_id)
 	if (err < 0)
 		goto out_free_newdev;
 #endif
+
+	err = register_vlan_dev(new_dev);
+	if (err < 0)
+		goto out_del_hw_vlan_id;
+
 	return 0;
 
+out_del_hw_vlan_id:
+#if defined (CONFIG_RAETH_HW_VLAN_TX)
+	rcu_read_lock();
+	if (rcu_dereference(del_hw_vlan_vid))
+		del_hw_vlan_vid(vlan_id);
+	rcu_read_unlock();
+
 out_free_newdev:
+#endif
 	free_netdev(new_dev);
+
 	return err;
 }
 
