@@ -178,8 +178,10 @@ void unregister_vlan_dev(struct net_device *dev, struct list_head *head)
 	if (vlan_id && (real_dev->features & NETIF_F_HW_VLAN_FILTER))
 		ops->ndo_vlan_rx_kill_vid(real_dev, vlan_id);
 
+	rcu_read_lock();
 	if (rcu_dereference(del_hw_vlan_vid))
 		del_hw_vlan_vid(vlan_id);
+	rcu_read_unlock();
 
 	grp->nr_vlans--;
 
@@ -399,20 +401,30 @@ static int register_vlan_device(struct net_device *real_dev, u16 vlan_id)
 	vlan_dev_info(new_dev)->flags = VLAN_FLAG_REORDER_HDR;
 
 	new_dev->rtnl_link_ops = &vlan_link_ops;
-	err = register_vlan_dev(new_dev);
-	if (err < 0)
-		goto out_free_newdev;
 
+	rcu_read_lock();
 	if (rcu_dereference(add_hw_vlan_vid))
 		err = add_hw_vlan_vid(vlan_id);
+	rcu_read_unlock();
 
 	if (err < 0)
 		goto out_free_newdev;
+
+	err = register_vlan_dev(new_dev);
+	if (err < 0)
+		goto out_del_hw_vlan_id;
 
 	return 0;
 
+out_del_hw_vlan_id:
+	rcu_read_lock();
+	if (rcu_dereference(del_hw_vlan_vid))
+		del_hw_vlan_vid(vlan_id);
+	rcu_read_unlock();
+
 out_free_newdev:
 	free_netdev(new_dev);
+
 	return err;
 }
 
