@@ -109,6 +109,7 @@ static void __init set_reset_flag(void)
 }
 
 int coherentio = -1;    /* no DMA cache coherency (may be set by user) */
+EXPORT_SYMBOL(coherentio);
 int hw_coherentio;      /* init to 0 => no HW DMA cache coherency (reflects real HW) */
 static int __init setcoherentio(char *str)
 {
