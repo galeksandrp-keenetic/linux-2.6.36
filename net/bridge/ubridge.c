@@ -114,6 +114,27 @@ static struct rtnl_link_stats64 *ubr_get_stats64(struct net_device *dev,
 	return stats;
 }
 
+void ubr_change_rx_flags(struct net_device *dev,
+						int flags)
+{
+	int err = 0;
+
+	if (flags & IFF_PROMISC) {
+		struct ubr_private *master_info = netdev_priv(dev);
+		struct net_device *slave_dev = master_info->slave_dev;
+
+		netdev_dbg(dev, "%s promiscuous mode for ubridge\n",
+				dev->flags & IFF_PROMISC? "Set": "Clear");
+
+		if (slave_dev)
+			err = dev_set_promiscuity(slave_dev, dev->flags & IFF_PROMISC? 1: -1);
+
+		if (err < 0)
+			printk(KERN_ERR "Error changing promiscuity\n");
+	}
+}
+
+
 static const struct net_device_ops ubr_netdev_ops =
 {
 	.ndo_open = ubr_open,
@@ -121,6 +142,8 @@ static const struct net_device_ops ubr_netdev_ops =
 	.ndo_start_xmit = ubr_xmit,
 	.ndo_get_stats64 = ubr_get_stats64,
 	.ndo_do_ioctl = ubr_dev_ioctl,
+	.ndo_change_rx_flags = ubr_change_rx_flags,
+
 };
 
 static int ubr_deregister(struct net_device *dev)
@@ -178,7 +201,7 @@ static int ubr_alloc_master(const char *name)
 	dev->features		= NETIF_F_FRAGLIST
 						| NETIF_F_HIGHDMA
 						| NETIF_F_LLTX;
-	dev->flags		= IFF_BROADCAST | IFF_MULTICAST |IFF_PROMISC;
+	dev->flags		= IFF_BROADCAST | IFF_MULTICAST;
 	dev->netdev_ops = &ubr_netdev_ops;
 	dev->destructor		= free_netdev;
 
@@ -245,6 +268,10 @@ static int ubr_atto_master(struct net_device *master_dev, int ifindex)
 		kfree(p);
 		goto out;
 	}
+
+	if (master_dev->flags & IFF_PROMISC)
+		dev_set_promiscuity(dev1, 1);
+
 	netif_carrier_on(master_dev);
 	err = 0;
 
@@ -267,6 +294,10 @@ static int ubr_detach(struct net_device *master_dev, int ifindex)
 	ubr0->slave_dev = NULL;
 
 	netdev_rx_handler_unregister(dev1);
+
+	if (master_dev->flags & IFF_PROMISC)
+		dev_set_promiscuity(dev1, -1);
+
 	err = 0;
 
 out:
