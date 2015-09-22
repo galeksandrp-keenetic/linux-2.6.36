@@ -151,7 +151,7 @@ static int dm_read_reg(struct usbnet *dev, u8 reg, u8 *value)
 	tmpwPtr= kmalloc (2, GFP_ATOMIC);
 	if (!tmpwPtr)
 	{
-		printk("+++++++++++ JJ5 dm_read_reg() Error: can not kmalloc!\n"); //usbnet_suspend (intf, message);
+		printk(KERN_ERR "+++++++++++ JJ5 dm_read_reg() Error: can not kmalloc!\n"); //usbnet_suspend (intf, message);
 		return 0; 
 	}
 	
@@ -283,7 +283,7 @@ static int dm_read_shared_word(struct usbnet *dev, int phy, u8 reg, __le16 *valu
 	tmpwPtr1= kmalloc (2, GFP_ATOMIC);
 	if (!tmpwPtr1)
 	{
-		printk("+++++++++++ JJ5 dm_read_reg() Error: can not kmalloc!\n"); //usbnet_suspend (intf, message);
+		printk(KERN_ERR "+++++++++++ JJ5 dm_read_reg() Error: can not kmalloc!\n"); //usbnet_suspend (intf, message);
 		return 0; 
 	}
 	
@@ -811,7 +811,7 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
 	dev->mii.reg_num_mask = 0x1f;
 	dev->mii.phy_id = DM9620_PHY_ID;
 
-	printk("[dm962] Linux Driver = %s\n", LNX_DM9620_VER_STR);
+	printk(KERN_INFO "[dm962x] Linux Driver = %s\n", LNX_DM9620_VER_STR);
 //JJ1
 #ifdef DEBUG
 	if ( (ret= dm_read_reg(dev, 0x29, &tmp)) >=0)
@@ -887,10 +887,12 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
         /* work-around for 9620 mode */
 	dm_read_reg(dev, 0x5c, &temp); 
 	priv->tx_fix_mod = temp;
+#ifdef DEBUG
 	printk(KERN_WARNING "[dm96] 9620 tx_fix_mod (DM9_NREV= %d)\n", priv->tx_fix_mod);
 
 	printk("[dm96] Fixme: work around for 9620 mode\n");
 	printk("[dm96] Add tx_fixup() debug...\n");
+#endif
 	dm_write_reg(dev, DM_MCAST_ADDR, 0);     // clear data bus to 0s
 	dm_read_reg(dev, DM_MCAST_ADDR, &temp);  // clear data bus to 0s
 	ret = dm_read_reg(dev, DM_SMIREG, &temp);   // Must clear data bus before we can read the 'MODE9620' bit
@@ -901,7 +903,9 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
 	}
 	else priv->mode_9620 = temp & DM_MODE9620;
 
-	printk(KERN_WARNING "[dm96] 9620 Mode = %d\n", priv->mode_9620);
+#ifdef DEBUG
+	printk("[dm96] 9620 Mode = %d\n", priv->mode_9620);
+#endif
 	
 	dm_read_reg(dev, DM_TXRX_M, &temp);  // Need to check the Chipset version (register 0x5c is 0x02?)
 	if (temp == 0x02)
@@ -915,7 +919,7 @@ static int dm9620_bind(struct usbnet *dev, struct usb_interface *intf)
   tmpwPtr2= kmalloc (2, GFP_ATOMIC);
 	if (!tmpwPtr2)
 	{
-		printk("+++++++++++ JJ5 dm_read_reg() Error: can not kmalloc!\n"); //usbnet_suspend (intf, message);
+		printk(KERN_ERR "+++++++++++ JJ5 dm_read_reg() Error: can not kmalloc!\n"); //usbnet_suspend (intf, message);
 		return 0; 
 	} 
   ret =dm_read(dev, DM_PID, 2, tmpwPtr2);
@@ -959,12 +963,15 @@ out:
 void dm9620_unbind(struct usbnet *dev, struct usb_interface *intf)
 {
 struct dm96xx_priv* priv= dev->driver_priv;
+#ifdef DEBUG
 	printk("dm9620_unbind():\n");
 
    //printk("flag_fail_count  %lu\n", (long unsigned int)priv->flag_fail_count);
 	printk("flg_txdbg  %lu\n", (long unsigned int)priv->flg_txdbg);
+#endif
 	kfree(dev->driver_priv); // displayed dev->.. above, then can free dev 
 
+#ifdef DEBUG
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,31) 
 	printk("rx_length_errors %lu\n",dev->net->stats.rx_length_errors);
 	printk("rx_over_errors   %lu\n",dev->net->stats.rx_over_errors  );
@@ -979,6 +986,7 @@ struct dm96xx_priv* priv= dev->driver_priv;
 	printk("rx_frame_errors  %lu\n",dev->stats.rx_frame_errors );
 	printk("rx_fifo_errors   %lu\n",dev->stats.rx_fifo_errors  );
 	printk("rx_missed_errors %lu\n",dev->stats.rx_missed_errors);	
+#endif
 #endif
 
 
