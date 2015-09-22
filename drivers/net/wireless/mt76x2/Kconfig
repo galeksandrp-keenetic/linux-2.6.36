@@ -152,6 +152,11 @@ config COC_SUPPORT
 	depends on WIFI_DRIVER
 	default n
 
+config NDM_POWER
+	bool "NDM power adjustment"
+	depends on WIFI_DRIVER
+	default y
+
 menu "PA/LNA settings of 1st card"
 	config FIRST_CARD_EXTERNAL_PA
 		bool "External power amplifier (PA)"
