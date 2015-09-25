@@ -2445,7 +2445,7 @@ static int handle_tx_event(struct xhci_hcd *xhci,
 		 * TD list.
 		 */
 		if (list_empty(&ep_ring->td_list)) {
-			xhci_warn(xhci, "WARN Event TRB for slot %d ep %d "
+			xhci_dbg(xhci, "WARN Event TRB for slot %d ep %d "
 					"with no TDs queued?\n",
 				  TRB_TO_SLOT_ID(le32_to_cpu(event->flags)),
 				  ep_index);
