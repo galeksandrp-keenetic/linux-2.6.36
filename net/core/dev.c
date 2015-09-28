@@ -3536,8 +3536,8 @@ int __skb_bond_should_drop(struct sk_buff *skb, struct net_device *master)
 }
 EXPORT_SYMBOL(__skb_bond_should_drop);
 
-int (*igmp_pthrough)(struct sk_buff *skb) = NULL;
-EXPORT_SYMBOL(igmp_pthrough);
+int (*pppoe_pthrough)(struct sk_buff *skb) = NULL;
+EXPORT_SYMBOL(pppoe_pthrough);
 
 int (*vpn_pthrough)(struct sk_buff *skb, int in) = NULL;
 EXPORT_SYMBOL(vpn_pthrough);
@@ -3777,7 +3777,7 @@ static int __netif_receive_skb(struct sk_buff *skb)
 		goto out;
 	}
 
-	if ( (mhook = rcu_dereference(igmp_pthrough)) && mhook(skb) ) {
+	if ( (mhook = rcu_dereference(pppoe_pthrough)) && mhook(skb) ) {
 		ret = NET_RX_SUCCESS;
 		goto out;
 	}
