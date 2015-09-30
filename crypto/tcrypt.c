@@ -1246,7 +1246,7 @@ static int __init tcrypt_mod_init(void)
 		err = do_test(mode);
 
 	if (err) {
-		printk(KERN_ERR "tcrypt: one or more tests failed!\n");
+		//printk(KERN_ERR "tcrypt: one or more tests failed!\n");
 		goto err_free_tv;
 	}
 
