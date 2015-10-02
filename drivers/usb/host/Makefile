@@ -23,6 +23,8 @@ ifeq ($(CONFIG_FHCI_DEBUG),y)
 fhci-objs += fhci-dbg.o
 endif
 
+obj-$(CONFIG_RALINK_MT7628) += mtk/mtk-phy.o mtk/mtk-phy-7628.o mtk/mtk-phy-ahb.o
+
 obj-$(CONFIG_USB_WHCI_HCD)	+= whci/
 
 obj-$(CONFIG_PCI)		+= pci-quirks.o

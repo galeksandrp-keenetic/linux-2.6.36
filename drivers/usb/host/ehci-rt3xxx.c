@@ -12,6 +12,9 @@
 
 #include <linux/platform_device.h>
 #include "ralink_usb.h"
+#if defined (CONFIG_RALINK_MT7628)
+#include "mtk/mtk-phy.h"
+#endif
 
 
 void static inline rt_writel(u32 val, unsigned long reg)
@@ -30,6 +33,9 @@ static void rt_set_host(void)
 	// host mode
 	val |= USB0_HOST_MODE;		
 	rt_writel(val, SYSCFG1);
+#if defined (CONFIG_RALINK_MT7628)
+	mdelay (100);
+#endif
 }
 
 #if 0
@@ -144,6 +150,11 @@ static int rt3xxx_ehci_probe(struct platform_device *pdev)
 
 	// wake up usb module from power saving mode...
 	try_wake_up();
+
+#if defined (CONFIG_RALINK_MT7628)
+	/* MTK PHY init */
+	mt7628_phy_init();
+#endif
 
 #ifdef CONFIG_USB_GADGET_RT
 #warning	"*********************************************************"

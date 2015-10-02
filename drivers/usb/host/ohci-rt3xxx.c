@@ -17,6 +17,9 @@
 #include <linux/platform_device.h>
 
 #include "ralink_usb.h"
+#if defined (CONFIG_RALINK_MT7628)
+#include "mtk/mtk-phy.h"
+#endif
 
 static int usb_hcd_rt3xxx_probe(const struct hc_driver *driver, struct platform_device *pdev)
 {
@@ -52,6 +55,10 @@ static int usb_hcd_rt3xxx_probe(const struct hc_driver *driver, struct platform_
 
 	try_wake_up();
 
+#if defined (CONFIG_RALINK_MT7628)
+	/* MTK PHY init */
+	mt7628_phy_init();
+#endif
 	ohci_hcd_init(hcd_to_ohci(hcd));
 
 	retval = usb_add_hcd(hcd, pdev->resource[1].start, IRQF_DISABLED | IRQF_SHARED);

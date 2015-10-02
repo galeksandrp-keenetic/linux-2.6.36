@@ -37,3 +37,4 @@ obj-$(CONFIG_RALINK_RT3352) +=  ehci_ohci.o udc.o
 obj-$(CONFIG_RALINK_RT5350) +=  ehci_ohci.o udc.o
 obj-$(CONFIG_RALINK_RT6855) +=  ehci_ohci.o udc.o
 obj-$(CONFIG_RALINK_MT7620) +=  ehci_ohci.o udc.o
+obj-$(CONFIG_RALINK_MT7628) +=  ehci_ohci.o udc.o
