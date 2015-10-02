@@ -3578,6 +3578,9 @@ EXPORT_SYMBOL(prebind_from_pppoetx);
 void (*prebind_from_raeth)(struct sk_buff * skb) = NULL;
 EXPORT_SYMBOL(prebind_from_raeth);
 
+void (*prebind_from_usb_mac)(struct sk_buff * skb) = NULL;
+EXPORT_SYMBOL(prebind_from_usb_mac);
+
 void (*swnat_add_stats_l2tp)(u32 saddr, u32 daddr, u16 sport, u16 dport,
 	u32 sent_bytes, u32 sent_packets, u32 recv_bytes, u32 recv_packets) = NULL;
 EXPORT_SYMBOL(swnat_add_stats_l2tp);

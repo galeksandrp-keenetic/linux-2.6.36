@@ -14,11 +14,11 @@
 #define FAST_VPN_RES_OK			1
 #define FAST_VPN_RES_SKIPPED	0
 
-
 /* SWNAT section */
 
 #define SWNAT_ORIGIN_RAETH		0x10
 #define SWNAT_ORIGIN_RT2860		0x20
+#define SWNAT_ORIGIN_USB_MAC	0x30
 
 /* 32-th bit */
 #define SWNAT_FNAT_MARK		0x80000000

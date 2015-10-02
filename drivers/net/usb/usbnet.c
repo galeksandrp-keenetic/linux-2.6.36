@@ -53,6 +53,12 @@
 #include <linux/foe_hook.h>
 #endif
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+#include <net/fast_vpn.h>
+extern int (*go_swnat)(struct sk_buff * skb, u8 origin);
+extern void (*prebind_from_usb_mac)(struct sk_buff * skb);
+#endif
+
 #define DRIVER_VERSION		"22-Aug-2005"
 
 /*-------------------------------------------------------------------------*/
@@ -230,6 +236,9 @@ static int init_status (struct usbnet *dev, struct usb_interface *intf)
 void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 {
 	int	status;
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	int (*swnat)(struct sk_buff * skb, u8 origin);
+#endif // defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
 	if (test_bit(EVENT_RX_PAUSED, &dev->flags)) {
 		skb_queue_tail(&dev->rxq_pause, skb);
@@ -260,7 +269,22 @@ void usbnet_skb_return (struct usbnet *dev, struct sk_buff *skb)
 			netif_dbg(dev, rx_err, dev->net, "netif_rx status %d\n", status);
 	}
 #else
-	status = netif_rx (skb);
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	rcu_read_lock();
+	if ((NULL == (swnat = rcu_dereference(go_swnat))) || (!swnat(skb, SWNAT_ORIGIN_USB_MAC)))
+	{
+		rcu_read_unlock();
+		status = netif_rx(skb);
+	} else
+	{
+		rcu_read_unlock();
+		status = NET_RX_SUCCESS;
+	}
+#else // defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	status = netif_rx(skb);
+#endif // defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+
 	if (status != NET_RX_SUCCESS)
 		netif_dbg(dev, rx_err, dev->net,
 			  "netif_rx status %d\n", status);
@@ -1085,6 +1109,10 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 	u8 *new_addr;
 #endif
 
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
+	void (*swnat_prebind)(struct sk_buff * skb);
+#endif
+
 	// some devices want funky USB-level framing, for
 	// win32 driver (usually) and/or hardware quirks
 	if (info->tx_fixup) {
@@ -1109,6 +1137,16 @@ netdev_tx_t usbnet_start_xmit (struct sk_buff *skb,
 		skb->data -= 4;
 	}
 #endif
+
+
+#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE) // {
+	rcu_read_lock();
+	if ((skb != NULL) && (SWNAT_PPP_CHECK_MARK(skb) || SWNAT_FNAT_CHECK_MARK(skb)) &&
+		(NULL != (swnat_prebind = rcu_dereference(prebind_from_usb_mac)))) {
+		swnat_prebind(skb);
+	}
+	rcu_read_unlock();
+#endif // }
 
 	entry = (struct skb_data *) skb->cb;
 	entry->urb = urb;
