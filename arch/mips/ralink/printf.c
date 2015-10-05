@@ -88,10 +88,19 @@ char getPromChar(void)
 
 void __init prom_setup_printf(int tty_no)
 {
+#if defined (CONFIG_RALINK_MT7621) || defined (CONFIG_RALINK_MT7628)
+	if (tty_no == 1)
+		uart_base = RALINK_UART_LITE_BASE;
+	else if (tty_no == 2)
+		uart_base = RALINK_UART_LITE3_BASE;
+	else	/* Default = ttys0 */
+		uart_base = RALINK_UART_LITE2_BASE;
+#else
 	if (tty_no == 1)
 		uart_base = RALINK_UART_LITE_BASE;
 	else	/* Default = ttys0 */
 		uart_base = RALINK_UART_BASE;
+#endif
 }
 
 static DEFINE_SPINLOCK(con_lock);
