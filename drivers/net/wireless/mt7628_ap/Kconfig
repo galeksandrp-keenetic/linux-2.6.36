@@ -107,6 +107,10 @@ config RTMP_FLASH_SUPPORT
 	bool "RTMP flash support"
 	default y
 
+config RTMP_EFUSE_SUPPORT
+	bool "RTMP eFUSE support"
+	default n
+
 config RTMP_TEMPERATURE_TX_ALC
 	bool "Temperature TX ALC"
 	default n
