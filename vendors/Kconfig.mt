@@ -1,9 +1,9 @@
-menu "MTK module (MT7602E && MT7612E)"
+menu "MediaTek modules"
 
-menuconfig WIFI_DRIVER
-	bool "Wi-Fi driver support"
+menuconfig MT76X2
+	bool "MT7602E && MT7612E Wi-Fi driver"
 
-if WIFI_DRIVER
+if MT76X2
 
 choice
 	prompt "Choose first Wi-Fi interface"
@@ -131,11 +131,19 @@ if CONFIG_METHOD_NEW
 		select RTMP_PCI_SUPPORT
 endif # CONFIG_METHOD_NEW
 
-endif # WIFI_DRIVER
+endif # MT76X2
 
 config RTDEV
 	bool
-	default y if WIFI_DRIVER && !SECOND_IF_NONE || RTDEV_MII
+	default y if MT76X2 && !SECOND_IF_NONE || RTDEV_MII
 	default y if RTDEV_PLC
+
+menuconfig MT7628
+	bool "MT7628 SoC Wi-Fi driver"
+
+if MT7628
+source "drivers/net/wireless/mt7628_ap/Kconfig"
+endif # MT7628
+
 endmenu
 

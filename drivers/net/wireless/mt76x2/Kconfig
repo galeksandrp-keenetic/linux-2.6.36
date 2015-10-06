@@ -6,178 +6,178 @@ config WIFI_BASIC_FUNC
 
 config WSC_INCLUDED
 	bool "WSC (Wi-Fi simple configuration)"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default y
 
 config WSC_V2_SUPPORT
 	bool "WSC V2 (Wi-Fi simple configuration version 2.0)"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default y
 
 config DOT11N_DRAFT3
 	bool "802.11n Draft3"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config DOT11_VHT_AC
 	bool "802.11ac"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config DOT11W_PMF_SUPPORT
 	bool "PMF support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config TXBF_SUPPORT
 	bool "TX beamforming support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config WMM_ACM_SUPPORT
 	bool "WMM ACM"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config LLTD_SUPPORT
 	bool "LLTD (link layer topology discovery protocol)"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config QOS_DLS_SUPPORT
 	bool "802.11e DLS (direct-link setup) support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config WAPI_SUPPORT
 	bool "WAPI support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config CARRIER_DETECTION_SUPPORT
 	bool "Carrier detection"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config ED_MONITOR_SUPPORT
 	bool "ED CCA monitor support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config IGMP_SNOOP_SUPPORT
 	bool "IGMP snooping"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default y
 
 config BLOCK_NET_IF
 	bool "NETIF block"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config VIDEO_TURBINE_SUPPORT
 	bool "Video turbine support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config RATE_ADAPTION
 	bool "New rate adaptation support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config NEW_RATE_ADAPT_SUPPORT
 	bool "Intelligent rate adaption"
 	depends on RATE_ADAPTION
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default y
 
 config AGS_SUPPORT
 	bool "Adaptive group switching"
 	depends on RATE_ADAPTION
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config IDS_SUPPORT
 	bool "IDS (intrusion detection system) support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config WIFI_WORK_QUEUE
 	bool "Work queue"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config RTMP_FLASH_SUPPORT
 	bool "Flash support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config LED_CONTROL_SUPPORT
 	bool "LED control support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default y
 
 config SINGLE_SKU_V2
 	bool "Single SKU V2"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config ATE_SUPPORT
 	bool "ATE/QA support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config WIFI_DEBUG_SUPPORT
 	bool "Debug mode support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config AP_32B_DESC
 	bool "32 byte descriptor support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config RTMP_INTERNAL_TX_ALC
 	bool "TSSI compensation"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	depends on RALINK_RT6352
 	default n
 
 config HOTSPOT
 	bool "Passpoint-R1 support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config COC_SUPPORT
 	bool "Co-clock support"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default n
 
 config NDM_POWER
 	bool "NDM power adjustment"
-	depends on WIFI_DRIVER
+	depends on MT76X2
 	default y
 
 menu "PA/LNA settings of 1st card"
 	config FIRST_CARD_EXTERNAL_PA
 		bool "External power amplifier (PA)"
-		depends on WIFI_DRIVER
+		depends on MT76X2
 		default n
 
 	config FIRST_CARD_EXTERNAL_LNA
 		bool "External low-noise amplifier (LNA)"
-		depends on WIFI_DRIVER
+		depends on MT76X2
 		default n
 endmenu
 
 menu "PA/LNA settings of 2nd card"
 	config SECOND_CARD_EXTERNAL_PA
 		bool "External power amplifier (PA)"
-		depends on WIFI_DRIVER
+		depends on MT76X2
 		default n
 
 	config SECOND_CARD_EXTERNAL_LNA
 		bool "External low-noise amplifier (LNA)"
-		depends on WIFI_DRIVER
+		depends on MT76X2
 		default n
 endmenu
 
