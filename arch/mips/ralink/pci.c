@@ -1445,7 +1445,7 @@ pcie(2/1/0) link status	pcie2_num	pcie1_num	pcie0_num
 	}
 	printk(" -> %x\n", RALINK_PCI_PCICFG_ADDR);
 #elif defined(CONFIG_RALINK_MT7628)
-	printk("\n*************** MT7628 PCIe RC mode *************\n");
+	printk(KERN_INFO "*************** MT7628 PCIe RC mode *************\n");
 	mdelay(500);
 	if(( RALINK_PCI0_STATUS & 0x1) == 0)
 	{
