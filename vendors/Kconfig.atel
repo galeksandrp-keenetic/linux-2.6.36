@@ -1,5 +1,4 @@
-
-menu "Atel Modules"
+menu "Atel modules"
 
 config USBNET_ATEL_LTE
         tristate "Atel LTE CDC USB modem driver"

@@ -1,5 +1,4 @@
-menu "Ralink Module"
-
+menu "Ralink modules"
 
 config  RALINK_HWCRYPTO
 	depends on RALINK_MT7621 || MIPS_RT63365
