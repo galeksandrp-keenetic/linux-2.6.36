@@ -192,9 +192,29 @@ int ip_call_ra_chain(struct sk_buff *skb)
 	return 0;
 }
 
+extern int (*l2tp_input)(struct sk_buff *skb);
+
 static int ip_local_deliver_finish(struct sk_buff *skb)
 {
+	struct udphdr *udp;
+	struct iphdr *iph;
+	int (*l2tp_rx)(struct sk_buff *skb);
 	struct net *net = dev_net(skb->dev);
+
+	/* Do recv l2tp not only from Ethernet */
+	rcu_read_lock();
+	if (iph = ip_hdr(skb)) {
+		if( iph->protocol == IPPROTO_UDP &&
+				(udp = (struct udphdr*)((char *)iph + (iph->ihl << 2))) &&
+				udp->dest == htons(1701) &&
+				udp->source == htons(1701) &&
+				(l2tp_rx = rcu_dereference(l2tp_input)) &&
+				l2tp_rx(skb) == 1 ) {
+			rcu_read_unlock();
+			return 0;
+		}
+	}
+	rcu_read_unlock();
 
 	__skb_pull(skb, ip_hdrlen(skb));
 
@@ -253,8 +273,6 @@ static int ip_local_deliver_finish(struct sk_buff *skb)
 
 	return 0;
 }
-
-extern int (*l2tp_input)(struct sk_buff *skb);
 
 /*
  * 	Deliver IP Packets to the higher protocol layers.
