@@ -1063,7 +1063,7 @@ static struct rtnl_link_stats64* ppp_get_stats64(struct net_device *dev, struct 
 	struct rtnl_link_stats64 hw_nat_stats;
 	memset(&hw_nat_stats, 0, sizeof(hw_nat_stats));
 	if (ra_sw_nat_hook_get_stats)
-		if (!ra_sw_nat_hook_get_stats(dev->name, &hw_nat_stats)) {
+		if (!ra_sw_nat_hook_get_stats(dev, &hw_nat_stats)) {
 			ppp->stats64.tx_bytes += hw_nat_stats.tx_bytes;
 			ppp->stats64.tx_packets += hw_nat_stats.tx_packets;
 			ppp->stats64.rx_bytes += hw_nat_stats.rx_bytes;

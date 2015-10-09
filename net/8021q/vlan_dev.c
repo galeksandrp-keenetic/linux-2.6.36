@@ -978,7 +978,7 @@ static struct rtnl_link_stats64 *vlan_dev_get_stats64(struct net_device *dev, st
 	struct rtnl_link_stats64 hw_nat_stats;
 	memset(&hw_nat_stats, 0, sizeof(hw_nat_stats));
 	if (ra_sw_nat_hook_get_stats)
-		if (!ra_sw_nat_hook_get_stats(dev->name, &hw_nat_stats)) {
+		if (!ra_sw_nat_hook_get_stats(dev, &hw_nat_stats)) {
 			struct netdev_queue *txq = netdev_get_tx_queue(dev, 0);
 			txq->tx_bytes += hw_nat_stats.tx_bytes;
 			txq->tx_packets += hw_nat_stats.tx_packets;

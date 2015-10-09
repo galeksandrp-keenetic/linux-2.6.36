@@ -20,7 +20,8 @@
 enum AcRuleType {
 	AC_MAC_GROUP = 0,
 	AC_IP_GROUP = 1,
-	AC_VLAN_GROUP = 2
+	AC_VLAN_GROUP = 2,
+	AC_PPPOE_GROUP = 3
 };
 
 enum AcType {
@@ -31,6 +32,11 @@ enum AcType {
 enum AcCntType {
 	AC_BYTE_CNT = 0,
 	AC_PKT_CNT = 1
+};
+
+enum AcSyncType {
+	AC_NO_SYNC,
+	AC_SYNC
 };
 
 typedef struct {
@@ -44,6 +50,7 @@ typedef struct {
 	uint32_t IpE;		/* end of ip */
 	uint32_t IpProto;	/* ip protocol */
 	uint16_t VLAN:12;	/* VLAN ID */
+	uint16_t PppoeId;	/* PPPoE session ID */
 	uint8_t AgIdx;		/* accounting group number */
 } AcPlcyNode;
 
@@ -55,8 +62,8 @@ uint32_t AcInsIp(AcPlcyNode * node);
 uint32_t AcInsVlan(AcPlcyNode * node);
 uint32_t AcInsPpp(AcPlcyNode * node);
 
-uint32_t AcAddNode(AcPlcyNode * NewNode);
-uint32_t AcDelNode(AcPlcyNode * NewNode);
+uint32_t AcAddNode(AcPlcyNode * NewNode, int * Grp, enum AcSyncType Sync);
+uint32_t AcDelNode(AcPlcyNode * NewNode, enum AcSyncType Sync);
 
 void SyncAcTbl(void);
 uint32_t AcCleanTbl(void);
@@ -72,7 +79,7 @@ uint16_t PpeGetPostAcEnd(void);
 int PpeGetFreeAcGrp(void);
 void PpeSetFreeAcGrp(uint32_t AcNum);
 
-AcPlcyNode *AcExistNode(AcPlcyNode * NewNode);
+bool AcExistNode(AcPlcyNode * NewNode);
 uint32_t AcGetCnt(AcPlcyNode * SearchNode, enum AcCntType AcCntType);
 
 #endif

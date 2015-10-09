@@ -56,7 +56,7 @@ int (*ra_sw_nat_hook_foeentry) (void * inputvalue,int operation) = NULL;
 void (*ra_sw_nat_hook_pse_stats) (struct psepkt_stats* pf,int port) = NULL;
 void (*ra_sw_nat_hook_release_dstport) (uint32_t port) = NULL;
 void (*ra_sw_nat_hook_acquire_dstport) (uint32_t port, char *name) = NULL;
-int (*ra_sw_nat_hook_get_stats) (char *ifname, struct rtnl_link_stats64 *out_stats) = NULL;
+int (*ra_sw_nat_hook_get_stats) (struct net_device *dev, struct rtnl_link_stats64 *out_stats) = NULL;
 
 
 
