@@ -103,6 +103,10 @@ config WIFI_DEBUG_SUPPORT
 	bool "Debug mode support"
 	default n
 
+config MEMORY_OPTIMIZATION
+	bool "Enable memory optimization"
+	default y
+
 config RTMP_FLASH_SUPPORT
 	bool "RTMP flash support"
 	default y
