@@ -34,9 +34,7 @@
 #define __LINUX_USB_CH9_H
 
 #include <linux/types.h>	/* __u8 etc */
-#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
 #include <asm/byteorder.h>	/* le16_to_cpu */
-#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 /*-------------------------------------------------------------------------*/
 
@@ -402,7 +400,6 @@ struct usb_endpoint_descriptor {
 #define USB_ENDPOINT_MAX_ADJUSTABLE	0x80
 
 
-#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
 /* The USB 3.0 spec redefines bits 5:4 of bmAttributes as interrupt ep type. */
 #define USB_ENDPOINT_INTRTYPE		0x30
 #define USB_ENDPOINT_INTR_PERIODIC	(0 << 4)
@@ -418,7 +415,6 @@ struct usb_endpoint_descriptor {
 #define USB_ENDPOINT_USAGE_DATA		0x00
 #define USB_ENDPOINT_USAGE_FEEDBACK	0x10
 #define USB_ENDPOINT_USAGE_IMPLICIT_FB	0x20	/* Implicit feedback Data endpoint */
-#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 /*-------------------------------------------------------------------------*/
 
@@ -600,7 +596,6 @@ static inline int usb_endpoint_is_isoc_out(
 	return usb_endpoint_xfer_isoc(epd) && usb_endpoint_dir_out(epd);
 }
 
-#if defined(CONFIG_USB_MT7621_XHCI_HCD) || defined(CONFIG_USB_MT7621_XHCI_HCD_MODULE)
 /**
  * usb_endpoint_maxp - get endpoint's max packet size
  * @epd: endpoint to be checked
@@ -617,7 +612,6 @@ static inline int usb_endpoint_interrupt_type(
 {
 	return epd->bmAttributes & USB_ENDPOINT_INTRTYPE;
 }
-#endif // CONFIG_USB_MT7621_XHCI_HCD
 
 /*-------------------------------------------------------------------------*/
 
