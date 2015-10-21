@@ -5261,7 +5261,7 @@ void sched_show_task(struct task_struct *p)
 	else
 		printk(KERN_CONT " %016lx ", thread_saved_pc(p));
 #endif
-#if defined(CONFIG_DEBUG_STACK_USAGE) || defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
+#ifdef CONFIG_DEBUG_STACK_USAGE
 	free = stack_not_used(p);
 #endif
 	printk(KERN_CONT "%5lu %5d %6d 0x%08lx\n", free,

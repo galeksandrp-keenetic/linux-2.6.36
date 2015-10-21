@@ -116,7 +116,7 @@ static struct kmem_cache *task_struct_cachep;
 #ifndef __HAVE_ARCH_THREAD_INFO_ALLOCATOR
 static inline struct thread_info *alloc_thread_info(struct task_struct *tsk)
 {
-#if defined(CONFIG_DEBUG_STACK_USAGE) || defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
+#ifdef CONFIG_DEBUG_STACK_USAGE
 	gfp_t mask = GFP_KERNEL | __GFP_ZERO;
 #else
 	gfp_t mask = GFP_KERNEL;

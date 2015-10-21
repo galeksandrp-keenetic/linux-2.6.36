@@ -2249,7 +2249,7 @@ static inline int object_is_on_stack(void *obj)
 
 extern void thread_info_cache_init(void);
 
-#if defined(CONFIG_DEBUG_STACK_USAGE) || defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
+#ifdef CONFIG_DEBUG_STACK_USAGE
 static inline unsigned long stack_not_used(struct task_struct *p)
 {
 	unsigned long *n = end_of_stack(p);

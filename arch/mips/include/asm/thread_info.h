@@ -96,11 +96,7 @@ register struct thread_info *__current_thread_info __asm__("$28");
 #ifdef CONFIG_DEBUG_STACK_USAGE
 #define alloc_thread_info(tsk) kzalloc(THREAD_SIZE, GFP_KERNEL)
 #else
-#if defined(CONFIG_CPU_TC3162) || defined(CONFIG_MIPS_TC3262)
-#define alloc_thread_info(tsk) kzalloc(THREAD_SIZE, GFP_KERNEL)
-#else
 #define alloc_thread_info(tsk) kmalloc(THREAD_SIZE, GFP_KERNEL)
-#endif
 #endif
 
 #define free_thread_info(info) kfree(info)
