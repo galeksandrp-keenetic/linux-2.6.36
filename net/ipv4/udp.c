@@ -1538,6 +1538,22 @@ static int __udp4_lib_mcast_deliver(struct net *net, struct sk_buff *skb,
 	return 0;
 }
 
+int udp4_mcast_deliver(struct sk_buff *skb, struct udphdr *uh,
+				    __be32 saddr, __be32 daddr) {
+
+	if (!pskb_may_pull(skb, sizeof(struct udphdr))) {
+		return -1;		/* No space for header. */
+	}
+
+	if (ntohs(uh->len) > skb->len) {
+		return -1;
+	}
+
+	return __udp4_lib_mcast_deliver(&init_net, skb, uh, saddr, daddr, &udp_table);
+}
+
+EXPORT_SYMBOL(udp4_mcast_deliver);
+
 /* Initialize UDP checksum. If exited with zero value (success),
  * CHECKSUM_UNNECESSARY means, that no more checks are required.
  * Otherwise, csum completion requires chacksumming packet body,
@@ -1692,6 +1708,8 @@ int udp_rcv(struct sk_buff *skb)
 
 	return __udp4_lib_rcv(skb, &udp_table, IPPROTO_UDP);
 }
+EXPORT_SYMBOL(udp_rcv);
+
 
 void udp_destroy_sock(struct sock *sk)
 {

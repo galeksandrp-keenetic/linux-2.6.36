@@ -1,6 +1,7 @@
 #ifndef __FAST_VPN_H_
 #define __FAST_VPN_H_
 
+#include <linux/list.h>
 
 #define FAST_VPN_RECV			1
 // By default, send through tasklets
@@ -103,5 +104,16 @@ do { \
 } while (0);
 
 /* End of MC probe mark */
+
+/* List of new MC streams */
+
+struct new_mc_streams {
+	u32 group_addr;
+	struct net_device * out_dev;
+	u32 handled;
+
+	struct list_head list;
+};
+
 
 #endif //__FAST_VPN_H_

@@ -3591,6 +3591,9 @@ EXPORT_SYMBOL(prebind_from_mc_preroute);
 void (*prebind_from_mc_output)(struct sk_buff * skb, u8 origin) = NULL;
 EXPORT_SYMBOL(prebind_from_mc_output);
 
+void (*update_mc_streams)(struct new_mc_streams * streams_list) = NULL;
+EXPORT_SYMBOL(update_mc_streams);
+
 #endif //#if defined(CONFIG_FAST_NAT) || defined(CONFIG_FAST_NAT_MODULE)
 
 static int __netif_receive_skb(struct sk_buff *skb)
