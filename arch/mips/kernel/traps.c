@@ -628,6 +628,7 @@ void __noreturn die(const char *str, struct pt_regs *regs)
 		panic("Fatal exception");
 	}
 
+	oops_exit();
 	do_exit(sig);
 }
 
