@@ -3539,6 +3539,9 @@ EXPORT_SYMBOL(__skb_bond_should_drop);
 int (*pppoe_pthrough)(struct sk_buff *skb) = NULL;
 EXPORT_SYMBOL(pppoe_pthrough);
 
+int (*ipv6_pthrough)(struct sk_buff *skb) = NULL;
+EXPORT_SYMBOL(ipv6_pthrough);
+
 int (*vpn_pthrough)(struct sk_buff *skb, int in) = NULL;
 EXPORT_SYMBOL(vpn_pthrough);
 
@@ -3608,6 +3611,7 @@ static int __netif_receive_skb(struct sk_buff *skb)
 	__be16 type;
 	int (*vhook)(struct sk_buff *skb, int in);
 	int (*mhook)(struct sk_buff *skb);
+	int (*ipv6hook)(struct sk_buff *skb);
 
 #if defined(CONFIG_TCSUPPORT_PON_VLAN)
 	int vlan_mode = MODE_HGU;
@@ -3784,6 +3788,11 @@ static int __netif_receive_skb(struct sk_buff *skb)
 	}
 
 	if ( (mhook = rcu_dereference(pppoe_pthrough)) && mhook(skb) ) {
+		ret = NET_RX_SUCCESS;
+		goto out;
+	}
+
+	if ( (ipv6hook = rcu_dereference(ipv6_pthrough)) && ipv6hook(skb) ) {
 		ret = NET_RX_SUCCESS;
 		goto out;
 	}
