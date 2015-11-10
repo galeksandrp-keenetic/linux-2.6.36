@@ -1544,12 +1544,14 @@ int usb_hcd_unlink_urb (struct urb *urb, int status)
 		retval = 0;
 		usb_get_dev(urb->dev);
 	}
-	spin_unlock_irqrestore(&hcd_urb_unlink_lock, flags);
 	if (retval == 0) {
-		hcd = bus_to_hcd(urb->dev->bus);
-		retval = unlink1(hcd, urb, status);
+		if (urb->dev != NULL) {
+			hcd = bus_to_hcd(urb->dev->bus);
+			retval = unlink1(hcd, urb, status);
+		}
 		usb_put_dev(urb->dev);
 	}
+	spin_unlock_irqrestore(&hcd_urb_unlink_lock, flags);
 
 	if (retval == 0)
 		retval = -EINPROGRESS;
