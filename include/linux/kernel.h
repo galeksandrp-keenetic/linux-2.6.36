@@ -37,7 +37,7 @@ extern const char linux_proc_banner[];
 #define LLONG_MIN	(-LLONG_MAX - 1)
 #define ULLONG_MAX	(~0ULL)
 
-#ifdef CONFIG_TC3162_IMEM
+#if defined(CONFIG_TC3162_IMEM) && !defined(CONFIG_FUNCTION_GRAPH_TRACER)
 #define __IMEM  __attribute__  ((__section__(".imem_text")))
 #else
 #define __IMEM
