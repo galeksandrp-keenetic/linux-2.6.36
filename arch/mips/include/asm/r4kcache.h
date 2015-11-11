@@ -236,7 +236,6 @@ static inline void invalidate_tcache_page(unsigned long addr)
 }
 
 #define cache16_unroll32(base,op)					\
-	__asm__ __volatile__("	nop;\n");				\
 	__asm__ __volatile__(						\
 	"	.set push					\n"	\
 	"	.set noreorder					\n"	\
@@ -263,7 +262,6 @@ static inline void invalidate_tcache_page(unsigned long addr)
 		  "i" (op));
 
 #define cache32_unroll32(base,op)					\
-	__asm__ __volatile__("	nop;\n");				\
 	__asm__ __volatile__(						\
 	"	.set push					\n"	\
 	"	.set noreorder					\n"	\
@@ -290,7 +288,6 @@ static inline void invalidate_tcache_page(unsigned long addr)
 		  "i" (op));
 
 #define cache64_unroll32(base,op)					\
-	__asm__ __volatile__("	nop;\n");				\
 	__asm__ __volatile__(						\
 	"	.set push					\n"	\
 	"	.set noreorder					\n"	\
@@ -317,7 +314,6 @@ static inline void invalidate_tcache_page(unsigned long addr)
 		  "i" (op));
 
 #define cache128_unroll32(base,op)					\
-	__asm__ __volatile__("	nop;\n");				\
 	__asm__ __volatile__(						\
 	"	.set push					\n"	\
 	"	.set noreorder					\n"	\
