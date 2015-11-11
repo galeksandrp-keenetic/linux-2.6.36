@@ -1263,6 +1263,8 @@ static void option_instat_callback(struct urb *urb)
 			dbg("%s: type %x req %x", __func__,
 				req_pkt->bRequestType, req_pkt->bRequest);
 		}
+	} else if (status == -ENOENT || status == -ESHUTDOWN) {
+		dbg("%s: urb stopped: %d\n", __func__, status);
 	} else
 		err("%s: error %d", __func__, status);
 
