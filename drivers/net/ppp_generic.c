@@ -96,7 +96,12 @@ struct ppp_file {
 #define PF_TO_PPP(pf)		PF_TO_X(pf, struct ppp)
 #define PF_TO_CHANNEL(pf)	PF_TO_X(pf, struct channel)
 
-struct ppp_link_stats64 {
+/*
+ * Data structure to hold primary network stats for which
+ * we want to use 64 bit storage.  Other network stats
+ * are stored in dev->stats of the ppp strucute.
+ */
+struct ppp_link_stats {
 	u64 rx_packets;
 	u64 tx_packets;
 	u64 rx_bytes;
@@ -140,13 +145,13 @@ struct ppp {
 	u32		minseq;		/* MP: min of most recent seqnos */
 	struct sk_buff_head mrq;	/* MP: receive reconstruction queue */
 #endif /* CONFIG_PPP_MULTILINK */
-	struct ppp_link_stats64 stats64;
 #ifdef CONFIG_PPP_FILTER
 	struct sock_filter *pass_filter;	/* filter for packets to pass */
 	struct sock_filter *active_filter;/* filter for pkts to reset idle */
 	unsigned pass_len, active_len;
 #endif /* CONFIG_PPP_FILTER */
 	struct net	*ppp_net;	/* the net we belong to */
+	struct ppp_link_stats stats64;	/* 64 bit network stats */
 };
 
 /*
@@ -1071,10 +1076,15 @@ static struct rtnl_link_stats64* ppp_get_stats64(struct net_device *dev, struct 
 		}
 #endif
 
+	ppp_recv_lock(ppp);
 	stats64->rx_packets = ppp->stats64.rx_packets;
 	stats64->rx_bytes   = ppp->stats64.rx_bytes;
+	ppp_recv_unlock(ppp);
+
+	ppp_xmit_lock(ppp);
 	stats64->tx_packets = ppp->stats64.tx_packets;
 	stats64->tx_bytes   = ppp->stats64.tx_bytes;
+	ppp_xmit_unlock(ppp);
 
 	stats64->rx_errors        = dev->stats.rx_errors;
 	stats64->tx_errors        = dev->stats.tx_errors;
