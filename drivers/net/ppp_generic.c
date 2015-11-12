@@ -2639,8 +2639,8 @@ void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb)
 	skb->dev = pch->ppp->dev;
 
 	ppp_recv_lock(ppp);
-	ppp->stats64.rx_packets++;
 	ppp->stats64.rx_bytes += skb->len;
+	ppp->stats64.rx_packets++;
 	ppp_recv_unlock(ppp);
 
 	skb->dev->last_rx = jiffies;
@@ -2659,8 +2659,8 @@ void ppp_stat_add_tx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes)
 		return;
 
 	ppp_xmit_lock(ppp);
-	ppp->stats64.tx_packets += add_pkt;
 	ppp->stats64.tx_bytes += add_bytes;
+	ppp->stats64.tx_packets += add_pkt;
 	ppp_xmit_unlock(ppp);
 }
 
@@ -2677,10 +2677,33 @@ void ppp_stat_add_rx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes)
 		return;
 
 	ppp_recv_lock(ppp);
-	ppp->stats64.rx_packets += add_pkt;
 	ppp->stats64.rx_bytes += add_bytes;
+	ppp->stats64.rx_packets += add_pkt;
 	ppp_recv_unlock(ppp);
 }
+
+void ppp_stats_set(struct net_device *dev,
+		   u64 rx_bytes, u64 rx_packets,
+		   u64 tx_bytes, u64 tx_packets)
+{
+	struct ppp *ppp;
+
+	if (dev == NULL)
+		return;
+
+	ppp = netdev_priv(dev);
+
+	ppp_xmit_lock(ppp);
+	ppp->stats64.tx_bytes = tx_bytes;
+	ppp->stats64.tx_packets = tx_packets;
+	ppp_xmit_unlock(ppp);
+
+	ppp_recv_lock(ppp);
+	ppp->stats64.rx_bytes = rx_bytes;
+	ppp->stats64.rx_packets = rx_packets;
+	ppp_recv_unlock(ppp);
+}
+
 /*
  * Stuff for handling the lists of ppp units and channels
  * and for initialization.
@@ -3089,6 +3112,7 @@ EXPORT_SYMBOL(ppp_input);
 EXPORT_SYMBOL(ppp_stat_add);
 EXPORT_SYMBOL(ppp_stat_add_tx);
 EXPORT_SYMBOL(ppp_stat_add_rx);
+EXPORT_SYMBOL(ppp_stats_set);
 EXPORT_SYMBOL(ppp_input_error);
 EXPORT_SYMBOL(ppp_output_wakeup);
 EXPORT_SYMBOL(ppp_register_compressor);
