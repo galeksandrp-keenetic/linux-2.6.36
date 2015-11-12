@@ -2624,31 +2624,62 @@ ppp_get_stats(struct ppp *ppp, struct ppp_stats *st)
 	st->vj.vjs_compressedin = vj->sls_i_compressed;
 }
 
-void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb) {
+void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb)
+{
 	struct channel *pch = chan->ppp;
+	struct ppp *ppp;
 	
-	if (pch == 0 || pch->ppp == 0 ) return;
-	
+	if (pch == NULL)
+		return;
+
+	ppp = pch->ppp;
+	if (ppp == NULL)
+		return;
+
 	skb->dev = pch->ppp->dev;
-	pch->ppp->stats64.rx_packets++;
-	pch->ppp->stats64.rx_bytes += skb->len;
+
+	ppp_recv_lock(ppp);
+	ppp->stats64.rx_packets++;
+	ppp->stats64.rx_bytes += skb->len;
+	ppp_recv_unlock(ppp);
+
 	skb->dev->last_rx = jiffies;
 }
 
-void ppp_stat_add_tx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes) {
+void ppp_stat_add_tx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes)
+{
 	struct channel *pch = chan->ppp;
+	struct ppp *ppp;
 
-	if (pch == 0 || pch->ppp == 0 ) return;
-	pch->ppp->stats64.tx_packets += add_pkt;
-	pch->ppp->stats64.tx_bytes += add_bytes;
+	if (pch == NULL)
+		return;
+
+	ppp = pch->ppp;
+	if (ppp == NULL)
+		return;
+
+	ppp_xmit_lock(ppp);
+	ppp->stats64.tx_packets += add_pkt;
+	ppp->stats64.tx_bytes += add_bytes;
+	ppp_xmit_unlock(ppp);
 }
 
-void ppp_stat_add_rx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes) {
+void ppp_stat_add_rx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes)
+{
 	struct channel *pch = chan->ppp;
+	struct ppp *ppp;
 
-	if (pch == 0 || pch->ppp == 0 ) return;
-	pch->ppp->stats64.rx_packets += add_pkt;
-	pch->ppp->stats64.rx_bytes += add_bytes;
+	if (pch == NULL)
+		return;
+
+	ppp = pch->ppp;
+	if (ppp == NULL)
+		return;
+
+	ppp_recv_lock(ppp);
+	ppp->stats64.rx_packets += add_pkt;
+	ppp->stats64.rx_bytes += add_bytes;
+	ppp_recv_unlock(ppp);
 }
 /*
  * Stuff for handling the lists of ppp units and channels
