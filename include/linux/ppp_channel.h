@@ -82,6 +82,11 @@ extern int ppp_unit_number(struct ppp_channel *);
 /* Get the device name associated with a channel, or NULL if none */
 extern char *ppp_dev_name(struct ppp_channel *);
 
+/* Set statistics for given device name */
+extern void ppp_stats_set(struct net_device *dev,
+			  u64 rx_bytes, u64 rx_packets,
+			  u64 tx_bytes, u64 tx_packets);
+
 /*
  * SMP locking notes:
  * The channel code must ensure that when it calls ppp_unregister_channel,
