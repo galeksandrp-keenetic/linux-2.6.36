@@ -201,7 +201,7 @@ static int ndm_flash_boot(struct mtd_info *master)
 	}
 
 	// Write new bootloader.
-	size = b.out_pos;
+	size = ALIGN(b.out_pos, master->writesize);
 
 	ret = master->write(master, p_off, size, &len, m);
 	if (ret || len != size) {
