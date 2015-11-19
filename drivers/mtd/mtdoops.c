@@ -32,12 +32,14 @@
 #include <linux/interrupt.h>
 #include <linux/mtd/mtd.h>
 #include <linux/kmsg_dump.h>
+#include <linux/string.h>
 
 /* Maximum MTD partition size */
 #define MTDOOPS_MAX_MTD_SIZE (8 * 1024 * 1024)
 
 #define MTDOOPS_KERNMSG_MAGIC 0x5d005d00
 #define MTDOOPS_HEADER_SIZE   8
+#define MTDOOPS_FORMAT_VERSION 1
 
 static unsigned long record_size = 4096;
 module_param(record_size, ulong, 0400);
@@ -53,6 +55,12 @@ static int dump_oops = 1;
 module_param(dump_oops, int, 0600);
 MODULE_PARM_DESC(dump_oops,
 		"set to 1 to dump oopses, 0 to only dump panics (default 1)");
+
+static char fw_version[25];
+module_param_string(fw_version, fw_version, 25, 0400);
+
+static char fw_name[25];
+module_param_string(fw_name, fw_name, 25, 0400);
 
 static struct mtdoops_context {
 	struct kmsg_dumper dump;
@@ -218,8 +226,8 @@ static void mtdoops_write(struct mtdoops_context *cxt, int panic)
 
 	/* Add mtdoops header to the buffer */
 	hdr = cxt->oops_buf;
-	hdr[0] = cxt->nextcount;
-	hdr[1] = MTDOOPS_KERNMSG_MAGIC;
+	hdr[0] = MTDOOPS_KERNMSG_MAGIC;
+	hdr[1] = MTDOOPS_FORMAT_VERSION;
 
 	if (panic)
 		ret = mtd->panic_write(mtd, cxt->nextpage * record_size,
@@ -297,6 +305,20 @@ static void find_next_position(struct mtdoops_context *cxt)
 	mtdoops_inc_counter(cxt);
 }
 
+static u32 hash_rot13(const char * buf, u32 len)
+{
+
+	u32 hash = 0, i;
+
+	for(i = 0; i < len; i++)
+	{
+		hash += (unsigned char)(buf[i]);
+		hash -= (hash << 13) | (hash >> 19);
+	}
+	
+	return hash;
+}
+
 static void mtdoops_do_dump(struct kmsg_dumper *dumper,
 		enum kmsg_dump_reason reason, const char *s1, unsigned long l1,
 		const char *s2, unsigned long l2)
@@ -305,22 +327,53 @@ static void mtdoops_do_dump(struct kmsg_dumper *dumper,
 			struct mtdoops_context, dump);
 	unsigned long s1_start, s2_start;
 	unsigned long l1_cpy, l2_cpy;
+	unsigned long size;
+	int size_format;
 	char *dst;
 
 	/* Only dump oopses if dump_oops is set */
 	if (reason == KMSG_DUMP_OOPS && !dump_oops)
 		return;
-
-	dst = cxt->oops_buf + MTDOOPS_HEADER_SIZE; /* Skip the header */
-	l2_cpy = min(l2, record_size - MTDOOPS_HEADER_SIZE);
-	l1_cpy = min(l1, record_size - MTDOOPS_HEADER_SIZE - l2_cpy);
+	// sizes of fw_v, fw_n, hash, oops buf, version 
+	size_format = sizeof(u32)*5 + strlen(fw_version) + strlen(fw_name) + MTDOOPS_HEADER_SIZE;
+	dst = cxt->oops_buf + size_format; /* Skip the header */
+	l2_cpy = min(l2, record_size - size_format);
+	l1_cpy = min(l1, record_size - size_format - l2_cpy);
 
 	s2_start = l2 - l2_cpy;
 	s1_start = l1 - l1_cpy;
 
 	memcpy(dst, s1 + s1_start, l1_cpy);
 	memcpy(dst + l1_cpy, s2 + s2_start, l2_cpy);
+	
+	//copy fw_version len
+	dst = cxt->oops_buf + MTDOOPS_HEADER_SIZE;
+	size = strlen(fw_version);
+	memcpy(dst, &size, sizeof(u32));
+	
+	//copy fw_version
+	dst += sizeof(u32);
+	memcpy(dst, fw_version, size);
 
+	//copy fw_name len
+	dst += size;
+	size = strlen(fw_name);
+	memcpy(dst, &size, sizeof(u32));
+
+	//copy fw_name
+	dst += sizeof(u32);
+	memcpy(dst, fw_name, size);
+
+	//hash of oops buf
+	dst += size;
+	size = hash_rot13(cxt->oops_buf + size_format, l1_cpy + l2_cpy);
+	memcpy(dst, &size, sizeof(u32));
+
+	//size of oops buf
+	dst += sizeof(u32);
+	size = l1_cpy + l2_cpy;
+	memcpy(dst, &size, sizeof(u32));
+	
 	/* Panics must be written immediately */
 	if (reason != KMSG_DUMP_OOPS) {
 		if (!cxt->mtd->panic_write)
@@ -422,6 +475,14 @@ static int __init mtdoops_init(void)
 	if (record_size < 4096) {
 		printk(KERN_ERR "mtdoops: record_size must be over 4096 bytes\n");
 		return -EINVAL;
+	}
+	if(strlen(fw_version) == 0){
+	     printk(KERN_ERR"mtdoops: fw version must be supplied\n");
+	     return -EINVAL;
+	}
+	if(strlen(fw_name) == 0){
+	     printk(KERN_ERR"mtdoops: fw name must be supplied\n");
+	     return -EINVAL;
 	}
 
 	/* Setup the MTD device to use */
