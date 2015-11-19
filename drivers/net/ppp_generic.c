@@ -121,6 +121,7 @@ struct ppp {
 	int		n_channels;	/* how many channels are attached 54 */
 	spinlock_t	rlock;		/* lock for receive side 58 */
 	spinlock_t	wlock;		/* lock for transmit side 5c */
+	spinlock_t	slock;		/* lock for statistics */
 	int		mru;		/* max receive unit 60 */
 	unsigned int	flags;		/* control bits 64 */
 	unsigned int	xstate;		/* transmit state bits 68 */
@@ -376,6 +377,8 @@ static const int npindex_to_ethertype[NUM_NP] = {
 				     ppp_recv_lock(ppp); } while (0)
 #define ppp_unlock(ppp)		do { ppp_recv_unlock(ppp); \
 				     ppp_xmit_unlock(ppp); } while (0)
+#define ppp_stats_lock(ppp)	spin_lock_bh(&(ppp)->slock)
+#define ppp_stats_unlock(ppp)	spin_unlock_bh(&(ppp)->slock)
 
 /*
  * /dev/ppp device routines.
@@ -1076,15 +1079,12 @@ static struct rtnl_link_stats64* ppp_get_stats64(struct net_device *dev, struct 
 		}
 #endif
 
-	ppp_recv_lock(ppp);
+	ppp_stats_lock(ppp);
 	stats64->rx_packets = ppp->stats64.rx_packets;
 	stats64->rx_bytes   = ppp->stats64.rx_bytes;
-	ppp_recv_unlock(ppp);
-
-	ppp_xmit_lock(ppp);
 	stats64->tx_packets = ppp->stats64.tx_packets;
 	stats64->tx_bytes   = ppp->stats64.tx_bytes;
-	ppp_xmit_unlock(ppp);
+	ppp_stats_unlock(ppp);
 
 	stats64->rx_errors        = dev->stats.rx_errors;
 	stats64->tx_errors        = dev->stats.tx_errors;
@@ -1230,8 +1230,10 @@ ppp_send_frame(struct ppp *ppp, struct sk_buff *skb)
 #endif /* CONFIG_PPP_FILTER */
 	}
 
+	ppp_stats_lock(ppp);
 	++ppp->stats64.tx_packets;
 	ppp->stats64.tx_bytes += skb->len - 2;
+	ppp_stats_unlock(ppp);
 
 	switch (proto) {
 	case PPP_IP:
@@ -1803,8 +1805,10 @@ ppp_receive_nonmp_frame(struct ppp *ppp, struct sk_buff *skb)
 		break;
 	}
 
+	ppp_stats_lock(ppp);
 	++ppp->stats64.rx_packets;
 	ppp->stats64.rx_bytes += skb->len - 2;
+	ppp_stats_unlock(ppp);
 
 	npi = proto_to_npindex(proto);
 	if (npi < 0) {
@@ -2638,10 +2642,10 @@ void ppp_stat_add(struct ppp_channel *chan, struct sk_buff *skb)
 
 	skb->dev = pch->ppp->dev;
 
-	ppp_recv_lock(ppp);
+	ppp_stats_lock(ppp);
 	ppp->stats64.rx_bytes += skb->len;
 	ppp->stats64.rx_packets++;
-	ppp_recv_unlock(ppp);
+	ppp_stats_unlock(ppp);
 
 	skb->dev->last_rx = jiffies;
 }
@@ -2658,10 +2662,10 @@ void ppp_stat_add_tx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes)
 	if (ppp == NULL)
 		return;
 
-	ppp_xmit_lock(ppp);
+	ppp_stats_lock(ppp);
 	ppp->stats64.tx_bytes += add_bytes;
 	ppp->stats64.tx_packets += add_pkt;
-	ppp_xmit_unlock(ppp);
+	ppp_stats_unlock(ppp);
 }
 
 void ppp_stat_add_rx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes)
@@ -2676,10 +2680,10 @@ void ppp_stat_add_rx(struct ppp_channel *chan, u32 add_pkt, u32 add_bytes)
 	if (ppp == NULL)
 		return;
 
-	ppp_recv_lock(ppp);
+	ppp_stats_lock(ppp);
 	ppp->stats64.rx_bytes += add_bytes;
 	ppp->stats64.rx_packets += add_pkt;
-	ppp_recv_unlock(ppp);
+	ppp_stats_unlock(ppp);
 }
 
 void ppp_stats_set(struct net_device *dev,
@@ -2693,15 +2697,12 @@ void ppp_stats_set(struct net_device *dev,
 
 	ppp = netdev_priv(dev);
 
-	ppp_xmit_lock(ppp);
+	ppp_stats_lock(ppp);
 	ppp->stats64.tx_bytes = tx_bytes;
 	ppp->stats64.tx_packets = tx_packets;
-	ppp_xmit_unlock(ppp);
-
-	ppp_recv_lock(ppp);
 	ppp->stats64.rx_bytes = rx_bytes;
 	ppp->stats64.rx_packets = rx_packets;
-	ppp_recv_unlock(ppp);
+	ppp_stats_unlock(ppp);
 }
 
 /*
@@ -2739,6 +2740,7 @@ ppp_create_interface(struct net *net, int unit, int *retp)
 	INIT_LIST_HEAD(&ppp->channels);
 	spin_lock_init(&ppp->rlock);
 	spin_lock_init(&ppp->wlock);
+	spin_lock_init(&ppp->slock);
 #ifdef CONFIG_PPP_MULTILINK
 	ppp->minseq = -1;
 	skb_queue_head_init(&ppp->mrq);
