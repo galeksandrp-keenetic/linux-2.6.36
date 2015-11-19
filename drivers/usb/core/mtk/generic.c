@@ -164,10 +164,7 @@ static int generic_probe(struct usb_device *udev)
 		;		/* Don't configure if the device is owned */
 	else if (udev->authorized == 0)
 		dev_err(&udev->dev, "Device is not authorized for usage\n");
-	else if (udev->state != USB_STATE_ADDRESS) {
-		dev_dbg(&udev->dev, "Device is not in 'set address' state\n");
-		return 0;
-	} else {
+	else {
 		c = usb_choose_configuration(udev);
 		if (c >= 0) {
 			err = usb_set_configuration(udev, c);

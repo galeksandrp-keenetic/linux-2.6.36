@@ -1839,9 +1839,6 @@ fail:
 	return err;
 }
 
-/* Implementation Microsoft Compatible ID Feature Descriptors, McMCC, 19112013 */
-int (*usb_get_os_str_desc_hook)(struct usb_device *udev) = NULL;
-EXPORT_SYMBOL(usb_get_os_str_desc_hook);
 
 /**
  * usb_enumerate_device - Read device configs/intfs/otg (usbcore-internal)
@@ -1873,18 +1870,11 @@ static int usb_enumerate_device(struct usb_device *udev)
 		udev->serial = kstrdup("n/a (unauthorized)", GFP_KERNEL);
 	}
 	else {
-		int (*usb_get_os_str_descriptor)(struct usb_device *udev);
-		int res = 0;
 		/* read the standard strings and cache them if present */
 		udev->product = usb_cache_string(udev, udev->descriptor.iProduct);
 		udev->manufacturer = usb_cache_string(udev,
 						      udev->descriptor.iManufacturer);
 		udev->serial = usb_cache_string(udev, udev->descriptor.iSerialNumber);
-		/* Get Microsoft Compatible ID Feature Descriptors, McMCC, 19112013 */
-		if((usb_get_os_str_descriptor = rcu_dereference(usb_get_os_str_desc_hook)))
-			res = usb_get_os_str_descriptor(udev);
-		if (res == 1)
-			usb_set_device_state(udev, USB_STATE_RECONNECTING);
 	}
 	err = usb_enumerate_device_otg(udev);
 fail:
