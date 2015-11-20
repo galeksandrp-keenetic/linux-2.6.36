@@ -1013,28 +1013,12 @@ ppp_net_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
 	struct ppp_stats stats;
 	struct ppp_comp_stats cstats;
 	char *vers;
-	struct net_device_stats *nd_stats = NULL;
 
 	switch (cmd) {
 	case SIOCGPPPSTATS:
 		ppp_get_stats(ppp, &stats);
 		if (copy_to_user(addr, &stats, sizeof(stats)))
 			break;
-		err = 0;
-		break;
-
-	case SIOCSPPPSTATS:
-		if((dev->netdev_ops != NULL)
-			&& (dev->netdev_ops->ndo_get_stats != NULL))
-		{
-			nd_stats = dev->netdev_ops->ndo_get_stats(dev);
-		} else {
-			nd_stats = &(dev->stats);
-		}
-
-		if(nd_stats != NULL)
-			memset(nd_stats, '\0', sizeof(struct net_device_stats));
-
 		err = 0;
 		break;
 
