@@ -601,4 +601,81 @@ static inline void debug_rcu_head_unqueue(struct rcu_head *head)
 #define rcu_dereference_index_check(p, c) \
 	__rcu_dereference_index_check((p), (c))
 
+
+static __always_inline void __write_once_size(volatile void *p, void *res, int size)
+{
+	switch (size) {
+		case 1: *(volatile __u8 *)p = *(__u8 *)res; break;
+		case 2: *(volatile __u16 *)p = *(__u16 *)res; break;
+		case 4: *(volatile __u32 *)p = *(__u32 *)res; break;
+		case 8: *(volatile __u64 *)p = *(__u64 *)res; break;
+		default:
+		barrier();
+		__builtin_memcpy((void *)p, (const void *)res, size);
+		barrier();
+	}
+}
+
+#define WRITE_ONCE(x, val) \
+({															\
+	union { typeof(x) __val; char __c[1]; } __u =			\
+			{ .__val = (__force typeof(x)) (val) };			\
+			__write_once_size(&(x), __u.__c, sizeof(x));	\
+			__u.__val;										\
+})
+
+/**
+ * RCU_INITIALIZER() - statically initialize an RCU-protected global variable
+ * @v: The value to statically initialize with.
+ */
+#define RCU_INITIALIZER(v) (typeof(*(v)) __force __rcu *)(v)
+
+#ifdef __CHECKER__
+#define rcu_dereference_sparse(p, space) \
+	((void)(((typeof(*p) space *)p) == p))
+#else /* #ifdef __CHECKER__ */
+#define rcu_dereference_sparse(p, space)
+#endif /* #else #ifdef __CHECKER__ */
+
+/**
+ * RCU_INIT_POINTER() - initialize an RCU protected pointer
+ *
+ * Initialize an RCU-protected pointer in special cases where readers
+ * do not need ordering constraints on the CPU or the compiler.  These
+ * special cases are:
+ *
+ * 1.	This use of RCU_INIT_POINTER() is NULLing out the pointer -or-
+ * 2.	The caller has taken whatever steps are required to prevent
+ *	RCU readers from concurrently accessing this pointer -or-
+ * 3.	The referenced data structure has already been exposed to
+ *	readers either at compile time or via rcu_assign_pointer() -and-
+ *	a.	You have not made -any- reader-visible changes to
+ *		this structure since then -or-
+ *	b.	It is OK for readers accessing this structure from its
+ *		new location to see the old state of the structure.  (For
+ *		example, the changes were to statistical counters or to
+ *		other state where exact synchronization is not required.)
+ *
+ * Failure to follow these rules governing use of RCU_INIT_POINTER() will
+ * result in impossible-to-diagnose memory corruption.  As in the structures
+ * will look OK in crash dumps, but any concurrent RCU readers might
+ * see pre-initialized values of the referenced data structure.  So
+ * please be very careful how you use RCU_INIT_POINTER()!!!
+ *
+ * If you are creating an RCU-protected linked structure that is accessed
+ * by a single external-to-structure RCU-protected pointer, then you may
+ * use RCU_INIT_POINTER() to initialize the internal RCU-protected
+ * pointers, but you must use rcu_assign_pointer() to initialize the
+ * external-to-structure pointer -after- you have completely initialized
+ * the reader-accessible portions of the linked structure.
+ *
+ * Note that unlike rcu_assign_pointer(), RCU_INIT_POINTER() provides no
+ * ordering guarantees for either the CPU or the compiler.
+ */
+#define RCU_INIT_POINTER(p, v) \
+	do { \
+		rcu_dereference_sparse(p, __rcu); \
+		WRITE_ONCE(p, RCU_INITIALIZER(v)); \
+	} while (0)
+
 #endif /* __LINUX_RCUPDATE_H */
