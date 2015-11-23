@@ -64,7 +64,7 @@ int lockdep_rht_mutex_is_held(struct rhashtable *ht)
 {
 	return (debug_locks) ? lockdep_is_held(&ht->mutex) : 1;
 }
-EXPORT_SYMBOL_GPL(lockdep_rht_mutex_is_held);
+EXPORT_SYMBOL(lockdep_rht_mutex_is_held);
 
 int lockdep_rht_bucket_is_held(const struct bucket_table *tbl, u32 hash)
 {
@@ -72,7 +72,7 @@ int lockdep_rht_bucket_is_held(const struct bucket_table *tbl, u32 hash)
 
 	return (debug_locks) ? lockdep_is_held(lock) : 1;
 }
-EXPORT_SYMBOL_GPL(lockdep_rht_bucket_is_held);
+EXPORT_SYMBOL(lockdep_rht_bucket_is_held);
 #else
 #define ASSERT_RHT_MUTEX(HT)
 #endif
@@ -447,7 +447,7 @@ int rhashtable_insert_rehash(struct rhashtable *ht)
 
 	return err;
 }
-EXPORT_SYMBOL_GPL(rhashtable_insert_rehash);
+EXPORT_SYMBOL(rhashtable_insert_rehash);
 
 int rhashtable_insert_slow(struct rhashtable *ht, const void *key,
 			   struct rhash_head *obj,
@@ -489,7 +489,7 @@ exit:
 
 	return err;
 }
-EXPORT_SYMBOL_GPL(rhashtable_insert_slow);
+EXPORT_SYMBOL(rhashtable_insert_slow);
 
 /**
  * rhashtable_walk_init - Initialise an iterator
@@ -530,7 +530,7 @@ int rhashtable_walk_init(struct rhashtable *ht, struct rhashtable_iter *iter)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(rhashtable_walk_init);
+EXPORT_SYMBOL(rhashtable_walk_init);
 
 /**
  * rhashtable_walk_exit - Free an iterator
@@ -546,7 +546,7 @@ void rhashtable_walk_exit(struct rhashtable_iter *iter)
 	mutex_unlock(&iter->ht->mutex);
 	kfree(iter->walker);
 }
-EXPORT_SYMBOL_GPL(rhashtable_walk_exit);
+EXPORT_SYMBOL(rhashtable_walk_exit);
 
 /**
  * rhashtable_walk_start - Start a hash table walk
@@ -583,7 +583,7 @@ int rhashtable_walk_start(struct rhashtable_iter *iter)
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(rhashtable_walk_start);
+EXPORT_SYMBOL(rhashtable_walk_start);
 
 /**
  * rhashtable_walk_next - Return the next object and advance the iterator
@@ -641,7 +641,7 @@ next:
 
 	return NULL;
 }
-EXPORT_SYMBOL_GPL(rhashtable_walk_next);
+EXPORT_SYMBOL(rhashtable_walk_next);
 
 /**
  * rhashtable_walk_stop - Finish a hash table walk
@@ -672,7 +672,7 @@ void rhashtable_walk_stop(struct rhashtable_iter *iter)
 out:
 	rcu_read_unlock();
 }
-EXPORT_SYMBOL_GPL(rhashtable_walk_stop);
+EXPORT_SYMBOL(rhashtable_walk_stop);
 
 static size_t rounded_hashtable_size(const struct rhashtable_params *params)
 {
@@ -807,7 +807,7 @@ int rhashtable_init(struct rhashtable *ht,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(rhashtable_init);
+EXPORT_SYMBOL(rhashtable_init);
 
 /**
  * rhashtable_free_and_destroy - free elements and destroy hash table
@@ -853,10 +853,10 @@ void rhashtable_free_and_destroy(struct rhashtable *ht,
 	bucket_table_free(tbl);
 	mutex_unlock(&ht->mutex);
 }
-EXPORT_SYMBOL_GPL(rhashtable_free_and_destroy);
+EXPORT_SYMBOL(rhashtable_free_and_destroy);
 
 void rhashtable_destroy(struct rhashtable *ht)
 {
 	return rhashtable_free_and_destroy(ht, NULL, NULL);
 }
-EXPORT_SYMBOL_GPL(rhashtable_destroy);
+EXPORT_SYMBOL(rhashtable_destroy);
