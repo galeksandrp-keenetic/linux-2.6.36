@@ -345,10 +345,11 @@ static void mtdoops_do_dump(struct kmsg_dumper *dumper,
 
 	memcpy(dst, s1 + s1_start, l1_cpy);
 	memcpy(dst + l1_cpy, s2 + s2_start, l2_cpy);
+	memset(dst + l1_cpy + l2_cpy - 1, '\0', sizeof(char));
 	
 	//copy fw_version len
 	dst = cxt->oops_buf + MTDOOPS_HEADER_SIZE;
-	size = strlen(fw_version);
+	size = strlen(fw_version) + 1;
 	memcpy(dst, &size, sizeof(u32));
 	
 	//copy fw_version
@@ -357,7 +358,7 @@ static void mtdoops_do_dump(struct kmsg_dumper *dumper,
 
 	//copy fw_name len
 	dst += size;
-	size = strlen(fw_name);
+	size = strlen(fw_name) + 1;
 	memcpy(dst, &size, sizeof(u32));
 
 	//copy fw_name
