@@ -334,8 +334,8 @@ static void mtdoops_do_dump(struct kmsg_dumper *dumper,
 	/* Only dump oopses if dump_oops is set */
 	if (reason == KMSG_DUMP_OOPS && !dump_oops)
 		return;
-	// sizes of fw_v, fw_n, hash, oops buf, version 
-	size_format = sizeof(u32)*5 + strlen(fw_version) + strlen(fw_name) + MTDOOPS_HEADER_SIZE;
+	// sizes of fw_v, fw_n, hash, oops buf, version; 0x00 for strings 
+	size_format = sizeof(u32)*4 + strlen(fw_version) + 2 + strlen(fw_name) + MTDOOPS_HEADER_SIZE;
 	dst = cxt->oops_buf + size_format; /* Skip the header */
 	l2_cpy = min(l2, record_size - size_format);
 	l1_cpy = min(l1, record_size - size_format - l2_cpy);
