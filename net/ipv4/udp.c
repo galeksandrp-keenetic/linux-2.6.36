@@ -2154,7 +2154,7 @@ void udp4_proc_exit(void)
 }
 #endif /* CONFIG_PROC_FS */
 
-static __initdata unsigned long uhash_entries;
+static __initdata unsigned long uhash_entries = UDP_HTABLE_SIZE_MIN;
 static int __init set_uhash_entries(char *str)
 {
 	if (!str)
