@@ -28,11 +28,16 @@
 #include <linux/err.h>
 #include <linux/module.h>
 
+/* vmalloc() seems to be broken, left only kmalloc allocations */
+//#define USE_VMALLOC
+
 void kvfree(const void *addr)
 {
-	if (is_vmalloc_addr(addr))
+#ifdef USE_VMALLOC
+	if (is_vmalloc_addr(addr)) {
 		vfree(addr);
-	else
+	} else
+#endif // USE_VMALLOC
 		kfree(addr);
 }
 
@@ -95,12 +100,12 @@ static int alloc_bucket_locks(struct rhashtable *ht, struct bucket_table *tbl,
 	size = min_t(unsigned int, size, tbl->size >> 1);
 
 	if (sizeof(spinlock_t) != 0) {
-#ifdef CONFIG_NUMA
+#ifdef USE_VMALLOC
 		if (size * sizeof(spinlock_t) > PAGE_SIZE &&
 		    gfp == GFP_KERNEL)
 			tbl->locks = vmalloc(size * sizeof(spinlock_t));
 		else
-#endif
+#endif // USE_VMALLOC
 		tbl->locks = kmalloc_array(size, sizeof(spinlock_t),
 					   gfp);
 		if (!tbl->locks)
@@ -135,11 +140,15 @@ static struct bucket_table *bucket_table_alloc(struct rhashtable *ht,
 	int i;
 
 	size = sizeof(*tbl) + nbuckets * sizeof(tbl->buckets[0]);
+#ifdef USE_VMALLOC
 	if (size <= (PAGE_SIZE << PAGE_ALLOC_COSTLY_ORDER) ||
 	    gfp != GFP_KERNEL)
+#endif // USE_VMALLOC
 		tbl = kzalloc(size, gfp | __GFP_NOWARN | __GFP_NORETRY);
+#ifdef USE_VMALLOC
 	if (tbl == NULL && gfp == GFP_KERNEL)
 		tbl = vmalloc(size);
+#endif // USE_VMALLOC
 	if (tbl == NULL)
 		return NULL;
 
