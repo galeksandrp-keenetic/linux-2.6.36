@@ -319,6 +319,27 @@ static u32 hash_rot13(const char * buf, u32 len)
 	return hash;
 }
 
+static char *find_start_call_trace(char *buf)
+{
+	size_t i = 0,k = 0;
+	int max_nl = 2;
+	char *start = strstr(buf, "Call Trace:");
+	if(!start)
+		return NULL;
+
+	while(i != max_nl){
+		if(start[k] == 0x0a)
+			i++;
+		if(start[k] == 0x00)
+			break;
+		k++;
+	}
+	if(i != max_nl)
+		return NULL;
+
+	return &start[k];
+}
+
 static void mtdoops_do_dump(struct kmsg_dumper *dumper,
 		enum kmsg_dump_reason reason, const char *s1, unsigned long l1,
 		const char *s2, unsigned long l2)
@@ -329,7 +350,7 @@ static void mtdoops_do_dump(struct kmsg_dumper *dumper,
 	unsigned long l1_cpy, l2_cpy;
 	unsigned long size;
 	int size_format;
-	char *dst;
+	char *dst = NULL, *start = NULL;
 
 	/* Only dump oopses if dump_oops is set */
 	if (reason == KMSG_DUMP_OOPS && !dump_oops)
@@ -367,7 +388,18 @@ static void mtdoops_do_dump(struct kmsg_dumper *dumper,
 
 	//hash of oops buf
 	dst += size;
-	size = hash_rot13(cxt->oops_buf + size_format, l1_cpy + l2_cpy);
+	start = find_start_call_trace(cxt->oops_buf + size_format);
+	if(start){
+		int count;
+		char *end = strstr(start, "Code:");
+		if(!end)
+			count = strlen(start);
+		else
+			count = end - start;
+		size = hash_rot13(start, count);
+	}
+	else
+		size = hash_rot13(cxt->oops_buf + size_format, l1_cpy + l2_cpy);
 	memcpy(dst, &size, sizeof(u32));
 
 	//size of oops buf
